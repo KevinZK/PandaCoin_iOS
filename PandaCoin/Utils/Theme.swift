@@ -1,0 +1,98 @@
+//
+//  Theme.swift
+//  PandaCoin
+//
+//  Created by kevin on 2025/11/20.
+//
+
+import SwiftUI
+
+// MARK: - 颜色主题配置
+struct Theme {
+    // MARK: - 主色调
+    static let bambooGreen = Color(hex: "#2ECC71")
+    static let pandaBlack = Color(hex: "#2C3E50")
+    static let offWhite = Color(hex: "#F5F7FA")
+    static let coralRed = Color(hex: "#FF6B6B")
+    
+    // MARK: - 语义化颜色
+    static let income = bambooGreen
+    static let expense = coralRed
+    static let background = offWhite
+    static let text = pandaBlack
+    static let textSecondary = Color.gray
+    
+    // MARK: - 渐变色
+    static let incomeGradient = LinearGradient(
+        colors: [bambooGreen, bambooGreen.opacity(0.7)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    
+    static let expenseGradient = LinearGradient(
+        colors: [coralRed, coralRed.opacity(0.7)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
+// MARK: - 字体配置
+struct AppFont {
+    // 数字专用字体(等宽)
+    static func monoNumber(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .monospaced)
+    }
+    
+    // 标题字体
+    static func title(size: CGFloat = 28) -> Font {
+        .system(size: size, weight: .bold, design: .default)
+    }
+    
+    // 正文字体
+    static func body(size: CGFloat = 16, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .default)
+    }
+}
+
+// MARK: - Color扩展 (支持十六进制)
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 6: // RGB
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
+
+// MARK: - 圆角配置
+struct CornerRadius {
+    static let small: CGFloat = 8
+    static let medium: CGFloat = 12
+    static let large: CGFloat = 20
+    static let extraLarge: CGFloat = 28
+}
+
+// MARK: - 间距配置
+struct Spacing {
+    static let tiny: CGFloat = 4
+    static let small: CGFloat = 8
+    static let medium: CGFloat = 16
+    static let large: CGFloat = 24
+    static let extraLarge: CGFloat = 32
+}

@@ -1,0 +1,134 @@
+/* 中文（简体） */
+
+/* Common */
+"app_name" = "熊猫记账";
+"common_confirm" = "确认";
+"common_cancel" = "取消";
+"common_save" = "保存";
+"common_delete" = "删除";
+"common_edit" = "编辑";
+"common_add" = "添加";
+"common_close" = "关闭";
+"common_loading" = "加载中...";
+"common_done" = "完成";
+"common_search" = "搜索";
+"common_all" = "全部";
+
+/* Auth */
+"auth_login" = "登录";
+"auth_register" = "注册";
+"auth_logout" = "退出登录";
+"auth_email" = "邮箱";
+"auth_password" = "密码";
+"auth_confirm_password" = "确认密码";
+"auth_name" = "姓名";
+"auth_welcome_back" = "欢迎回来";
+"auth_create_account" = "创建账户";
+"auth_email_placeholder" = "请输入邮箱";
+"auth_password_placeholder" = "请输入密码";
+"auth_name_placeholder" = "请输入姓名（可选）";
+"auth_no_account" = "还没有账号？";
+"auth_has_account" = "已有账号？";
+
+/* TabBar */
+"tab_home" = "首页";
+"tab_records" = "记录";
+"tab_statistics" = "统计";
+"tab_accounts" = "账户";
+
+/* Dashboard */
+"dashboard_total_assets" = "总资产";
+"dashboard_net_assets" = "净资产";
+"dashboard_month_income" = "收入";
+"dashboard_month_expense" = "支出";
+"dashboard_budget_progress" = "预算进度";
+"dashboard_quick_actions" = "快捷操作";
+"dashboard_recent_records" = "最近记录";
+"dashboard_view_all" = "查看全部";
+
+/* Voice */
+"voice_record" = "语音记账";
+"voice_listening" = "正在听...";
+"voice_tap_to_record" = "按住记账";
+"voice_hold_to_speak" = "按住说话";
+"voice_confirm_records" = "确认记账";
+"voice_panda_says" = "熊猫已经为你整理好啦";
+
+/* Account */
+"account_management" = "账户管理";
+"account_add" = "添加账户";
+"account_edit" = "编辑账户";
+"account_name" = "账户名称";
+"account_type" = "账户类型";
+"account_balance" = "余额";
+"account_initial_balance" = "初始余额";
+"account_current_balance" = "当前余额";
+"account_delete" = "删除账户";
+"account_delete_confirm" = "确定要删除这个账户吗？相关的记账记录也将被删除。";
+"account_no_accounts" = "还没有账户";
+"account_add_hint" = "点击右上角 + 添加账户";
+
+"account_type_bank" = "银行卡";
+"account_type_investment" = "投资账户";
+"account_type_cash" = "现金";
+"account_type_credit_card" = "信用卡";
+
+/* Record */
+"record_records" = "记账记录";
+"record_add" = "添加记录";
+"record_manual" = "手动记账";
+"record_type" = "类型";
+"record_amount" = "金额";
+"record_category" = "分类";
+"record_description" = "备注";
+"record_date" = "日期";
+"record_no_records" = "还没有记账记录";
+"record_start_hint" = "点击右上角 + 开始记账";
+
+"record_type_expense" = "支出";
+"record_type_income" = "收入";
+"record_type_transfer" = "转账";
+
+/* Categories */
+"category_food" = "餐饮";
+"category_transport" = "交通";
+"category_shopping" = "购物";
+"category_entertainment" = "娱乐";
+"category_medical" = "医疗";
+"category_housing" = "住房";
+"category_education" = "教育";
+"category_communication" = "通讯";
+"category_sports" = "运动";
+"category_beauty" = "美容";
+"category_travel" = "旅行";
+"category_other" = "其他";
+
+"category_salary" = "工资";
+"category_bonus" = "奖金";
+"category_investment" = "投资";
+"category_parttime" = "兼职";
+
+/* Statistics */
+"statistics_title" = "统计报表";
+"statistics_this_month" = "本月";
+"statistics_this_year" = "本年";
+"statistics_total_income" = "总收入";
+"statistics_total_expense" = "总支出";
+"statistics_net_income" = "净收入";
+"statistics_expense_distribution" = "支出分布";
+"statistics_expense_ranking" = "支出排行";
+"statistics_no_data" = "暂无数据";
+
+/* Settings */
+"settings_title" = "设置";
+"settings_language" = "语言";
+"settings_currency" = "货币";
+"settings_theme" = "主题";
+"settings_about" = "关于";
+
+/* Errors */
+"error_invalid_email" = "请输入有效的邮箱地址";
+"error_password_too_short" = "密码至少需要6个字符";
+"error_password_mismatch" = "两次输入的密码不一致";
+"error_network" = "网络连接失败，请检查网络设置";
+"error_unknown" = "发生未知错误";

@@ -1,0 +1,134 @@
+/* Español */
+
+/* Common */
+"app_name" = "PandaCoin";
+"common_confirm" = "Confirmar";
+"common_cancel" = "Cancelar";
+"common_save" = "Guardar";
+"common_delete" = "Eliminar";
+"common_edit" = "Editar";
+"common_add" = "Añadir";
+"common_close" = "Cerrar";
+"common_loading" = "Cargando...";
+"common_done" = "Hecho";
+"common_search" = "Buscar";
+"common_all" = "Todo";
+
+/* Auth */
+"auth_login" = "Iniciar sesión";
+"auth_register" = "Registrarse";
+"auth_logout" = "Cerrar sesión";
+"auth_email" = "Correo electrónico";
+"auth_password" = "Contraseña";
+"auth_confirm_password" = "Confirmar contraseña";
+"auth_name" = "Nombre";
+"auth_welcome_back" = "Bienvenido de nuevo";
+"auth_create_account" = "Crear cuenta";
+"auth_email_placeholder" = "Ingrese su correo electrónico";
+"auth_password_placeholder" = "Ingrese su contraseña";
+"auth_name_placeholder" = "Ingrese su nombre (opcional)";
+"auth_no_account" = "¿No tienes una cuenta?";
+"auth_has_account" = "¿Ya tienes una cuenta?";
+
+/* TabBar */
+"tab_home" = "Inicio";
+"tab_records" = "Registros";
+"tab_statistics" = "Estadísticas";
+"tab_accounts" = "Cuentas";
+
+/* Dashboard */
+"dashboard_total_assets" = "Activos totales";
+"dashboard_net_assets" = "Activos netos";
+"dashboard_month_income" = "Ingresos";
+"dashboard_month_expense" = "Gastos";
+"dashboard_budget_progress" = "Progreso del presupuesto";
+"dashboard_quick_actions" = "Acciones rápidas";
+"dashboard_recent_records" = "Registros recientes";
+"dashboard_view_all" = "Ver todo";
+
+/* Voice */
+"voice_record" = "Grabación de voz";
+"voice_listening" = "Escuchando...";
+"voice_tap_to_record" = "Toca para grabar";
+"voice_hold_to_speak" = "Mantén presionado para hablar";
+"voice_confirm_records" = "Confirmar registros";
+"voice_panda_says" = "Panda lo ha organizado para ti";
+
+/* Account */
+"account_management" = "Gestión de cuentas";
+"account_add" = "Añadir cuenta";
+"account_edit" = "Editar cuenta";
+"account_name" = "Nombre de la cuenta";
+"account_type" = "Tipo de cuenta";
+"account_balance" = "Saldo";
+"account_initial_balance" = "Saldo inicial";
+"account_current_balance" = "Saldo actual";
+"account_delete" = "Eliminar cuenta";
+"account_delete_confirm" = "¿Está seguro de que desea eliminar esta cuenta? Los registros relacionados también se eliminarán.";
+"account_no_accounts" = "Aún no hay cuentas";
+"account_add_hint" = "Toca + en la esquina superior derecha para agregar una cuenta";
+
+"account_type_bank" = "Tarjeta bancaria";
+"account_type_investment" = "Inversión";
+"account_type_cash" = "Efectivo";
+"account_type_credit_card" = "Tarjeta de crédito";
+
+/* Record */
+"record_records" = "Registros";
+"record_add" = "Añadir registro";
+"record_manual" = "Registro manual";
+"record_type" = "Tipo";
+"record_amount" = "Cantidad";
+"record_category" = "Categoría";
+"record_description" = "Descripción";
+"record_date" = "Fecha";
+"record_no_records" = "Aún no hay registros";
+"record_start_hint" = "Toca + en la esquina superior derecha para comenzar";
+
+"record_type_expense" = "Gasto";
+"record_type_income" = "Ingreso";
+"record_type_transfer" = "Transferencia";
+
+/* Categories */
+"category_food" = "Comida";
+"category_transport" = "Transporte";
+"category_shopping" = "Compras";
+"category_entertainment" = "Entretenimiento";
+"category_medical" = "Médico";
+"category_housing" = "Vivienda";
+"category_education" = "Educación";
+"category_communication" = "Comunicación";
+"category_sports" = "Deportes";
+"category_beauty" = "Belleza";
+"category_travel" = "Viajes";
+"category_other" = "Otro";
+
+"category_salary" = "Salario";
+"category_bonus" = "Bonificación";
+"category_investment" = "Inversión";
+"category_parttime" = "Tiempo parcial";
+
+/* Statistics */
+"statistics_title" = "Estadísticas";
+"statistics_this_month" = "Este mes";
+"statistics_this_year" = "Este año";
+"statistics_total_income" = "Ingresos totales";
+"statistics_total_expense" = "Gastos totales";
+"statistics_net_income" = "Ingresos netos";
+"statistics_expense_distribution" = "Distribución de gastos";
+"statistics_expense_ranking" = "Clasificación de gastos";
+"statistics_no_data" = "No hay datos disponibles";
+
+/* Settings */
+"settings_title" = "Configuración";
+"settings_language" = "Idioma";
+"settings_currency" = "Moneda";
+"settings_theme" = "Tema";
+"settings_about" = "Acerca de";
+
+/* Errors */
+"error_invalid_email" = "Por favor, ingrese una dirección de correo electrónico válida";
+"error_password_too_short" = "La contraseña debe tener al menos 6 caracteres";
+"error_password_mismatch" = "Las contraseñas no coinciden";
+"error_network" = "Error de conexión de red. Por favor, verifique su configuración de red";
+"error_unknown" = "Se produjo un error desconocido";

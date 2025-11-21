@@ -9,9 +9,24 @@ import SwiftUI
 
 @main
 struct PandaCoinApp: App {
+    init() {
+        // 配置全局外观
+        setupAppearance()
+    }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
         }
+    }
+    
+    private func setupAppearance() {
+        // 配置导航栏样式
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(Theme.background)
+        
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
     }
 }

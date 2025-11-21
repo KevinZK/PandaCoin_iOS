@@ -1,0 +1,134 @@
+/* Deutsch */
+
+/* Common */
+"app_name" = "PandaCoin";
+"common_confirm" = "Bestätigen";
+"common_cancel" = "Abbrechen";
+"common_save" = "Speichern";
+"common_delete" = "Löschen";
+"common_edit" = "Bearbeiten";
+"common_add" = "Hinzufügen";
+"common_close" = "Schließen";
+"common_loading" = "Laden...";
+"common_done" = "Fertig";
+"common_search" = "Suchen";
+"common_all" = "Alle";
+
+/* Auth */
+"auth_login" = "Anmelden";
+"auth_register" = "Registrieren";
+"auth_logout" = "Abmelden";
+"auth_email" = "E-Mail";
+"auth_password" = "Passwort";
+"auth_confirm_password" = "Passwort bestätigen";
+"auth_name" = "Name";
+"auth_welcome_back" = "Willkommen zurück";
+"auth_create_account" = "Konto erstellen";
+"auth_email_placeholder" = "E-Mail eingeben";
+"auth_password_placeholder" = "Passwort eingeben";
+"auth_name_placeholder" = "Name eingeben (optional)";
+"auth_no_account" = "Noch kein Konto?";
+"auth_has_account" = "Bereits ein Konto?";
+
+/* TabBar */
+"tab_home" = "Start";
+"tab_records" = "Einträge";
+"tab_statistics" = "Statistiken";
+"tab_accounts" = "Konten";
+
+/* Dashboard */
+"dashboard_total_assets" = "Gesamtvermögen";
+"dashboard_net_assets" = "Nettovermögen";
+"dashboard_month_income" = "Einkommen";
+"dashboard_month_expense" = "Ausgaben";
+"dashboard_budget_progress" = "Budgetfortschritt";
+"dashboard_quick_actions" = "Schnellaktionen";
+"dashboard_recent_records" = "Letzte Einträge";
+"dashboard_view_all" = "Alle anzeigen";
+
+/* Voice */
+"voice_record" = "Sprachaufnahme";
+"voice_listening" = "Hört zu...";
+"voice_tap_to_record" = "Tippen zum Aufnehmen";
+"voice_hold_to_speak" = "Halten zum Sprechen";
+"voice_confirm_records" = "Einträge bestätigen";
+"voice_panda_says" = "Panda hat es für Sie organisiert";
+
+/* Account */
+"account_management" = "Kontenverwaltung";
+"account_add" = "Konto hinzufügen";
+"account_edit" = "Konto bearbeiten";
+"account_name" = "Kontoname";
+"account_type" = "Kontotyp";
+"account_balance" = "Saldo";
+"account_initial_balance" = "Anfangssaldo";
+"account_current_balance" = "Aktueller Saldo";
+"account_delete" = "Konto löschen";
+"account_delete_confirm" = "Möchten Sie dieses Konto wirklich löschen? Zugehörige Einträge werden ebenfalls gelöscht.";
+"account_no_accounts" = "Noch keine Konten";
+"account_add_hint" = "Tippen Sie oben rechts auf +, um ein Konto hinzuzufügen";
+
+"account_type_bank" = "Bankkarte";
+"account_type_investment" = "Investition";
+"account_type_cash" = "Bargeld";
+"account_type_credit_card" = "Kreditkarte";
+
+/* Record */
+"record_records" = "Einträge";
+"record_add" = "Eintrag hinzufügen";
+"record_manual" = "Manueller Eintrag";
+"record_type" = "Typ";
+"record_amount" = "Betrag";
+"record_category" = "Kategorie";
+"record_description" = "Beschreibung";
+"record_date" = "Datum";
+"record_no_records" = "Noch keine Einträge";
+"record_start_hint" = "Tippen Sie oben rechts auf +, um einen Eintrag zu erstellen";
+
+"record_type_expense" = "Ausgabe";
+"record_type_income" = "Einkommen";
+"record_type_transfer" = "Überweisung";
+
+/* Categories */
+"category_food" = "Essen & Trinken";
+"category_transport" = "Transport";
+"category_shopping" = "Einkaufen";
+"category_entertainment" = "Unterhaltung";
+"category_medical" = "Medizinisch";
+"category_housing" = "Wohnen";
+"category_education" = "Bildung";
+"category_communication" = "Kommunikation";
+"category_sports" = "Sport";
+"category_beauty" = "Schönheit";
+"category_travel" = "Reisen";
+"category_other" = "Sonstiges";
+
+"category_salary" = "Gehalt";
+"category_bonus" = "Bonus";
+"category_investment" = "Investition";
+"category_parttime" = "Teilzeit";
+
+/* Statistics */
+"statistics_title" = "Statistiken";
+"statistics_this_month" = "Dieser Monat";
+"statistics_this_year" = "Dieses Jahr";
+"statistics_total_income" = "Gesamteinkommen";
+"statistics_total_expense" = "Gesamtausgaben";
+"statistics_net_income" = "Nettoeinkommen";
+"statistics_expense_distribution" = "Ausgabenverteilung";
+"statistics_expense_ranking" = "Ausgabenrangliste";
+"statistics_no_data" = "Keine Daten verfügbar";
+
+/* Settings */
+"settings_title" = "Einstellungen";
+"settings_language" = "Sprache";
+"settings_currency" = "Währung";
+"settings_theme" = "Design";
+"settings_about" = "Über";
+
+/* Errors */
+"error_invalid_email" = "Bitte geben Sie eine gültige E-Mail-Adresse ein";
+"error_password_too_short" = "Passwort muss mindestens 6 Zeichen lang sein";
+"error_password_mismatch" = "Passwörter stimmen nicht überein";
+"error_network" = "Netzwerkverbindung fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkeinstellungen";
+"error_unknown" = "Ein unbekannter Fehler ist aufgetreten";

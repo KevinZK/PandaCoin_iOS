@@ -1,0 +1,134 @@
+/* 한국어 */
+
+/* Common */
+"app_name" = "PandaCoin";
+"common_confirm" = "확인";
+"common_cancel" = "취소";
+"common_save" = "저장";
+"common_delete" = "삭제";
+"common_edit" = "편집";
+"common_add" = "추가";
+"common_close" = "닫기";
+"common_loading" = "로딩 중...";
+"common_done" = "완료";
+"common_search" = "검색";
+"common_all" = "전체";
+
+/* Auth */
+"auth_login" = "로그인";
+"auth_register" = "회원가입";
+"auth_logout" = "로그아웃";
+"auth_email" = "이메일";
+"auth_password" = "비밀번호";
+"auth_confirm_password" = "비밀번호 확인";
+"auth_name" = "이름";
+"auth_welcome_back" = "다시 오신 것을 환영합니다";
+"auth_create_account" = "계정 만들기";
+"auth_email_placeholder" = "이메일 입력";
+"auth_password_placeholder" = "비밀번호 입력";
+"auth_name_placeholder" = "이름 입력 (선택사항)";
+"auth_no_account" = "계정이 없으신가요?";
+"auth_has_account" = "이미 계정이 있으신가요?";
+
+/* TabBar */
+"tab_home" = "홈";
+"tab_records" = "기록";
+"tab_statistics" = "통계";
+"tab_accounts" = "계좌";
+
+/* Dashboard */
+"dashboard_total_assets" = "총 자산";
+"dashboard_net_assets" = "순자산";
+"dashboard_month_income" = "수입";
+"dashboard_month_expense" = "지출";
+"dashboard_budget_progress" = "예산 진행률";
+"dashboard_quick_actions" = "빠른 실행";
+"dashboard_recent_records" = "최근 기록";
+"dashboard_view_all" = "모두 보기";
+
+/* Voice */
+"voice_record" = "음성 기록";
+"voice_listening" = "듣는 중...";
+"voice_tap_to_record" = "탭하여 기록";
+"voice_hold_to_speak" = "길게 눌러 말하기";
+"voice_confirm_records" = "기록 확인";
+"voice_panda_says" = "판다가 정리했습니다";
+
+/* Account */
+"account_management" = "계좌 관리";
+"account_add" = "계좌 추가";
+"account_edit" = "계좌 편집";
+"account_name" = "계좌명";
+"account_type" = "계좌 유형";
+"account_balance" = "잔액";
+"account_initial_balance" = "초기 잔액";
+"account_current_balance" = "현재 잔액";
+"account_delete" = "계좌 삭제";
+"account_delete_confirm" = "이 계좌를 삭제하시겠습니까? 관련 기록도 함께 삭제됩니다.";
+"account_no_accounts" = "계좌가 없습니다";
+"account_add_hint" = "오른쪽 상단의 +를 탭하여 계좌 추가";
+
+"account_type_bank" = "은행 카드";
+"account_type_investment" = "투자 계좌";
+"account_type_cash" = "현금";
+"account_type_credit_card" = "신용카드";
+
+/* Record */
+"record_records" = "기록";
+"record_add" = "기록 추가";
+"record_manual" = "수동 기록";
+"record_type" = "유형";
+"record_amount" = "금액";
+"record_category" = "카테고리";
+"record_description" = "메모";
+"record_date" = "날짜";
+"record_no_records" = "기록이 없습니다";
+"record_start_hint" = "오른쪽 상단의 +를 탭하여 기록 시작";
+
+"record_type_expense" = "지출";
+"record_type_income" = "수입";
+"record_type_transfer" = "이체";
+
+/* Categories */
+"category_food" = "식비";
+"category_transport" = "교통";
+"category_shopping" = "쇼핑";
+"category_entertainment" = "오락";
+"category_medical" = "의료";
+"category_housing" = "주거";
+"category_education" = "교육";
+"category_communication" = "통신";
+"category_sports" = "스포츠";
+"category_beauty" = "미용";
+"category_travel" = "여행";
+"category_other" = "기타";
+
+"category_salary" = "급여";
+"category_bonus" = "보너스";
+"category_investment" = "투자";
+"category_parttime" = "아르바이트";
+
+/* Statistics */
+"statistics_title" = "통계";
+"statistics_this_month" = "이번 달";
+"statistics_this_year" = "올해";
+"statistics_total_income" = "총 수입";
+"statistics_total_expense" = "총 지출";
+"statistics_net_income" = "순수입";
+"statistics_expense_distribution" = "지출 분포";
+"statistics_expense_ranking" = "지출 순위";
+"statistics_no_data" = "데이터가 없습니다";
+
+/* Settings */
+"settings_title" = "설정";
+"settings_language" = "언어";
+"settings_currency" = "통화";
+"settings_theme" = "테마";
+"settings_about" = "정보";
+
+/* Errors */
+"error_invalid_email" = "유효한 이메일 주소를 입력하세요";
+"error_password_too_short" = "비밀번호는 최소 6자 이상이어야 합니다";
+"error_password_mismatch" = "비밀번호가 일치하지 않습니다";
+"error_network" = "네트워크 연결에 실패했습니다. 네트워크 설정을 확인하세요";
+"error_unknown" = "알 수 없는 오류가 발생했습니다";

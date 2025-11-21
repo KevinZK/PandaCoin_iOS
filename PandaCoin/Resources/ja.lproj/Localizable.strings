@@ -1,0 +1,134 @@
+/* 日本語 */
+
+/* Common */
+"app_name" = "PandaCoin";
+"common_confirm" = "確認";
+"common_cancel" = "キャンセル";
+"common_save" = "保存";
+"common_delete" = "削除";
+"common_edit" = "編集";
+"common_add" = "追加";
+"common_close" = "閉じる";
+"common_loading" = "読み込み中...";
+"common_done" = "完了";
+"common_search" = "検索";
+"common_all" = "すべて";
+
+/* Auth */
+"auth_login" = "ログイン";
+"auth_register" = "登録";
+"auth_logout" = "ログアウト";
+"auth_email" = "メール";
+"auth_password" = "パスワード";
+"auth_confirm_password" = "パスワード確認";
+"auth_name" = "名前";
+"auth_welcome_back" = "おかえりなさい";
+"auth_create_account" = "アカウント作成";
+"auth_email_placeholder" = "メールアドレスを入力";
+"auth_password_placeholder" = "パスワードを入力";
+"auth_name_placeholder" = "名前を入力（任意）";
+"auth_no_account" = "アカウントをお持ちでない方";
+"auth_has_account" = "すでにアカウントをお持ちの方";
+
+/* TabBar */
+"tab_home" = "ホーム";
+"tab_records" = "記録";
+"tab_statistics" = "統計";
+"tab_accounts" = "口座";
+
+/* Dashboard */
+"dashboard_total_assets" = "総資産";
+"dashboard_net_assets" = "純資産";
+"dashboard_month_income" = "収入";
+"dashboard_month_expense" = "支出";
+"dashboard_budget_progress" = "予算進捗";
+"dashboard_quick_actions" = "クイックアクション";
+"dashboard_recent_records" = "最近の記録";
+"dashboard_view_all" = "すべて表示";
+
+/* Voice */
+"voice_record" = "音声記録";
+"voice_listening" = "聞いています...";
+"voice_tap_to_record" = "タップして記録";
+"voice_hold_to_speak" = "長押しして話す";
+"voice_confirm_records" = "記録を確認";
+"voice_panda_says" = "パンダが整理しました";
+
+/* Account */
+"account_management" = "口座管理";
+"account_add" = "口座追加";
+"account_edit" = "口座編集";
+"account_name" = "口座名";
+"account_type" = "口座種類";
+"account_balance" = "残高";
+"account_initial_balance" = "初期残高";
+"account_current_balance" = "現在の残高";
+"account_delete" = "口座削除";
+"account_delete_confirm" = "この口座を削除してもよろしいですか？関連する記録も削除されます。";
+"account_no_accounts" = "口座がありません";
+"account_add_hint" = "右上の + をタップして口座を追加";
+
+"account_type_bank" = "銀行カード";
+"account_type_investment" = "投資口座";
+"account_type_cash" = "現金";
+"account_type_credit_card" = "クレジットカード";
+
+/* Record */
+"record_records" = "記録";
+"record_add" = "記録追加";
+"record_manual" = "手動記録";
+"record_type" = "種類";
+"record_amount" = "金額";
+"record_category" = "カテゴリー";
+"record_description" = "備考";
+"record_date" = "日付";
+"record_no_records" = "記録がありません";
+"record_start_hint" = "右上の + をタップして記録を開始";
+
+"record_type_expense" = "支出";
+"record_type_income" = "収入";
+"record_type_transfer" = "振替";
+
+/* Categories */
+"category_food" = "食事";
+"category_transport" = "交通";
+"category_shopping" = "ショッピング";
+"category_entertainment" = "娯楽";
+"category_medical" = "医療";
+"category_housing" = "住宅";
+"category_education" = "教育";
+"category_communication" = "通信";
+"category_sports" = "スポーツ";
+"category_beauty" = "美容";
+"category_travel" = "旅行";
+"category_other" = "その他";
+
+"category_salary" = "給料";
+"category_bonus" = "ボーナス";
+"category_investment" = "投資";
+"category_parttime" = "アルバイト";
+
+/* Statistics */
+"statistics_title" = "統計";
+"statistics_this_month" = "今月";
+"statistics_this_year" = "今年";
+"statistics_total_income" = "総収入";
+"statistics_total_expense" = "総支出";
+"statistics_net_income" = "純収入";
+"statistics_expense_distribution" = "支出分布";
+"statistics_expense_ranking" = "支出ランキング";
+"statistics_no_data" = "データがありません";
+
+/* Settings */
+"settings_title" = "設定";
+"settings_language" = "言語";
+"settings_currency" = "通貨";
+"settings_theme" = "テーマ";
+"settings_about" = "について";
+
+/* Errors */
+"error_invalid_email" = "有効なメールアドレスを入力してください";
+"error_password_too_short" = "パスワードは6文字以上必要です";
+"error_password_mismatch" = "パスワードが一致しません";
+"error_network" = "ネットワーク接続に失敗しました。ネットワーク設定を確認してください";
+"error_unknown" = "不明なエラーが発生しました";
