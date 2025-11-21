@@ -25,6 +25,48 @@ struct DashboardView: View {
         ("12/12", 2500),
         ("12/13", 2100)
     ]
+    @State private var breathingPhase = false
+    @State private var breathingAnimationStarted = false
+    
+    private var indexedChartData: [(index: Int, label: String, value: Double)] {
+        chartData.enumerated().map { (index, element) in
+            (index: index, label: element.0, value: element.1)
+        }
+    }
+    
+    private let maxVisiblePoints: Int = 6
+    
+    private var displayedChartData: [(index: Int, label: String, value: Double)] {
+        guard indexedChartData.count > maxVisiblePoints else {
+            return indexedChartData
+        }
+        return Array(indexedChartData.suffix(maxVisiblePoints))
+    }
+    
+    private var extendedChartData: [(index: Double, label: String, value: Double)] {
+        guard let first = displayedChartData.first, let last = displayedChartData.last else { return [] }
+        
+        var data = displayedChartData.map { (index: Double($0.index), label: $0.label, value: $0.value) }
+        
+        // 在首尾添加额外的数据点，用于延伸线条
+        // 使用 -0.5 和 count-0.5 作为延伸点，配合 Domain 设置实现全屏效果
+        // 值保持与首尾点一致，形成平滑延伸
+        data.insert((index: Double(first.index) - 0.5, label: "", value: first.value), at: 0)
+        data.append((index: Double(last.index) + 0.5, label: "", value: last.value))
+        
+        return data
+    }
+    
+    private var chartDomain: ClosedRange<Double> {
+        guard let minIndex = displayedChartData.map({ $0.index }).min(),
+              let maxIndex = displayedChartData.map({ $0.index }).max() else {
+            return 0...1
+        }
+        
+        // 扩大 Domain 范围，使实际数据点向内收缩，留出 breathing space
+        // 0.5 的偏移量对应延伸数据点的位置
+        return (Double(minIndex) - 0.5)...(Double(maxIndex) + 0.5)
+    }
     
     // 导航状态
     @State private var showAccounts = false
@@ -86,7 +128,6 @@ struct DashboardView: View {
                     
                     // 图表区域
                     chartSection
-                        .padding(.horizontal, Spacing.large)
                     
                     Spacer()
                     
@@ -135,6 +176,7 @@ struct DashboardView: View {
         }
         .onAppear {
             loadData()
+            startBreathingAnimation()
         }
     }
     
@@ -155,44 +197,91 @@ struct DashboardView: View {
     // MARK: - 图表区域
     private var chartSection: some View {
         VStack(spacing: Spacing.medium) {
-            // 简单的收支趋势图
-            Chart(chartData, id: \.0) { item in
-                LineMark(
-                    x: .value("Date", item.0),
-                    y: .value("Amount", item.1)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.green.opacity(0.6), .green.opacity(0.3)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: 3))
-                
-                AreaMark(
-                    x: .value("Date", item.0),
-                    y: .value("Amount", item.1)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.green.opacity(0.2), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .interpolationMethod(.catmullRom)
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisValueLabel()
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.black.opacity(0.4))
+            if displayedChartData.isEmpty {
+                Text("暂无数据")
+                    .frame(height: 220)
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(.gray)
+            } else {
+                Chart {
+                    // 线条和区域使用扩展数据源（包含延伸点）
+                    ForEach(extendedChartData, id: \.index) { item in
+                        LineMark(
+                            x: .value("Index", item.index),
+                            y: .value("Amount", item.value)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green.opacity(0.8), .green.opacity(0.4)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .lineStyle(StrokeStyle(lineWidth: 3))
+                        
+                        AreaMark(
+                            x: .value("Index", item.index),
+                            y: .value("Amount", item.value)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green.opacity(0.25), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+                    }
+                    
+                    // 数据点和标签只使用真实数据源
+                    ForEach(displayedChartData, id: \.index) { item in
+                        PointMark(
+                            x: .value("Index", Double(item.index)),
+                            y: .value("Amount", item.value)
+                        )
+                        .symbol {
+                            ZStack {
+                                // 呼吸光晕
+                                Circle()
+                                    .fill(Theme.income.opacity(0.3))
+                                    .frame(width: 24, height: 24)
+                                    .scaleEffect(breathingPhase ? 1.2 : 0.8)
+                                    .opacity(breathingPhase ? 1.0 : 0.5)
+                                
+                                // 实心点
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 12, height: 12)
+                                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Theme.income, lineWidth: 2)
+                                    )
+                            }
+                        }
+                        .annotation(position: .bottom, alignment: .center, spacing: 10) {
+                            Text(formatChartAmount(item.value))
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Theme.income)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                                .shadow(color: Theme.income.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
+                    }
                 }
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                    .chartXScale(domain: chartDomain)
+                    .chartPlotStyle { plotArea in
+                        plotArea
+                            .frame(height: 220)
+                    }
+                    .frame(maxWidth: .infinity)
             }
-            .chartYAxis(.hidden)
-            .frame(height: 200)
             
             // 分页指示器
             HStack(spacing: 8) {
@@ -262,6 +351,25 @@ struct DashboardView: View {
     }
     
     // MARK: - 辅助方法
+    private func startBreathingAnimation() {
+        guard !breathingAnimationStarted else { return }
+        breathingAnimationStarted = true
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            breathingPhase.toggle()
+        }
+    }
+    
+    private func formatChartAmount(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        formatter.groupingSeparator = ","
+        
+        let number = NSNumber(value: value)
+        let formatted = formatter.string(from: number) ?? "\(Int(value))"
+        return "¥\(formatted)"
+    }
+    
     private func formatCurrency(_ amount: Decimal) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
