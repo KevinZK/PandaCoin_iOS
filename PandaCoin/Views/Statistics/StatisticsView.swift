@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(Charts)
 import Charts
+#endif
 
 struct StatisticsView: View {
     @StateObject private var recordService = RecordService()
@@ -112,17 +114,30 @@ struct StatisticsView: View {
                     .frame(height: 200)
                     .frame(maxWidth: .infinity)
             } else {
-                Chart(categoryData, id: \.0) { item in
-                    SectorMark(
-                        angle: .value("金额", item.1),
-                        innerRadius: .ratio(0.6),
-                        angularInset: 2
-                    )
-                    .foregroundStyle(by: .value("分类", item.0))
-                    .cornerRadius(4)
+                if #available(iOS 17.0, *) {
+                    Chart(categoryData, id: \.0) { item in
+                        SectorMark(
+                            angle: .value("金额", item.1),
+                            innerRadius: .ratio(0.6),
+                            angularInset: 2
+                        )
+                        .foregroundStyle(by: .value("分类", item.0))
+                        .cornerRadius(4)
+                    }
+                    .frame(height: 250)
+                    .padding()
+                } else if #available(iOS 16.0, *) {
+                    // iOS 16 不支持 SectorMark
+                    Text("饼图功能需要 iOS 17.0 或更高版本")
+                        .foregroundColor(.gray)
+                        .frame(height: 250)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("图表功能需要 iOS 16.0 或更高版本")
+                        .foregroundColor(.gray)
+                        .frame(height: 250)
+                        .frame(maxWidth: .infinity)
                 }
-                .frame(height: 250)
-                .padding()
             }
         }
         .background(Color.white)

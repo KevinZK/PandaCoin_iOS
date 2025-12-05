@@ -10,6 +10,9 @@ import SwiftUI
 @main
 struct PandaCoinApp: App {
     init() {
+        // 打印配置信息
+        AppConfig.printConfiguration()
+        
         // 配置全局外观
         setupAppearance()
     }

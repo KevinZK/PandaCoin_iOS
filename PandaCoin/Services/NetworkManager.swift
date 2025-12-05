@@ -39,7 +39,9 @@ enum APIError: Error, LocalizedError {
 class NetworkManager: ObservableObject {
     static let shared = NetworkManager()
     
-    private let baseURL = "http://localhost:3000/api" // 后端API地址
+    private var baseURL: String {
+        AppConfig.apiBaseURL
+    }
     private var cancellables = Set<AnyCancellable>()
     
     // JWT Token存储
@@ -132,10 +134,10 @@ class NetworkManager: ObservableObject {
                     logWarning("未授权访问: \(url.absoluteString)")
                     throw APIError.unauthorized
                 case 400...499, 500...599:
-                    // 尝试解析错误消息
-                    if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                        logError("服务器错误 [\(httpResponse.statusCode)]: \(errorResponse.message)")
-                        throw APIError.serverError(errorResponse.message)
+                    // 尝试解析错误消息（新格式）
+                    if let apiError = try? JSONDecoder().decode(APIResponse<String?>.self, from: data) {
+                        logError("服务器错误 [\(httpResponse.statusCode)]: \(apiError.message)")
+                        throw APIError.serverError(apiError.message)
                     }
                     logError("服务器错误 [\(httpResponse.statusCode)]")
                     throw APIError.invalidResponse
@@ -143,11 +145,27 @@ class NetworkManager: ObservableObject {
                     throw APIError.invalidResponse
                 }
             }
-            .decode(type: T.self, decoder: {
+            .tryMap { data -> T in
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
-                return decoder
-            }())
+                
+                // 先解析为APIResponse包装
+                let wrapper = try decoder.decode(APIResponseWrapper<T>.self, from: data)
+                
+                // 检查响应码
+                guard wrapper.code == 0 else {
+                    logError("服务器返回错误: \(wrapper.message)")
+                    throw APIError.serverError(wrapper.message)
+                }
+                
+                // 提取data字段
+                guard let data = wrapper.data else {
+                    logError("响应数据为空")
+                    throw APIError.invalidResponse
+                }
+                
+                return data
+            }
             .mapError { error in
                 let duration = Date().timeIntervalSince(startTime)
                 
@@ -197,9 +215,20 @@ struct ErrorResponse: Codable {
     }
 }
 
-// MARK: - API响应包装
+// MARK: - 通用响应包装
+struct APIResponseWrapper<T: Decodable>: Decodable {
+    let code: Int
+    let message: String
+    let data: T?
+    let timestamp: Int64
+    let path: String?
+}
+
+// MARK: - API响应包装（兼容）
 struct APIResponse<T: Codable>: Codable {
-    let data: T
-    let message: String?
-    let success: Bool
+    let code: Int
+    let message: String
+    let data: T?
+    let timestamp: Int64
+    let path: String?
 }

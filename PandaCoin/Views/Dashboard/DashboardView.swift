@@ -7,7 +7,9 @@
 
 import SwiftUI
 import Combine
+#if canImport(Charts)
 import Charts
+#endif
 
 // MARK: - 首页仪表盘（重新设计）
 struct DashboardView: View {
@@ -203,84 +205,91 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity)
                     .foregroundColor(.gray)
             } else {
-                Chart {
-                    // 线条和区域使用扩展数据源（包含延伸点）
-                    ForEach(extendedChartData, id: \.index) { item in
-                        LineMark(
-                            x: .value("Index", item.index),
-                            y: .value("Amount", item.value)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.green.opacity(0.8), .green.opacity(0.4)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                if #available(iOS 16.0, *) {
+                    Chart {
+                        // 线条和区域使用扩展数据源（包含延伸点）
+                        ForEach(extendedChartData, id: \.index) { item in
+                            LineMark(
+                                x: .value("Index", item.index),
+                                y: .value("Amount", item.value)
                             )
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .lineStyle(StrokeStyle(lineWidth: 3))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green.opacity(0.8), .green.opacity(0.4)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 3))
+                            
+                            AreaMark(
+                                x: .value("Index", item.index),
+                                y: .value("Amount", item.value)
+                            )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.green.opacity(0.25), .clear],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .interpolationMethod(.catmullRom)
+                        }
                         
-                        AreaMark(
-                            x: .value("Index", item.index),
-                            y: .value("Amount", item.value)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.green.opacity(0.25), .clear],
-                                startPoint: .top,
-                                endPoint: .bottom
+                        // 数据点和标签只使用真实数据源
+                        ForEach(displayedChartData, id: \.index) { item in
+                            PointMark(
+                                x: .value("Index", Double(item.index)),
+                                y: .value("Amount", item.value)
                             )
-                        )
-                        .interpolationMethod(.catmullRom)
-                    }
-                    
-                    // 数据点和标签只使用真实数据源
-                    ForEach(displayedChartData, id: \.index) { item in
-                        PointMark(
-                            x: .value("Index", Double(item.index)),
-                            y: .value("Amount", item.value)
-                        )
-                        .symbol {
-                            ZStack {
-                                // 呼吸光晕
-                                Circle()
-                                    .fill(Theme.income.opacity(0.3))
-                                    .frame(width: 24, height: 24)
-                                    .scaleEffect(breathingPhase ? 1.2 : 0.8)
-                                    .opacity(breathingPhase ? 1.0 : 0.5)
-                                
-                                // 实心点
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 12, height: 12)
-                                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Theme.income, lineWidth: 2)
-                                    )
+                            .symbol {
+                                ZStack {
+                                    // 呼吸光晕
+                                    Circle()
+                                        .fill(Theme.income.opacity(0.3))
+                                        .frame(width: 24, height: 24)
+                                        .scaleEffect(breathingPhase ? 1.2 : 0.8)
+                                        .opacity(breathingPhase ? 1.0 : 0.5)
+                                    
+                                    // 实心点
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 12, height: 12)
+                                        .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Theme.income, lineWidth: 2)
+                                        )
+                                }
+                            }
+                            .annotation(position: .bottom, alignment: .center, spacing: 10) {
+                                Text(formatChartAmount(item.value))
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Theme.income)
+                                    .foregroundColor(.white)
+                                    .clipShape(Capsule())
+                                    .shadow(color: Theme.income.opacity(0.3), radius: 4, x: 0, y: 2)
                             }
                         }
-                        .annotation(position: .bottom, alignment: .center, spacing: 10) {
-                            Text(formatChartAmount(item.value))
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Theme.income)
-                                .foregroundColor(.white)
-                                .clipShape(Capsule())
-                                .shadow(color: Theme.income.opacity(0.3), radius: 4, x: 0, y: 2)
-                        }
                     }
-                }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
+                    .chartXAxis(.hidden)
+                    .chartYAxis(.hidden)
                     .chartXScale(domain: chartDomain)
                     .chartPlotStyle { plotArea in
                         plotArea
                             .frame(height: 220)
                     }
                     .frame(maxWidth: .infinity)
+                } else {
+                    Text("图表功能需要 iOS 16.0 或更高版本")
+                        .foregroundColor(.gray)
+                        .frame(height: 220)
+                        .frame(maxWidth: .infinity)
+                }
             }
             
             // 分页指示器
