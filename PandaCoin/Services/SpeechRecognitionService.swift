@@ -47,7 +47,33 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     // MARK: - Recording Control
     func startRecording() throws {
         // 检查权限
-        guard authorizationStatus == .authorized else {
+        let currentStatus = SFSpeechRecognizer.authorizationStatus()
+        
+        switch currentStatus {
+        case .notDetermined:
+            // 未请求过权限，弹出系统授权框
+            SFSpeechRecognizer.requestAuthorization { [weak self] status in
+                DispatchQueue.main.async {
+                    self?.authorizationStatus = status
+                    if status == .authorized {
+                        // 授权成功后重试启动
+                        try? self?.startRecording()
+                    } else {
+                        self?.errorMessage = "需要语音识别权限才能使用此功能"
+                    }
+                }
+            }
+            throw SpeechRecognitionError.notAuthorized
+            
+        case .denied, .restricted:
+            // 用户拒绝或被限制，提示去设置中打开
+            throw SpeechRecognitionError.needsSettingsAuthorization
+            
+        case .authorized:
+            // 已授权，继续执行
+            break
+            
+        @unknown default:
             throw SpeechRecognitionError.notAuthorized
         }
         
@@ -141,12 +167,15 @@ class SpeechRecognitionService: NSObject, ObservableObject {
 // MARK: - Speech Recognition Errors
 enum SpeechRecognitionError: Error, LocalizedError {
     case notAuthorized
+    case needsSettingsAuthorization
     case recognizerNotAvailable
     case cannotCreateRequest
     
     var errorDescription: String? {
         switch self {
         case .notAuthorized:
+            return "需要语音识别权限"
+        case .needsSettingsAuthorization:
             return "请在设置中允许访问语音识别"
         case .recognizerNotAvailable:
             return "语音识别服务暂时不可用"

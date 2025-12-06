@@ -50,23 +50,39 @@ class RecordService: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // MARK: - AI语音记账
-    func createFromVoice(text: String) -> AnyPublisher<VoiceRecordResponse, APIError> {
+    // MARK: - AI语音记账（新流程：只解析不存储）
+    func parseVoiceInput(text: String) -> AnyPublisher<[AIRecordParsed], APIError> {
         Logger.shared.logAIRequest(text: text)
-        let request = VoiceRecordRequest(text: text)
-        
+        let request = ParseFinancialRequest(text: text)
         return networkManager.request(
-            endpoint: "/records/voice",
+            endpoint: "/financial/parse",
             method: "POST",
             body: request
         )
-        .handleEvents(
-            receiveOutput: { (response: VoiceRecordResponse) in
-                Logger.shared.logAIResponse(
-                    records: response.records.count,
-                    confidence: response.records.first?.confidence
+        .map { (response: FinancialEventsResponse) -> [AIRecordParsed] in
+            // 转换 FinancialEvent 为 AIRecordParsed
+            response.events.compactMap { event -> AIRecordParsed? in
+                guard event.event_type == "TRANSACTION",
+                      let data = event.data else { return nil }
+                
+                return AIRecordParsed(
+                    type: self.mapTransactionType(data.transaction_type ?? ""),
+                    amount: Decimal(data.amount ?? 0),
+                    category: data.category ?? "其他",
+                    accountName: data.source_account ?? "支付宝",
+                    description: data.note ?? "",
+                    date: self.parseDate(data.date) ?? Date(),
+                    confidence: 0.95
                 )
-                logInfo("成功创建\(response.records.count)条AI记账")
+            }
+        }
+        .handleEvents(
+            receiveOutput: { records in
+                Logger.shared.logAIResponse(
+                    records: records.count,
+                    confidence: records.first?.confidence
+                )
+                logInfo("成功解析\(records.count)条AI记账")
             },
             receiveCompletion: { completion in
                 if case .failure(let error) = completion {
@@ -75,6 +91,50 @@ class RecordService: ObservableObject {
             }
         )
         .eraseToAnyPublisher()
+    }
+    
+    // MARK: - 批量创建记账（用户确认后）
+    func batchCreateRecords(_ parsedRecords: [AIRecordParsed], accountMap: [String: String]) -> AnyPublisher<[Record], APIError> {
+        let publishers = parsedRecords.map { parsed -> AnyPublisher<Record, APIError> in
+            guard let accountId = accountMap[parsed.accountName] else {
+                return Fail(error: APIError.invalidResponse).eraseToAnyPublisher()
+            }
+            
+            let request = CreateRecordRequest(
+                amount: parsed.amount,
+                type: parsed.type,
+                category: parsed.category,
+                accountId: accountId,
+                description: parsed.description,
+                date: parsed.date
+            )
+            
+            return networkManager.request(
+                endpoint: "/records",
+                method: "POST",
+                body: request
+            )
+        }
+        
+        return Publishers.MergeMany(publishers)
+            .collect()
+            .eraseToAnyPublisher()
+    }
+    
+    // MARK: - 辅助方法
+    private func mapTransactionType(_ type: String) -> RecordType {
+        switch type.uppercased() {
+        case "EXPENSE": return .expense
+        case "INCOME": return .income
+        case "TRANSFER": return .transfer
+        default: return .expense
+        }
+    }
+    
+    private func parseDate(_ dateStr: String?) -> Date? {
+        guard let dateStr = dateStr else { return nil }
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: dateStr)
     }
     
     // MARK: - 手动创建记账
@@ -194,3 +254,26 @@ struct RecordStatistics: Codable {
 }
 
 struct EmptyResponse: Codable {}
+
+// MARK: - Financial API Models
+struct ParseFinancialRequest: Codable {
+    let text: String
+}
+
+struct FinancialEventsResponse: Codable {
+    let events: [FinancialEvent]
+}
+
+struct FinancialEvent: Codable {
+    let event_type: String
+    let data: FinancialEventData?
+}
+
+struct FinancialEventData: Codable {
+    let transaction_type: String?
+    let amount: Double?
+    let category: String?
+    let source_account: String?
+    let note: String?
+    let date: String?
+}

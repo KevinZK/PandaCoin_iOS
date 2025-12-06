@@ -29,6 +29,7 @@ struct DashboardView: View {
     ]
     @State private var breathingPhase = false
     @State private var breathingAnimationStarted = false
+    @State private var wavePhases: [CGFloat] = [1.0, 1.0, 1.0]
     
     private var indexedChartData: [(index: Int, label: String, value: Double)] {
         chartData.enumerated().map { (index, element) in
@@ -307,52 +308,104 @@ struct DashboardView: View {
     private var voiceButton: some View {
         VStack(spacing: Spacing.small) {
             // 熊猫语音按钮
-            Button(action: {
-                do {
-                    try speechService.startRecording()
-                } catch {
-                    logError("语音识别启动失败", error: error)
-                }
-            }) {
-                ZStack {
-                    // 外圈阴影
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.gray.opacity(0.3),
-                                    Color.gray.opacity(0.1),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 50,
-                                endRadius: 90
+            ZStack {
+                // 波浪动画（录音时显示）
+                if speechService.isRecording {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.green.opacity(0.6),
+                                        Color.green.opacity(0.2)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 3
                             )
-                        )
-                        .frame(width: 180, height: 180)
-                    
-                    // 主按钮
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.4, green: 0.4, blue: 0.4),
-                                    Color(red: 0.5, green: 0.5, blue: 0.5)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                            .frame(width: 120, height: 120)
+                            .scaleEffect(wavePhases[index])
+                            .opacity(2.5 - wavePhases[index])
+                            .animation(
+                                Animation.easeOut(duration: 1.2)
+                                    .repeatForever(autoreverses: false)
+                                    .delay(Double(index) * 0.2),
+                                value: wavePhases[index]
                             )
-                        )
-                        .frame(width: 120, height: 120)
-                        .shadow(color: .black.opacity(0.3), radius: 15, x: 0, y: 8)
-                    
-                    // 熊猫图标
-                    Text("🐼")
-                        .font(.system(size: 50))
+                    }
                 }
+                
+                // 外圈阴影
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.gray.opacity(0.3),
+                                Color.gray.opacity(0.1),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 50,
+                            endRadius: 90
+                        )
+                    )
+                    .frame(width: 180, height: 180)
+                
+                // 主按钮
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: speechService.isRecording ? [
+                                Color.green.opacity(0.8),
+                                Color.green.opacity(0.6)
+                            ] : [
+                                Color(red: 0.4, green: 0.4, blue: 0.4),
+                                Color(red: 0.5, green: 0.5, blue: 0.5)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                    .shadow(color: .black.opacity(0.3), radius: 15, x: 0, y: 8)
+                    .scaleEffect(speechService.isRecording ? 1.05 : 1.0)
+                
+                // 熊猫图标
+                Text("🐼")
+                    .font(.system(size: 50))
+                    .scaleEffect(speechService.isRecording ? 1.1 : 1.0)
             }
+            .id("voice_button")  // 添加稳定ID
+            .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 5.0, perform: {
+                print("✅ 长按完成！")
+            }, onPressingChanged: { isPressing in
+                if isPressing {
+                    guard !speechService.isRecording else { return }
+                    do {
+                        try speechService.startRecording()
+                        startWaveAnimation()
+                    } catch {
+                        logError("语音识别启动失败", error: error)
+                        if let speechError = error as? SpeechRecognitionError {
+                            if speechError == .needsSettingsAuthorization {
+                                showSettingsAlert()
+                            }
+                        }
+                    }
+                } else {
+                    print("长按结束")
+                    guard speechService.isRecording else { return }
+                    
+                    let recognizedText = speechService.recognizedText
+                    speechService.stopRecording()
+                    stopWaveAnimation()
+                    handleVoiceInput(recognizedText)
+                }
+            })
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: speechService.isRecording)
             
-            Text("Voice Input")
+            Text(speechService.isRecording ? "Recording..." : "Voice Input")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundColor(.black.opacity(0.5))
                 .tracking(1)
@@ -366,6 +419,29 @@ struct DashboardView: View {
         withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
             breathingPhase.toggle()
         }
+    }
+    
+    private func startWaveAnimation() {
+        // 重置所有波浪
+        wavePhases = [1.0, 1.0, 1.0]
+        
+        // 延迟启动动画，确保视图已渲染
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            for i in 0..<3 {
+                self.wavePhases[i] = 2.0
+            }
+        }
+    }
+    
+    private func stopWaveAnimation() {
+        for i in 0..<3 {
+            wavePhases[i] = 1.0
+        }
+    }
+    
+    private func showSettingsAlert() {
+        // TODO: 显示设置提醒
+        logInfo("需要在设置中打开语音识别权限")
     }
     
     private func formatChartAmount(_ value: Double) -> String {
@@ -406,39 +482,42 @@ struct DashboardView: View {
     private func handleVoiceInput(_ text: String) {
         logInfo("语音输入: \(text)")
         
-        // 使用模拟数据
-        parsedRecords = mockParseVoice(text)
-        showVoiceConfirmation = true
-    }
-    
-    private func mockParseVoice(_ text: String) -> [AIRecordParsed] {
-        let numbers = text.components(separatedBy: CharacterSet.decimalDigits.inverted)
-            .filter { !$0.isEmpty }
-            .compactMap { Decimal(string: $0) }
-        
-        if numbers.isEmpty {
-            return []
-        }
-        
-        return numbers.map { amount in
-            AIRecordParsed(
-                type: .expense,
-                amount: amount,
-                category: "餐饮",
-                accountName: "支付宝",
-                description: text,
-                date: Date(),
-                confidence: 0.95
-            )
-        }
+        // 调用后端 AI 解析接口（只解析，不存储）
+        recordService.parseVoiceInput(text: text)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    logError("AI 解析失败", error: error)
+                }
+            } receiveValue: { parsedRecords in
+                self.parsedRecords = parsedRecords
+                self.showVoiceConfirmation = true
+            }
+            .store(in: &recordService.cancellables)
     }
     
     private func saveRecords(_ records: [AIRecordParsed]) {
         showVoiceConfirmation = false
-        logInfo("保存\(records.count)条记录")
+        logInfo("用户确认保存\(records.count)条记录")
         
-        // TODO: 调用API保存记录
-        loadData()
+        // 构建账户名称到ID的映射
+        var accountMap: [String: String] = [:]
+        for account in accountService.accounts {
+            accountMap[account.name] = account.id
+        }
+        
+        // 批量创建记录
+        recordService.batchCreateRecords(records, accountMap: accountMap)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    logError("保存记录失败", error: error)
+                }
+            } receiveValue: { _ in
+                logInfo("记录保存成功")
+                self.loadData()
+            }
+            .store(in: &recordService.cancellables)
     }
 }
 

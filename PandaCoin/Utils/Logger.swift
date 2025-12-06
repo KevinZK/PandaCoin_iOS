@@ -179,9 +179,6 @@ class Logger {
         #if DEBUG
         print(logMessage)
         #endif
-        
-        // 同时写入系统日志
-        os_log("%{public}@", log: osLog, type: getOSLogType(level), logMessage)
     }
     
     private func getOSLogType(_ level: LogLevel) -> OSLogType {

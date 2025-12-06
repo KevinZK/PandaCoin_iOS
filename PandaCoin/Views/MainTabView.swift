@@ -24,17 +24,23 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
-            StatisticsView()
+            BudgetView()
                 .tabItem {
-                    Label(L10n.TabBar.statistics, systemImage: "chart.pie.fill")
+                    Label("预算", systemImage: "chart.pie.fill")
                 }
                 .tag(2)
+            
+            StatisticsView()
+                .tabItem {
+                    Label(L10n.TabBar.statistics, systemImage: "chart.bar.fill")
+                }
+                .tag(3)
             
             AccountsView()
                 .tabItem {
                     Label(L10n.TabBar.accounts, systemImage: "creditcard.fill")
                 }
-                .tag(3)
+                .tag(4)
         }
         .accentColor(Theme.bambooGreen)
     }

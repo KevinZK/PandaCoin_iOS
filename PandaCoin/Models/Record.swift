@@ -107,11 +107,30 @@ struct VoiceRecordRequest: Codable {
 
 // MARK: - AI语音记账响应
 struct VoiceRecordResponse: Codable {
-    let records: [AIRecordParsed]
-    let needConfirm: Bool
+    let records: [Record]  // 返回完整的 Record 对象（未确认的）
+    let originalText: String
     
     enum CodingKeys: String, CodingKey {
         case records
-        case needConfirm = "need_confirm"
+        case originalText = "original_text"  // 后端实际返回 originalText，需映射
+    }
+    
+    // 自定义解码，兼容驼峰和下划线两种格式
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        records = try container.decode([Record].self, forKey: .records)
+        
+        // 尝试两种格式
+        if let text = try? container.decode(String.self, forKey: .originalText) {
+            originalText = text
+        } else {
+            // 尝试直接用驼峰格式
+            let rawContainer = try decoder.container(keyedBy: RawCodingKeys.self)
+            originalText = try rawContainer.decode(String.self, forKey: .originalText)
+        }
+    }
+    
+    private enum RawCodingKeys: String, CodingKey {
+        case originalText
     }
 }
