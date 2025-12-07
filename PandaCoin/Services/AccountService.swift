@@ -15,17 +15,17 @@ class AssetService: ObservableObject {
     private let networkManager = NetworkManager.shared
     var cancellables = Set<AnyCancellable>()
     
-    // MARK: - 获取所有账户
+    // MARK: - 获取所有资产
     func fetchAccounts() {
         isLoading = true
         
-        networkManager.request(endpoint: "/accounts", method: "GET")
+        networkManager.request(endpoint: "/assets", method: "GET")
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] completion in
                     self?.isLoading = false
                     if case .failure(let error) = completion {
-                        print("获取账户失败: \(error.localizedDescription)")
+                        print("获取资产失败: \(error.localizedDescription)")
                     }
                 },
                 receiveValue: { [weak self] (accounts: [Asset]) in
@@ -35,11 +35,11 @@ class AssetService: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // MARK: - 创建账户
+    // MARK: - 创建资产
     func createAccount(name: String, type: AssetType, balance: Decimal) -> AnyPublisher<Asset, APIError> {
         let request = AssetRequest(name: name, type: type, balance: balance, currency: "CNY")
         return networkManager.request(
-            endpoint: "/accounts",
+            endpoint: "/assets",
             method: "POST",
             body: request
         )
@@ -53,29 +53,29 @@ class AssetService: ObservableObject {
     func updateAsset(id: String, name: String, balance: Decimal) -> AnyPublisher<Asset, APIError> {
         let request = UpdateAccountRequest(name: name, balance: balance)
         return networkManager.request(
-            endpoint: "/accounts/\(id)",
+            endpoint: "/assets/\(id)",
             method: "PATCH",
             body: request
         )
         .eraseToAnyPublisher()
     }
     
-    // MARK: - 删除账户
+    // MARK: - 删除资产
     func deleteAccount(id: String) -> AnyPublisher<Void, APIError> {
         return networkManager.request(
-            endpoint: "/accounts/\(id)",
+            endpoint: "/assets/\(id)",
             method: "DELETE"
         )
         .map { (_: EmptyResponse) in () }
         .eraseToAnyPublisher()
     }
     
-    // MARK: - 获取账户名称列表
+    // MARK: - 获取资产名称列表
     func getAccountNames() -> [String] {
         return accounts.map { $0.name }
     }
     
-    // MARK: - 根据名称查找账户
+    // MARK: - 根据名称查找资产
     func findAccount(byName name: String) -> Asset? {
         return accounts.first { $0.name == name }
     }

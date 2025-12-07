@@ -90,9 +90,32 @@ struct Asset: Codable, Identifiable, Hashable {
         case type
         case balance
         case currency
-        case userId = "user_id"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+        case userId
+        case createdAt
+        case updatedAt
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        type = try container.decode(AssetType.self, forKey: .type)
+        balance = try container.decode(Decimal.self, forKey: .balance)
+        currency = try container.decode(String.self, forKey: .currency)
+        userId = try container.decode(String.self, forKey: .userId)
+        
+        // 支持多种日期格式
+        if let dateString = try? container.decode(String.self, forKey: .createdAt) {
+            createdAt = ISO8601DateFormatter().date(from: dateString) ?? Date()
+        } else {
+            createdAt = try container.decode(Date.self, forKey: .createdAt)
+        }
+        
+        if let dateString = try? container.decode(String.self, forKey: .updatedAt) {
+            updatedAt = ISO8601DateFormatter().date(from: dateString) ?? Date()
+        } else {
+            updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        }
     }
     
     // 格式化余额显示

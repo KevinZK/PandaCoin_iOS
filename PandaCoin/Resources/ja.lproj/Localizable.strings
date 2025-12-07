@@ -119,6 +119,7 @@
 "category_bonus" = "ボーナス";
 "category_investment" = "投資";
 "category_parttime" = "アルバイト";
+"category_initial_balance" = "期首残高";
 
 /* Statistics */
 "statistics_title" = "統計";
@@ -137,6 +138,17 @@
 "settings_currency" = "通貨";
 "settings_theme" = "テーマ";
 "settings_about" = "について";
+"settings_language_hint" = "言語を変更した後、アプリを再起動してください";
+
+/* Languages */
+"language_system" = "システムに従う";
+"language_chinese" = "中国語";
+"language_english" = "英語";
+"language_japanese" = "日本語";
+"language_korean" = "韓国語";
+"language_german" = "ドイツ語";
+"language_french" = "フランス語";
+"language_spanish" = "スペイン語";
 
 /* Errors */
 "error_invalid_email" = "有効なメールアドレスを入力してください";

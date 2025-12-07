@@ -318,7 +318,7 @@ struct EditAccountView: View {
                         Button(role: .destructive, action: { showDeleteAlert = true }) {
                             HStack {
                                 Spacer()
-                                Label("删除账户", systemImage: "trash")
+                                Label("删除资产", systemImage: "trash")
                                 Spacer()
                             }
                         }

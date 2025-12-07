@@ -65,7 +65,7 @@
 "account_balance" = "余额";
 "account_initial_balance" = "初始余额";
 "account_current_balance" = "当前余额";
-"account_delete" = "删除账户";
+"account_delete" = "删除资产";
 "account_delete_confirm" = "确定要删除这个账户吗？相关的记账记录也将被删除。";
 "account_no_accounts" = "还没有账户";
 "account_add_hint" = "点击右上角 + 添加账户";
@@ -119,6 +119,7 @@
 "category_bonus" = "奖金";
 "category_investment" = "投资";
 "category_parttime" = "兼职";
+"category_initial_balance" = "期初余额";
 
 /* Statistics */
 "statistics_title" = "统计报表";
@@ -137,6 +138,17 @@
 "settings_currency" = "货币";
 "settings_theme" = "主题";
 "settings_about" = "关于";
+"settings_language_hint" = "切换语言后需重新启动应用生效";
+
+/* Languages */
+"language_system" = "跟随系统";
+"language_chinese" = "简体中文";
+"language_english" = "英语";
+"language_japanese" = "日语";
+"language_korean" = "韩语";
+"language_german" = "德语";
+"language_french" = "法语";
+"language_spanish" = "西班牙语";
 
 /* Errors */
 "error_invalid_email" = "请输入有效的邮箱地址";

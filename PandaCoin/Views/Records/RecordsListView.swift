@@ -61,10 +61,14 @@ struct RecordsListView: View {
             }
             .sheet(isPresented: $showAddRecord) {
                 AddRecordView(accountService: accountService, recordService: recordService)
+                    .onAppear {
+                        // 只有打开添加记账页面时才加载账户列表
+                        accountService.fetchAccounts()
+                    }
             }
             .onAppear {
                 recordService.fetchRecords()
-                accountService.fetchAccounts()
+                // 账户列表在打开添加记账页面时加载
             }
         }
     }

@@ -119,6 +119,7 @@
 "category_bonus" = "Bonificación";
 "category_investment" = "Inversión";
 "category_parttime" = "Tiempo parcial";
+"category_initial_balance" = "Saldo inicial";
 
 /* Statistics */
 "statistics_title" = "Estadísticas";
@@ -137,6 +138,17 @@
 "settings_currency" = "Moneda";
 "settings_theme" = "Tema";
 "settings_about" = "Acerca de";
+"settings_language_hint" = "Reinicia la aplicación para aplicar los cambios de idioma";
+
+/* Languages */
+"language_system" = "Seguir sistema";
+"language_chinese" = "Chino";
+"language_english" = "Inglés";
+"language_japanese" = "Japonés";
+"language_korean" = "Coreano";
+"language_german" = "Alemán";
+"language_french" = "Francés";
+"language_spanish" = "Español";
 
 /* Errors */
 "error_invalid_email" = "Por favor, ingrese una dirección de correo electrónico válida";

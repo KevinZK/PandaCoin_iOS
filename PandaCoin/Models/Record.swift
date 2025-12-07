@@ -22,6 +22,13 @@ enum RecordType: String, Codable {
     }
 }
 
+// MARK: - 记录中嵌套的简化账户信息
+struct RecordAccount: Codable {
+    let id: String
+    let name: String
+    let type: String
+}
+
 // MARK: - 记账记录
 struct Record: Codable, Identifiable {
     let id: String
@@ -38,8 +45,8 @@ struct Record: Codable, Identifiable {
     let createdAt: Date
     let updatedAt: Date
     
-    // 关联数据
-    var account: Asset?
+    // 关联数据（后端只返回部分字段）
+    var account: RecordAccount?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -47,14 +54,14 @@ struct Record: Codable, Identifiable {
         case type
         case category
         case description
-        case rawText = "raw_text"
+        case rawText
         case date
-        case accountId = "account_id"
-        case userId = "user_id"
-        case isConfirmed = "is_confirmed"
+        case accountId
+        case userId
+        case isConfirmed
         case confidence
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+        case createdAt
+        case updatedAt
         case account
     }
     

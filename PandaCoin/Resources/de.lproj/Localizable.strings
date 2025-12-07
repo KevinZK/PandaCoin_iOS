@@ -119,6 +119,7 @@
 "category_bonus" = "Bonus";
 "category_investment" = "Investition";
 "category_parttime" = "Teilzeit";
+"category_initial_balance" = "Anfangssaldo";
 
 /* Statistics */
 "statistics_title" = "Statistiken";
@@ -137,6 +138,17 @@
 "settings_currency" = "Währung";
 "settings_theme" = "Design";
 "settings_about" = "Über";
+"settings_language_hint" = "Starten Sie die App neu, um die Sprachänderungen anzuwenden";
+
+/* Languages */
+"language_system" = "System folgen";
+"language_chinese" = "Chinesisch";
+"language_english" = "Englisch";
+"language_japanese" = "Japanisch";
+"language_korean" = "Koreanisch";
+"language_german" = "Deutsch";
+"language_french" = "Französisch";
+"language_spanish" = "Spanisch";
 
 /* Errors */
 "error_invalid_email" = "Bitte geben Sie eine gültige E-Mail-Adresse ein";

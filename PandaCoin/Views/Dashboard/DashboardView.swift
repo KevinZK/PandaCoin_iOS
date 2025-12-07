@@ -11,6 +11,18 @@ import Combine
 import Charts
 #endif
 
+// MARK: - 解析记录包装器
+struct ParsedRecordsWrapper: Identifiable {
+    let id = UUID()
+    let records: [AIRecordParsed]
+}
+
+// MARK: - 统一事件包装器
+struct ParsedEventsWrapper: Identifiable {
+    let id = UUID()
+    let events: [ParsedFinancialEvent]
+}
+
 // MARK: - 首页仪表盘（重新设计）
 struct DashboardView: View {
     @StateObject private var speechService = SpeechRecognitionService()
@@ -19,8 +31,8 @@ struct DashboardView: View {
     @StateObject private var authService = AuthService.shared
     
     @State private var totalAssets: Decimal = 0
-    @State private var showVoiceConfirmation = false
-    @State private var parsedRecords: [AIRecordParsed] = []
+    @State private var voiceConfirmationWrapper: ParsedRecordsWrapper? = nil
+    @State private var unifiedEventsWrapper: ParsedEventsWrapper? = nil
     @State private var chartData: [(String, Double)] = [
         ("12/10", 2300),
         ("12/11", 1800),
@@ -146,11 +158,19 @@ struct DashboardView: View {
             }
             
         }
-        .sheet(isPresented: $showVoiceConfirmation) {
+        .sheet(item: $voiceConfirmationWrapper) { wrapper in
             VoiceRecordConfirmationView(
-                records: parsedRecords,
+                records: wrapper.records,
                 onConfirm: { confirmedRecords in
                     saveRecords(confirmedRecords)
+                }
+            )
+        }
+        .sheet(item: $unifiedEventsWrapper) { wrapper in
+            UnifiedConfirmationView(
+                events: wrapper.events,
+                onConfirm: { confirmedEvents in
+                    saveUnifiedEvents(confirmedEvents)
                 }
             )
         }
@@ -176,20 +196,17 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showSettings) {
             NavigationView {
-                Text(L10n.Settings.settings)
-                    .navigationTitle(L10n.Settings.settings)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button(L10n.Common.done) {
-                                showSettings = false
-                            }
-                        }
-                    }
+                SettingsView()
             }
         }
         .onAppear {
             loadData()
             startBreathingAnimation()
+        }
+        .onReceive(accountService.$accounts) { accounts in
+            // 账户数据加载完成后计算总资产
+            let total = accounts.reduce(Decimal(0)) { $0 + $1.balance }
+            totalAssets = total
         }
     }
     
@@ -481,39 +498,41 @@ struct DashboardView: View {
     private func loadData() {
         accountService.fetchAccounts()
         recordService.fetchRecords()
-        
-        // 计算总资产
-        let total = accountService.accounts.reduce(0.0) { sum, account in
-            sum + account.balance
-        }
-        totalAssets = Decimal(string: "\(total)") ?? 0
     }
     
     private func handleVoiceInput(_ text: String) {
         logInfo("语音输入: \(text)")
         
-        // 调用后端 AI 解析接口（只解析，不存储）
-        recordService.parseVoiceInput(text: text)
+        // 调用后端 AI 统一解析接口（支持多种事件类型）
+        recordService.parseVoiceInputUnified(text: text)
             .receive(on: DispatchQueue.main)
             .sink { completion in
                 if case .failure(let error) = completion {
                     logError("AI 解析失败", error: error)
                 }
-            } receiveValue: { parsedRecords in
-                self.parsedRecords = parsedRecords
-                self.showVoiceConfirmation = true
+            } receiveValue: { events in
+                logInfo("设置 unifiedEventsWrapper: \(events.count)条事件")
+                if !events.isEmpty {
+                    self.unifiedEventsWrapper = ParsedEventsWrapper(events: events)
+                }
             }
             .store(in: &recordService.cancellables)
     }
     
     private func saveRecords(_ records: [AIRecordParsed]) {
-        showVoiceConfirmation = false
+        voiceConfirmationWrapper = nil
         logInfo("用户确认保存\(records.count)条记录")
         
         // 构建账户名称到ID的映射
         var accountMap: [String: String] = [:]
         for account in accountService.accounts {
             accountMap[account.name] = account.id
+        }
+        
+        // 调试日志
+        logInfo("📊 账户映射: \(accountMap.keys.joined(separator: ", "))")
+        for record in records {
+            logInfo("📌 记录账户: \(record.accountName), 匹配: \(accountMap[record.accountName] != nil)")
         }
         
         // 批量创建记录
@@ -525,6 +544,37 @@ struct DashboardView: View {
                 }
             } receiveValue: { _ in
                 logInfo("记录保存成功")
+                self.loadData()
+            }
+            .store(in: &recordService.cancellables)
+    }
+    
+    // MARK: - 统一保存事件（支持多类型）
+    private func saveUnifiedEvents(_ events: [ParsedFinancialEvent]) {
+        unifiedEventsWrapper = nil
+        logInfo("用户确认保存\(events.count)条事件")
+        
+        // 构建账户名称到ID的映射
+        var accountMap: [String: String] = [:]
+        for account in accountService.accounts {
+            accountMap[account.name] = account.id
+        }
+        
+        // 调试日志
+        logInfo("📊 账户映射: \(accountMap.keys.joined(separator: ", "))")
+        for event in events {
+            logInfo("📌 事件类型: \(event.eventType.rawValue)")
+        }
+        
+        // 统一保存所有事件
+        recordService.saveFinancialEvents(events, accountMap: accountMap)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    logError("保存事件失败", error: error)
+                }
+            } receiveValue: { count in
+                logInfo("✅ 成功保存\(count)条事件")
                 self.loadData()
             }
             .store(in: &recordService.cancellables)

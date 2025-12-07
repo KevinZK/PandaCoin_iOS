@@ -65,7 +65,7 @@
 "account_balance" = "Balance";
 "account_initial_balance" = "Initial Balance";
 "account_current_balance" = "Current Balance";
-"account_delete" = "Delete Account";
+"account_delete" = "Delete Asset";
 "account_delete_confirm" = "Are you sure you want to delete this account? Related records will also be deleted.";
 "account_no_accounts" = "No accounts yet";
 "account_add_hint" = "Tap + in the upper right to add an account";
@@ -119,6 +119,7 @@
 "category_bonus" = "Bonus";
 "category_investment" = "Investment";
 "category_parttime" = "Part-time";
+"category_initial_balance" = "Initial Balance";
 
 /* Statistics */
 "statistics_title" = "Statistics";
@@ -137,6 +138,17 @@
 "settings_currency" = "Currency";
 "settings_theme" = "Theme";
 "settings_about" = "About";
+"settings_language_hint" = "Restart app to apply language changes";
+
+/* Languages */
+"language_system" = "Follow System";
+"language_chinese" = "Chinese";
+"language_english" = "English";
+"language_japanese" = "Japanese";
+"language_korean" = "Korean";
+"language_german" = "German";
+"language_french" = "French";
+"language_spanish" = "Spanish";
 
 /* Errors */
 "error_invalid_email" = "Please enter a valid email address";

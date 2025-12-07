@@ -119,6 +119,7 @@
 "category_bonus" = "보너스";
 "category_investment" = "투자";
 "category_parttime" = "아르바이트";
+"category_initial_balance" = "기초 잔액";
 
 /* Statistics */
 "statistics_title" = "통계";
@@ -137,6 +138,17 @@
 "settings_currency" = "통화";
 "settings_theme" = "테마";
 "settings_about" = "정보";
+"settings_language_hint" = "언어 변경 후 앱을 다시 시작해야 적용됩니다";
+
+/* Languages */
+"language_system" = "시스템 따르기";
+"language_chinese" = "중국어";
+"language_english" = "영어";
+"language_japanese" = "일본어";
+"language_korean" = "한국어";
+"language_german" = "독일어";
+"language_french" = "프랑스어";
+"language_spanish" = "스페인어";
 
 /* Errors */
 "error_invalid_email" = "유효한 이메일 주소를 입력하세요";

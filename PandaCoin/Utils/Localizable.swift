@@ -165,6 +165,19 @@ enum L10n {
         static let currency = "settings_currency".localized
         static let theme = "settings_theme".localized
         static let about = "settings_about".localized
+        static let languageHint = "settings_language_hint".localized
+    }
+    
+    // MARK: - Language Names
+    enum Language {
+        static let system = "language_system".localized
+        static let chinese = "language_chinese".localized
+        static let english = "language_english".localized
+        static let japanese = "language_japanese".localized
+        static let korean = "language_korean".localized
+        static let german = "language_german".localized
+        static let french = "language_french".localized
+        static let spanish = "language_spanish".localized
     }
     
     // MARK: - Errors
