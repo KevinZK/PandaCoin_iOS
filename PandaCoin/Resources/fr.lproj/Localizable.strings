@@ -34,7 +34,9 @@
 "tab_home" = "Accueil";
 "tab_records" = "Enregistrements";
 "tab_statistics" = "Statistiques";
-"tab_accounts" = "Comptes";
+"tab_accounts" = "Actifs";
+"tab_budget" = "Budget";
+"tab_settings" = "Paramètres";
 
 /* Dashboard */
 "dashboard_total_assets" = "Actifs totaux";
@@ -55,11 +57,11 @@
 "voice_panda_says" = "Panda l'a organisé pour vous";
 
 /* Account */
-"account_management" = "Gestion des comptes";
-"account_add" = "Ajouter un compte";
-"account_edit" = "Modifier le compte";
-"account_name" = "Nom du compte";
-"account_type" = "Type de compte";
+"account_management" = "Gestion des actifs";
+"account_add" = "Ajouter un actif";
+"account_edit" = "Modifier l'actif";
+"account_name" = "Nom de l'actif";
+"account_type" = "Type d'actif";
 "account_balance" = "Solde";
 "account_initial_balance" = "Solde initial";
 "account_current_balance" = "Solde actuel";
@@ -72,6 +74,16 @@
 "account_type_investment" = "Investissement";
 "account_type_cash" = "Espèces";
 "account_type_credit_card" = "Carte de crédit";
+"account_type_digital_wallet" = "Portefeuille numérique";
+"account_type_loan" = "Prêt";
+"account_type_mortgage" = "Hypothèque";
+"account_type_savings" = "Compte d'épargne";
+"account_type_retirement" = "Retraite";
+"account_type_crypto" = "Cryptomonnaie";
+"account_type_property" = "Immobilier";
+"account_type_vehicle" = "Véhicule";
+"account_type_other_asset" = "Autre actif";
+"account_type_other_liability" = "Autre passif";
 
 /* Record */
 "record_records" = "Enregistrements";

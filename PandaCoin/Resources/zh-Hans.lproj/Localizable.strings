@@ -34,7 +34,9 @@
 "tab_home" = "首页";
 "tab_records" = "记录";
 "tab_statistics" = "统计";
-"tab_accounts" = "账户";
+"tab_accounts" = "资产";
+"tab_budget" = "预算";
+"tab_settings" = "设置";
 
 /* Dashboard */
 "dashboard_total_assets" = "总资产";
@@ -55,11 +57,11 @@
 "voice_panda_says" = "熊猫已经为你整理好啦";
 
 /* Account */
-"account_management" = "账户管理";
-"account_add" = "添加账户";
-"account_edit" = "编辑账户";
-"account_name" = "账户名称";
-"account_type" = "账户类型";
+"account_management" = "资产管理";
+"account_add" = "添加资产";
+"account_edit" = "编辑资产";
+"account_name" = "资产名称";
+"account_type" = "资产类型";
 "account_balance" = "余额";
 "account_initial_balance" = "初始余额";
 "account_current_balance" = "当前余额";
@@ -72,6 +74,16 @@
 "account_type_investment" = "投资账户";
 "account_type_cash" = "现金";
 "account_type_credit_card" = "信用卡";
+"account_type_digital_wallet" = "电子钱包";
+"account_type_loan" = "贷款";
+"account_type_mortgage" = "房贷";
+"account_type_savings" = "储蓄账户";
+"account_type_retirement" = "养老金";
+"account_type_crypto" = "加密货币";
+"account_type_property" = "房产";
+"account_type_vehicle" = "车辆";
+"account_type_other_asset" = "其他资产";
+"account_type_other_liability" = "其他负债";
 
 /* Record */
 "record_records" = "记账记录";

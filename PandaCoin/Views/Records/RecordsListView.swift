@@ -10,7 +10,7 @@ import Combine
 
 struct RecordsListView: View {
     @StateObject private var recordService = RecordService()
-    @StateObject private var accountService = AccountService()
+    @StateObject private var accountService = AssetService()
     @State private var showAddRecord = false
     @State private var selectedType: RecordType? = nil
     @State private var searchText = ""
@@ -294,13 +294,13 @@ struct FilterChip: View {
 // MARK: - 添加记账视图
 struct AddRecordView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var accountService: AccountService
+    @ObservedObject var accountService: AssetService
     @ObservedObject var recordService: RecordService
     
     @State private var amount: String = ""
     @State private var type: RecordType = .expense
     @State private var category: String = "餐饮"
-    @State private var selectedAccount: Account?
+    @State private var selectedAccount: Asset?
     @State private var description: String = ""
     @State private var date = Date()
     @State private var isLoading = false
@@ -341,7 +341,7 @@ struct AddRecordView: View {
                     Section("账户") {
                         Picker("选择账户", selection: $selectedAccount) {
                             ForEach(accountService.accounts) { account in
-                                Text(account.name).tag(account as Account?)
+                                Text(account.name).tag(account as Asset?)
                             }
                         }
                     }

@@ -34,7 +34,9 @@
 "tab_home" = "ホーム";
 "tab_records" = "記録";
 "tab_statistics" = "統計";
-"tab_accounts" = "口座";
+"tab_accounts" = "資産";
+"tab_budget" = "予算";
+"tab_settings" = "設定";
 
 /* Dashboard */
 "dashboard_total_assets" = "総資産";
@@ -55,11 +57,11 @@
 "voice_panda_says" = "パンダが整理しました";
 
 /* Account */
-"account_management" = "口座管理";
-"account_add" = "口座追加";
-"account_edit" = "口座編集";
-"account_name" = "口座名";
-"account_type" = "口座種類";
+"account_management" = "資産管理";
+"account_add" = "資産追加";
+"account_edit" = "資産編集";
+"account_name" = "資産名";
+"account_type" = "資産種類";
 "account_balance" = "残高";
 "account_initial_balance" = "初期残高";
 "account_current_balance" = "現在の残高";
@@ -72,6 +74,16 @@
 "account_type_investment" = "投資口座";
 "account_type_cash" = "現金";
 "account_type_credit_card" = "クレジットカード";
+"account_type_digital_wallet" = "電子マネー";
+"account_type_loan" = "ローン";
+"account_type_mortgage" = "住宅ローン";
+"account_type_savings" = "貯蓄口座";
+"account_type_retirement" = "年金";
+"account_type_crypto" = "暗号通貨";
+"account_type_property" = "不動産";
+"account_type_vehicle" = "車両";
+"account_type_other_asset" = "その他の資産";
+"account_type_other_liability" = "その他の負債";
 
 /* Record */
 "record_records" = "記録";

@@ -14,7 +14,7 @@ import Charts
 // MARK: - 首页仪表盘（重新设计）
 struct DashboardView: View {
     @StateObject private var speechService = SpeechRecognitionService()
-    @StateObject private var accountService = AccountService()
+    @StateObject private var accountService = AssetService()
     @StateObject private var recordService = RecordService()
     @StateObject private var authService = AuthService.shared
     
@@ -75,6 +75,7 @@ struct DashboardView: View {
     @State private var showAccounts = false
     @State private var showRecords = false
     @State private var showStatistics = false
+    @State private var showBudget = false
     @State private var showSettings = false
     
     var body: some View {
@@ -102,16 +103,20 @@ struct DashboardView: View {
                                 Label(L10n.TabBar.statistics, systemImage: "chart.pie")
                             }
                             
+                            Button(action: { showBudget = true }) {
+                                Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
+                            }
+                            
                             Divider()
                             
                             Button(action: { showSettings = true }) {
-                                Label("设置", systemImage: "gearshape")
+                                Label(L10n.TabBar.settings, systemImage: "gearshape")
                             }
                             
                             Button(role: .destructive, action: {
                                 authService.logout()
                             }) {
-                                Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                                Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
                             }
                         } label: {
                             Image(systemName: "line.3.horizontal")
@@ -151,7 +156,7 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showAccounts) {
             NavigationView {
-                AccountsView()
+                AssetsView()
             }
         }
         .sheet(isPresented: $showRecords) {
@@ -164,13 +169,18 @@ struct DashboardView: View {
                 StatisticsView()
             }
         }
+        .sheet(isPresented: $showBudget) {
+            NavigationView {
+                BudgetView()
+            }
+        }
         .sheet(isPresented: $showSettings) {
             NavigationView {
-                Text("设置页面")
-                    .navigationTitle("设置")
+                Text(L10n.Settings.settings)
+                    .navigationTitle(L10n.Settings.settings)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("完成") {
+                            Button(L10n.Common.done) {
                                 showSettings = false
                             }
                         }

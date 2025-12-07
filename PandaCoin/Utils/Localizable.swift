@@ -48,6 +48,8 @@ enum L10n {
         static let records = "tab_records".localized
         static let statistics = "tab_statistics".localized
         static let accounts = "tab_accounts".localized
+        static let budget = "tab_budget".localized
+        static let settings = "tab_settings".localized
     }
     
     // MARK: - Dashboard
@@ -92,6 +94,16 @@ enum L10n {
         static let typeInvestment = "account_type_investment".localized
         static let typeCash = "account_type_cash".localized
         static let typeCreditCard = "account_type_credit_card".localized
+        static let typeDigitalWallet = "account_type_digital_wallet".localized
+        static let typeLoan = "account_type_loan".localized
+        static let typeMortgage = "account_type_mortgage".localized
+        static let typeSavings = "account_type_savings".localized
+        static let typeRetirement = "account_type_retirement".localized
+        static let typeCrypto = "account_type_crypto".localized
+        static let typeProperty = "account_type_property".localized
+        static let typeVehicle = "account_type_vehicle".localized
+        static let typeOtherAsset = "account_type_other_asset".localized
+        static let typeOtherLiability = "account_type_other_liability".localized
     }
     
     // MARK: - Record

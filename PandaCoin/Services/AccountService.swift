@@ -8,8 +8,8 @@
 import Foundation
 import Combine
 
-class AccountService: ObservableObject {
-    @Published var accounts: [Account] = []
+class AssetService: ObservableObject {
+    @Published var accounts: [Asset] = []
     @Published var isLoading = false
     
     private let networkManager = NetworkManager.shared
@@ -28,7 +28,7 @@ class AccountService: ObservableObject {
                         print("获取账户失败: \(error.localizedDescription)")
                     }
                 },
-                receiveValue: { [weak self] (accounts: [Account]) in
+                receiveValue: { [weak self] (accounts: [Asset]) in
                     self?.accounts = accounts
                 }
             )
@@ -36,21 +36,21 @@ class AccountService: ObservableObject {
     }
     
     // MARK: - 创建账户
-    func createAccount(name: String, type: AccountType, balance: Decimal) -> AnyPublisher<Account, APIError> {
-        let request = AccountRequest(name: name, type: type, balance: balance, currency: "CNY")
+    func createAccount(name: String, type: AssetType, balance: Decimal) -> AnyPublisher<Asset, APIError> {
+        let request = AssetRequest(name: name, type: type, balance: balance, currency: "CNY")
         return networkManager.request(
             endpoint: "/accounts",
             method: "POST",
             body: request
         )
-        .handleEvents(receiveOutput: { [weak self] (account: Account) in
+        .handleEvents(receiveOutput: { [weak self] (account: Asset) in
             self?.accounts.append(account)
         })
         .eraseToAnyPublisher()
     }
     
-    // MARK: - 更新账户
-    func updateAccount(id: String, name: String, balance: Decimal) -> AnyPublisher<Account, APIError> {
+    // MARK: - 更新资产
+    func updateAsset(id: String, name: String, balance: Decimal) -> AnyPublisher<Asset, APIError> {
         let request = UpdateAccountRequest(name: name, balance: balance)
         return networkManager.request(
             endpoint: "/accounts/\(id)",
@@ -76,7 +76,7 @@ class AccountService: ObservableObject {
     }
     
     // MARK: - 根据名称查找账户
-    func findAccount(byName name: String) -> Account? {
+    func findAccount(byName name: String) -> Asset? {
         return accounts.first { $0.name == name }
     }
 }

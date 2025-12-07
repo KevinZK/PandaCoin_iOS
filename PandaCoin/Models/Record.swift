@@ -39,7 +39,7 @@ struct Record: Codable, Identifiable {
     let updatedAt: Date
     
     // 关联数据
-    var account: Account?
+    var account: Asset?
     
     enum CodingKeys: String, CodingKey {
         case id

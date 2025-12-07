@@ -34,7 +34,9 @@
 "tab_home" = "홈";
 "tab_records" = "기록";
 "tab_statistics" = "통계";
-"tab_accounts" = "계좌";
+"tab_accounts" = "자산";
+"tab_budget" = "예산";
+"tab_settings" = "설정";
 
 /* Dashboard */
 "dashboard_total_assets" = "총 자산";
@@ -55,11 +57,11 @@
 "voice_panda_says" = "판다가 정리했습니다";
 
 /* Account */
-"account_management" = "계좌 관리";
-"account_add" = "계좌 추가";
-"account_edit" = "계좌 편집";
-"account_name" = "계좌명";
-"account_type" = "계좌 유형";
+"account_management" = "자산 관리";
+"account_add" = "자산 추가";
+"account_edit" = "자산 편집";
+"account_name" = "자산명";
+"account_type" = "자산 유형";
 "account_balance" = "잔액";
 "account_initial_balance" = "초기 잔액";
 "account_current_balance" = "현재 잔액";
@@ -72,6 +74,16 @@
 "account_type_investment" = "투자 계좌";
 "account_type_cash" = "현금";
 "account_type_credit_card" = "신용카드";
+"account_type_digital_wallet" = "전자지갑";
+"account_type_loan" = "대출";
+"account_type_mortgage" = "주택담보대출";
+"account_type_savings" = "저축 계좌";
+"account_type_retirement" = "퇴직금";
+"account_type_crypto" = "암호화폐";
+"account_type_property" = "부동산";
+"account_type_vehicle" = "차량";
+"account_type_other_asset" = "기타 자산";
+"account_type_other_liability" = "기타 부채";
 
 /* Record */
 "record_records" = "기록";

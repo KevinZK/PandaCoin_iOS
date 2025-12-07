@@ -34,7 +34,9 @@
 "tab_home" = "Home";
 "tab_records" = "Records";
 "tab_statistics" = "Statistics";
-"tab_accounts" = "Accounts";
+"tab_accounts" = "Assets";
+"tab_budget" = "Budget";
+"tab_settings" = "Settings";
 
 /* Dashboard */
 "dashboard_total_assets" = "Total Assets";
@@ -55,11 +57,11 @@
 "voice_panda_says" = "Panda has organized it for you";
 
 /* Account */
-"account_management" = "Account Management";
-"account_add" = "Add Account";
-"account_edit" = "Edit Account";
-"account_name" = "Account Name";
-"account_type" = "Account Type";
+"account_management" = "Asset Management";
+"account_add" = "Add Asset";
+"account_edit" = "Edit Asset";
+"account_name" = "Asset Name";
+"account_type" = "Asset Type";
 "account_balance" = "Balance";
 "account_initial_balance" = "Initial Balance";
 "account_current_balance" = "Current Balance";
@@ -72,6 +74,16 @@
 "account_type_investment" = "Investment";
 "account_type_cash" = "Cash";
 "account_type_credit_card" = "Credit Card";
+"account_type_digital_wallet" = "Digital Wallet";
+"account_type_loan" = "Loan";
+"account_type_mortgage" = "Mortgage";
+"account_type_savings" = "Savings Account";
+"account_type_retirement" = "Retirement";
+"account_type_crypto" = "Cryptocurrency";
+"account_type_property" = "Property";
+"account_type_vehicle" = "Vehicle";
+"account_type_other_asset" = "Other Asset";
+"account_type_other_liability" = "Other Liability";
 
 /* Record */
 "record_records" = "Records";

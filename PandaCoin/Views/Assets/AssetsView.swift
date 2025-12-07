@@ -8,8 +8,8 @@
 import SwiftUI
 import Combine
 
-struct AccountsView: View {
-    @StateObject private var accountService = AccountService()
+struct AssetsView: View {
+    @StateObject private var accountService = AssetService()
     @State private var showAddAccount = false
     
     var totalAssets: Decimal {
@@ -33,7 +33,7 @@ struct AccountsView: View {
                     .padding(.top, Spacing.medium)
                 }
             }
-            .navigationTitle("账户管理")
+            .navigationTitle("资产管理")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -93,10 +93,10 @@ struct AccountsView: View {
         VStack(spacing: Spacing.medium) {
             Text("💳")
                 .font(.system(size: 60))
-            Text("还没有账户")
+            Text("还没有资产")
                 .font(.headline)
                 .foregroundColor(.gray)
-            Text("点击右上角 + 添加账户")
+            Text("点击右上角 + 添加资产")
                 .font(.subheadline)
                 .foregroundColor(.gray)
         }
@@ -114,8 +114,8 @@ struct AccountsView: View {
 
 // MARK: - 账户卡片
 struct AccountCard: View {
-    let account: Account
-    @ObservedObject var accountService: AccountService
+    let account: Asset
+    @ObservedObject var accountService: AssetService
     @State private var showEditSheet = false
     
     var body: some View {
@@ -162,6 +162,16 @@ struct AccountCard: View {
         case .investment: return .orange
         case .cash: return .purple
         case .creditCard: return .blue
+        case .digitalWallet: return .green
+        case .loan: return .red
+        case .mortgage: return .brown
+        case .savings: return .teal
+        case .retirement: return .indigo
+        case .crypto: return .yellow
+        case .property: return .gray
+        case .vehicle: return .mint
+        case .otherAsset: return .cyan
+        case .otherLiability: return .pink
         }
     }
     
@@ -177,10 +187,10 @@ struct AccountCard: View {
 // MARK: - 添加账户
 struct AddAccountView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var accountService: AccountService
+    @ObservedObject var accountService: AssetService
     
     @State private var name = ""
-    @State private var type: AccountType = .bank
+    @State private var type: AssetType = .bank
     @State private var balance = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -191,13 +201,13 @@ struct AddAccountView: View {
                 Theme.background.ignoresSafeArea()
                 
                 Form {
-                    Section("账户名称") {
+                    Section("资产名称") {
                         TextField("例如:招商银行", text: $name)
                     }
                     
-                    Section("账户类型") {
+                    Section("资产类型") {
                         Picker("类型", selection: $type) {
-                            ForEach(AccountType.allCases, id: \.self) { type in
+                            ForEach(AssetType.allCases, id: \.self) { type in
                                 Label(type.displayName, systemImage: type.icon)
                                     .tag(type)
                             }
@@ -218,7 +228,7 @@ struct AddAccountView: View {
                     }
                 }
             }
-            .navigationTitle("添加账户")
+            .navigationTitle("添加资产")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -265,15 +275,15 @@ struct AddAccountView: View {
 // MARK: - 编辑账户
 struct EditAccountView: View {
     @Environment(\.dismiss) var dismiss
-    let account: Account
-    @ObservedObject var accountService: AccountService
+    let account: Asset
+    @ObservedObject var accountService: AssetService
     
     @State private var name: String
     @State private var balance: String
     @State private var isLoading = false
     @State private var showDeleteAlert = false
     
-    init(account: Account, accountService: AccountService) {
+    init(account: Asset, accountService: AssetService) {
         self.account = account
         self.accountService = accountService
         _name = State(initialValue: account.name)
@@ -286,11 +296,11 @@ struct EditAccountView: View {
                 Theme.background.ignoresSafeArea()
                 
                 Form {
-                    Section("账户名称") {
-                        TextField("账户名称", text: $name)
+                    Section("资产名称") {
+                        TextField("资产名称", text: $name)
                     }
                     
-                    Section("账户类型") {
+                    Section("资产类型") {
                         HStack {
                             Text("类型")
                             Spacer()
@@ -315,7 +325,7 @@ struct EditAccountView: View {
                     }
                 }
             }
-            .navigationTitle("编辑账户")
+            .navigationTitle("编辑资产")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -329,13 +339,13 @@ struct EditAccountView: View {
                     .disabled(name.isEmpty || isLoading)
                 }
             }
-            .alert("删除账户", isPresented: $showDeleteAlert) {
+            .alert("删除资产", isPresented: $showDeleteAlert) {
                 Button("取消", role: .cancel) {}
                 Button("删除", role: .destructive) {
                     deleteAccount()
                 }
             } message: {
-                Text("确定要删除这个账户吗？相关的记账记录也将被删除。")
+                Text("确定要删除这个资产吗？相关的记账记录也将被删除。")
             }
         }
     }
@@ -345,7 +355,7 @@ struct EditAccountView: View {
         
         isLoading = true
         
-        accountService.updateAccount(id: account.id, name: name, balance: balanceValue)
+        accountService.updateAsset(id: account.id, name: name, balance: balanceValue)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in
@@ -374,5 +384,5 @@ struct EditAccountView: View {
 }
 
 #Preview {
-    AccountsView()
+    AssetsView()
 }

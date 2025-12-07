@@ -34,7 +34,9 @@
 "tab_home" = "Start";
 "tab_records" = "Einträge";
 "tab_statistics" = "Statistiken";
-"tab_accounts" = "Konten";
+"tab_accounts" = "Vermögen";
+"tab_budget" = "Budget";
+"tab_settings" = "Einstellungen";
 
 /* Dashboard */
 "dashboard_total_assets" = "Gesamtvermögen";
@@ -55,11 +57,11 @@
 "voice_panda_says" = "Panda hat es für Sie organisiert";
 
 /* Account */
-"account_management" = "Kontenverwaltung";
-"account_add" = "Konto hinzufügen";
-"account_edit" = "Konto bearbeiten";
-"account_name" = "Kontoname";
-"account_type" = "Kontotyp";
+"account_management" = "Vermögensverwaltung";
+"account_add" = "Vermögen hinzufügen";
+"account_edit" = "Vermögen bearbeiten";
+"account_name" = "Vermögensname";
+"account_type" = "Vermögenstyp";
 "account_balance" = "Saldo";
 "account_initial_balance" = "Anfangssaldo";
 "account_current_balance" = "Aktueller Saldo";
@@ -72,6 +74,16 @@
 "account_type_investment" = "Investition";
 "account_type_cash" = "Bargeld";
 "account_type_credit_card" = "Kreditkarte";
+"account_type_digital_wallet" = "Digitale Geldbörse";
+"account_type_loan" = "Darlehen";
+"account_type_mortgage" = "Hypothek";
+"account_type_savings" = "Sparkonto";
+"account_type_retirement" = "Rente";
+"account_type_crypto" = "Kryptowährung";
+"account_type_property" = "Immobilie";
+"account_type_vehicle" = "Fahrzeug";
+"account_type_other_asset" = "Sonstiges Vermögen";
+"account_type_other_liability" = "Sonstige Verbindlichkeiten";
 
 /* Record */
 "record_records" = "Einträge";
