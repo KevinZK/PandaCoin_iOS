@@ -143,14 +143,18 @@ class RecordService: ObservableObject {
                     )
                     
                 case .assetUpdate:
-                    // AI 返回的 ASSET_UPDATE 使用与 TRANSACTION 相同的字段结构
+                    // 使用 ASSET_UPDATE 专用字段
                     let assetData = AssetUpdateParsed(
-                        assetType: data.category ?? "OTHER_ASSET",      // 使用 category
-                        assetName: data.source_account ?? "",           // 使用 source_account
-                        totalValue: Decimal(data.amount ?? 0),          // 使用 amount
+                        assetType: data.asset_type ?? "BANK_BALANCE",
+                        assetName: data.asset_name ?? data.source_account ?? "",
+                        totalValue: Decimal(data.total_value ?? data.amount ?? 0),
                         currency: data.currency ?? "CNY",
                         date: self.parseDate(data.date) ?? Date(),
-                        institutionName: data.target_account           // 使用 target_account 作为机构名
+                        institutionName: data.institution_name ?? data.target_account,
+                        quantity: data.quantity,
+                        interestRateAPY: data.interest_rate_apy,
+                        maturityDate: data.maturity_date,
+                        isInitialRecord: data.is_initial_record ?? false
                     )
                     return ParsedFinancialEvent(
                         eventType: .assetUpdate,
@@ -535,6 +539,10 @@ struct FinancialEventData: Codable {
     let asset_name: String?
     let total_value: Double?
     let institution_name: String?
+    let quantity: Double?              // 股票/加密货币数量
+    let interest_rate_apy: Double?     // 年化利率（定期存款）
+    let maturity_date: String?         // 到期日（定期存款）
+    let is_initial_record: Bool?       // 是否初始记录
     
     // BUDGET 字段
     let budget_action: String?
@@ -569,12 +577,18 @@ struct ParsedFinancialEvent: Identifiable {
 
 // 资产更新解析结果
 struct AssetUpdateParsed {
-    let assetType: String
+    let assetType: String           // BANK_BALANCE, STOCK, CRYPTO, FIXED_INCOME, LIABILITY, PHYSICAL_ASSET
     let assetName: String
     let totalValue: Decimal
     let currency: String
     let date: Date
     let institutionName: String?
+    
+    // 新增字段
+    let quantity: Double?           // 股票/加密货币数量
+    let interestRateAPY: Double?    // 年化利率（定期存款）
+    let maturityDate: String?       // 到期日（定期存款）
+    let isInitialRecord: Bool       // 是否初始记录
 }
 
 // 预算解析结果

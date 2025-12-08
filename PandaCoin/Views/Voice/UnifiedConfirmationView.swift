@@ -219,29 +219,139 @@ struct AssetUpdateCardContent: View {
         VStack(alignment: .leading, spacing: Spacing.small) {
             // 资产名称和金额
             HStack {
-                Text(data.assetName)
-                    .font(AppFont.body(size: 18, weight: .semibold))
-                    .foregroundColor(Theme.text)
+                HStack(spacing: 8) {
+                    Text(assetIcon)
+                        .font(.system(size: 20))
+                    Text(data.assetName)
+                        .font(AppFont.body(size: 18, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                }
                 
                 Spacer()
                 
                 Text(formatValue())
                     .font(AppFont.monoNumber(size: 20, weight: .bold))
-                    .foregroundColor(.blue)
+                    .foregroundColor(valueColor)
             }
             
-            // 资产类型
+            // 根据资产类型显示不同的次要信息
             HStack(spacing: Spacing.medium) {
-                Label(mapAssetType(data.assetType), systemImage: assetIcon)
-                    .font(AppFont.body(size: 14))
-                    .foregroundColor(Theme.textSecondary)
+                // 资产分类标签
+                Text(assetCategoryLabel)
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(assetCategoryColor)
+                    .cornerRadius(10)
                 
-                if let institution = data.institutionName {
+                // 机构名称
+                if let institution = data.institutionName, !institution.isEmpty {
                     Label(institution, systemImage: "building.2")
-                        .font(AppFont.body(size: 14))
+                        .font(AppFont.body(size: 13))
                         .foregroundColor(Theme.textSecondary)
                 }
             }
+            
+            // 特殊信息行（根据资产类型）
+            if hasExtraInfo {
+                HStack(spacing: Spacing.medium) {
+                    // 定期存款：显示利率和到期日
+                    if let rate = data.interestRateAPY {
+                        Label(String(format: "%.2f%% APY", rate), systemImage: "percent")
+                            .font(AppFont.body(size: 13))
+                            .foregroundColor(Theme.income)
+                    }
+                    
+                    if let maturity = data.maturityDate {
+                        Label("到期: \(maturity)", systemImage: "calendar")
+                            .font(AppFont.body(size: 13))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    
+                    // 股票/加密货币：显示数量
+                    if let qty = data.quantity, qty > 0 {
+                        Label(formatQuantity(qty), systemImage: "number")
+                            .font(AppFont.body(size: 13))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - 计算属性
+    
+    private var hasExtraInfo: Bool {
+        data.interestRateAPY != nil || data.maturityDate != nil || (data.quantity ?? 0) > 0
+    }
+    
+    private var assetIcon: String {
+        switch data.assetType.uppercased() {
+        case "BANK_BALANCE":
+            return data.interestRateAPY != nil ? "💰" : "🏦"
+        case "STOCK":
+            return "📈"
+        case "CRYPTO":
+            return "₿"
+        case "FIXED_INCOME":
+            return "📊"
+        case "PHYSICAL_ASSET":
+            return "🏠"
+        case "LIABILITY":
+            return "💳"
+        default:
+            return "💵"
+        }
+    }
+    
+    private var assetCategoryLabel: String {
+        switch data.assetType.uppercased() {
+        case "BANK_BALANCE":
+            if data.interestRateAPY != nil {
+                return "定期存款"
+            }
+            return "活期存款"
+        case "STOCK":
+            return "股票"
+        case "CRYPTO":
+            return "加密货币"
+        case "FIXED_INCOME":
+            return "固定收益"
+        case "PHYSICAL_ASSET":
+            return "实物资产"
+        case "LIABILITY":
+            return "负债"
+        default:
+            return "资产"
+        }
+    }
+    
+    private var assetCategoryColor: Color {
+        switch data.assetType.uppercased() {
+        case "BANK_BALANCE":
+            return data.interestRateAPY != nil ? .orange : .blue
+        case "STOCK":
+            return .green
+        case "CRYPTO":
+            return .purple
+        case "FIXED_INCOME":
+            return .teal
+        case "PHYSICAL_ASSET":
+            return .brown
+        case "LIABILITY":
+            return .red
+        default:
+            return .gray
+        }
+    }
+    
+    private var valueColor: Color {
+        switch data.assetType.uppercased() {
+        case "LIABILITY":
+            return Theme.expense
+        default:
+            return .blue
         }
     }
     
@@ -251,35 +361,27 @@ struct AssetUpdateCardContent: View {
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         
-        let symbol = data.currency == "USD" ? "$" : "¥"
-        return "\(symbol)\(formatter.string(from: NSDecimalNumber(decimal: data.totalValue)) ?? "0.00")"
+        let symbol = currencySymbol(data.currency)
+        let prefix = data.assetType.uppercased() == "LIABILITY" ? "-" : ""
+        return "\(prefix)\(symbol)\(formatter.string(from: NSDecimalNumber(decimal: data.totalValue)) ?? "0.00")"
     }
     
-    private var assetIcon: String {
-        // AI 返回的是 category 类型，如 FOOD, SHOPPING, OTHER 等
-        switch data.assetType.uppercased() {
-        case "BANK_BALANCE", "BANK", "SAVINGS": return "building.columns"
-        case "STOCK", "INVESTMENT": return "chart.line.uptrend.xyaxis"
-        case "CRYPTO": return "bitcoinsign.circle"
-        case "PHYSICAL_ASSET", "PROPERTY": return "house"
-        case "LIABILITY", "CREDIT_CARD", "LOAN": return "creditcard"
-        case "CASH": return "banknote"
-        default: return "dollarsign.circle"
+    private func currencySymbol(_ currency: String) -> String {
+        switch currency.uppercased() {
+        case "USD": return "$"
+        case "EUR": return "€"
+        case "GBP": return "£"
+        case "JPY": return "¥"
+        case "HKD": return "HK$"
+        default: return "¥"
         }
     }
     
-    private func mapAssetType(_ type: String) -> String {
-        // AI 返回的是 category 类型
-        switch type.uppercased() {
-        case "BANK_BALANCE", "BANK", "SAVINGS": return "银行存款"
-        case "STOCK", "INVESTMENT": return "股票"
-        case "CRYPTO": return "加密货币"
-        case "PHYSICAL_ASSET", "PROPERTY": return "实物资产"
-        case "LIABILITY", "CREDIT_CARD", "LOAN": return "负债"
-        case "FIXED_INCOME": return "固定收益"
-        case "CASH": return "现金"
-        default: return "资产"  // 改为通用名称
+    private func formatQuantity(_ qty: Double) -> String {
+        if qty == floor(qty) {
+            return "\(Int(qty)) 份"
         }
+        return String(format: "%.4f 份", qty)
     }
 }
 
@@ -376,9 +478,10 @@ struct BudgetCardContent: View {
     }
 }
 
-#Preview {
+#Preview("统一确认页面 - 全部类型") {
     UnifiedConfirmationView(
         events: [
+            // TRANSACTION - 支出
             ParsedFinancialEvent(
                 eventType: .transaction,
                 transactionData: AIRecordParsed(
@@ -393,20 +496,297 @@ struct BudgetCardContent: View {
                 assetUpdateData: nil,
                 budgetData: nil
             ),
+            // TRANSACTION - 收入
+            ParsedFinancialEvent(
+                eventType: .transaction,
+                transactionData: AIRecordParsed(
+                    type: .income,
+                    amount: 8000,
+                    category: "INCOME_SALARY",
+                    accountName: "工商银行",
+                    description: "工资",
+                    date: Date(),
+                    confidence: 0.98
+                ),
+                assetUpdateData: nil,
+                budgetData: nil
+            ),
+            // ASSET_UPDATE - 活期存款
             ParsedFinancialEvent(
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
                     assetType: "BANK_BALANCE",
-                    assetName: "工商银行",
+                    assetName: "工商银行储蓄卡",
                     totalValue: 50000,
                     currency: "CNY",
                     date: Date(),
-                    institutionName: "工商银行"
+                    institutionName: "工商银行",
+                    quantity: nil,
+                    interestRateAPY: nil,
+                    maturityDate: nil,
+                    isInitialRecord: false
                 ),
                 budgetData: nil
+            ),
+            // ASSET_UPDATE - 定期存款
+            ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "BANK_BALANCE",
+                    assetName: "招商银行定期",
+                    totalValue: 100000,
+                    currency: "CNY",
+                    date: Date(),
+                    institutionName: "招商银行",
+                    quantity: nil,
+                    interestRateAPY: 2.85,
+                    maturityDate: "2025-06-30",
+                    isInitialRecord: false
+                ),
+                budgetData: nil
+            ),
+            // ASSET_UPDATE - 股票
+            ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "STOCK",
+                    assetName: "腾讯控股",
+                    totalValue: 38500,
+                    currency: "HKD",
+                    date: Date(),
+                    institutionName: "富途证券",
+                    quantity: 100,
+                    interestRateAPY: nil,
+                    maturityDate: nil,
+                    isInitialRecord: false
+                ),
+                budgetData: nil
+            ),
+            // BUDGET - 储蓄目标
+            ParsedFinancialEvent(
+                eventType: .budget,
+                transactionData: nil,
+                assetUpdateData: nil,
+                budgetData: BudgetParsed(
+                    action: "CREATE_SAVINGS",
+                    name: "旅游基金",
+                    targetAmount: 20000,
+                    targetDate: "2025-06",
+                    priority: "HIGH"
+                )
             )
         ],
         onConfirm: { _ in }
     )
+}
+
+#Preview("资产更新卡片 - 活期存款") {
+    VStack {
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "BANK_BALANCE",
+                    assetName: "工商银行储蓄卡",
+                    totalValue: 50000,
+                    currency: "CNY",
+                    date: Date(),
+                    institutionName: "工商银行",
+                    quantity: nil,
+                    interestRateAPY: nil,
+                    maturityDate: nil,
+                    isInitialRecord: false
+                ),
+                budgetData: nil
+            )
+        )
+        .padding()
+    }
+    .background(Theme.background)
+}
+
+#Preview("资产更新卡片 - 定期存款") {
+    VStack {
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "BANK_BALANCE",
+                    assetName: "招商银行定期",
+                    totalValue: 100000,
+                    currency: "CNY",
+                    date: Date(),
+                    institutionName: "招商银行",
+                    quantity: nil,
+                    interestRateAPY: 2.85,
+                    maturityDate: "2025-06-30",
+                    isInitialRecord: false
+                ),
+                budgetData: nil
+            )
+        )
+        .padding()
+    }
+    .background(Theme.background)
+}
+
+#Preview("资产更新卡片 - 股票") {
+    VStack {
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "STOCK",
+                    assetName: "腾讯控股",
+                    totalValue: 38500,
+                    currency: "HKD",
+                    date: Date(),
+                    institutionName: "富途证券",
+                    quantity: 100,
+                    interestRateAPY: nil,
+                    maturityDate: nil,
+                    isInitialRecord: false
+                ),
+                budgetData: nil
+            )
+        )
+        .padding()
+    }
+    .background(Theme.background)
+}
+
+#Preview("资产更新卡片 - 加密货币") {
+    VStack {
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "CRYPTO",
+                    assetName: "Bitcoin",
+                    totalValue: 45000,
+                    currency: "USD",
+                    date: Date(),
+                    institutionName: "Binance",
+                    quantity: 0.5,
+                    interestRateAPY: nil,
+                    maturityDate: nil,
+                    isInitialRecord: false
+                ),
+                budgetData: nil
+            )
+        )
+        .padding()
+    }
+    .background(Theme.background)
+}
+
+#Preview("资产更新卡片 - 负债") {
+    VStack {
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "LIABILITY",
+                    assetName: "招商信用卡",
+                    totalValue: 5000,
+                    currency: "CNY",
+                    date: Date(),
+                    institutionName: "招商银行",
+                    quantity: nil,
+                    interestRateAPY: nil,
+                    maturityDate: nil,
+                    isInitialRecord: false
+                ),
+                budgetData: nil
+            )
+        )
+        .padding()
+    }
+    .background(Theme.background)
+}
+
+#Preview("交易记录卡片") {
+    VStack(spacing: 16) {
+        // 支出
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .transaction,
+                transactionData: AIRecordParsed(
+                    type: .expense,
+                    amount: 35,
+                    category: "FOOD",
+                    accountName: "招商银行",
+                    description: "午餐",
+                    date: Date(),
+                    confidence: 0.95
+                ),
+                assetUpdateData: nil,
+                budgetData: nil
+            )
+        )
+        
+        // 收入
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .transaction,
+                transactionData: AIRecordParsed(
+                    type: .income,
+                    amount: 8000,
+                    category: "INCOME_SALARY",
+                    accountName: "工商银行",
+                    description: "工资",
+                    date: Date(),
+                    confidence: 0.98
+                ),
+                assetUpdateData: nil,
+                budgetData: nil
+            )
+        )
+    }
+    .padding()
+    .background(Theme.background)
+}
+
+#Preview("预算卡片") {
+    VStack(spacing: 16) {
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .budget,
+                transactionData: nil,
+                assetUpdateData: nil,
+                budgetData: BudgetParsed(
+                    action: "CREATE_SAVINGS",
+                    name: "旅游基金",
+                    targetAmount: 20000,
+                    targetDate: "2025-06",
+                    priority: "HIGH"
+                )
+            )
+        )
+        
+        EventConfirmCard(
+            event: ParsedFinancialEvent(
+                eventType: .budget,
+                transactionData: nil,
+                assetUpdateData: nil,
+                budgetData: BudgetParsed(
+                    action: "CREATE_DEBT_REPAYMENT",
+                    name: "信用卡还款",
+                    targetAmount: 5000,
+                    targetDate: "2025-01",
+                    priority: "MEDIUM"
+                )
+            )
+        )
+    }
+    .padding()
+    .background(Theme.background)
 }
