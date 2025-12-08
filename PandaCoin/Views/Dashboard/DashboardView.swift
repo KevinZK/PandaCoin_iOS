@@ -11,12 +11,6 @@ import Combine
 import Charts
 #endif
 
-// MARK: - 解析记录包装器
-struct ParsedRecordsWrapper: Identifiable {
-    let id = UUID()
-    let records: [AIRecordParsed]
-}
-
 // MARK: - 统一事件包装器
 struct ParsedEventsWrapper: Identifiable {
     let id = UUID()
@@ -31,7 +25,6 @@ struct DashboardView: View {
     @StateObject private var authService = AuthService.shared
     
     @State private var totalAssets: Decimal = 0
-    @State private var voiceConfirmationWrapper: ParsedRecordsWrapper? = nil
     @State private var unifiedEventsWrapper: ParsedEventsWrapper? = nil
     @State private var chartData: [(String, Double)] = [
         ("12/10", 2300),
@@ -157,14 +150,6 @@ struct DashboardView: View {
                 }
             }
             
-        }
-        .sheet(item: $voiceConfirmationWrapper) { wrapper in
-            VoiceRecordConfirmationView(
-                records: wrapper.records,
-                onConfirm: { confirmedRecords in
-                    saveRecords(confirmedRecords)
-                }
-            )
         }
         .sheet(item: $unifiedEventsWrapper) { wrapper in
             UnifiedConfirmationView(
@@ -515,36 +500,6 @@ struct DashboardView: View {
                 if !events.isEmpty {
                     self.unifiedEventsWrapper = ParsedEventsWrapper(events: events)
                 }
-            }
-            .store(in: &recordService.cancellables)
-    }
-    
-    private func saveRecords(_ records: [AIRecordParsed]) {
-        voiceConfirmationWrapper = nil
-        logInfo("用户确认保存\(records.count)条记录")
-        
-        // 构建账户名称到ID的映射
-        var accountMap: [String: String] = [:]
-        for account in accountService.accounts {
-            accountMap[account.name] = account.id
-        }
-        
-        // 调试日志
-        logInfo("📊 账户映射: \(accountMap.keys.joined(separator: ", "))")
-        for record in records {
-            logInfo("📌 记录账户: \(record.accountName), 匹配: \(accountMap[record.accountName] != nil)")
-        }
-        
-        // 批量创建记录
-        recordService.batchCreateRecords(records, accountMap: accountMap)
-            .receive(on: DispatchQueue.main)
-            .sink { completion in
-                if case .failure(let error) = completion {
-                    logError("保存记录失败", error: error)
-                }
-            } receiveValue: { _ in
-                logInfo("记录保存成功")
-                self.loadData()
             }
             .store(in: &recordService.cancellables)
     }
