@@ -179,7 +179,7 @@ struct TransactionCardContent: View {
             
             // 分类和账户
             HStack(spacing: Spacing.large) {
-                Label(data.category, systemImage: "tag.fill")
+                Label(CategoryMapper.displayName(for: data.category), systemImage: "tag.fill")
                     .font(AppFont.body(size: 14))
                     .foregroundColor(Theme.text)
                 

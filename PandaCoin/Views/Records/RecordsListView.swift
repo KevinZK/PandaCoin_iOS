@@ -223,8 +223,8 @@ struct RecordRowView: View {
     
     var body: some View {
         HStack(spacing: Spacing.medium) {
-            // 分类图标
-            Text(categoryIcon(record.category))
+            // 分类图标 - 使用映射工具
+            Text(CategoryMapper.icon(for: record.category))
                 .font(.system(size: 24))
                 .frame(width: 44, height: 44)
                 .background(categoryColor.opacity(0.1))
@@ -232,14 +232,17 @@ struct RecordRowView: View {
             
             // 信息
             VStack(alignment: .leading, spacing: 4) {
-                Text(record.category)
+                // 显示映射后的中文名称
+                Text(CategoryMapper.displayName(for: record.category))
                     .font(.body)
                     .foregroundColor(Theme.text)
                 
-                if let description = record.description {
+                // 显示描述（如果有）
+                if let description = record.description, !description.isEmpty {
                     Text(description)
                         .font(.caption)
                         .foregroundColor(.gray)
+                        .lineLimit(1)
                 }
             }
             
@@ -268,11 +271,6 @@ struct RecordRowView: View {
     private func formatAmount(_ amount: Decimal, type: RecordType) -> String {
         let prefix = type == .expense ? "-" : (type == .income ? "+" : "")
         return "\(prefix)¥\(amount)"
-    }
-    
-    private func categoryIcon(_ category: String) -> String {
-        DefaultCategories.expenseCategories.first { $0.0 == category }?.1 ??
-        DefaultCategories.incomeCategories.first { $0.0 == category }?.1 ?? "💰"
     }
 }
 
