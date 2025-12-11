@@ -10,8 +10,13 @@ import SwiftUI
 struct UnifiedConfirmationView: View {
     @Environment(\.dismiss) var dismiss
     
-    let events: [ParsedFinancialEvent]
+    @State private var editableEvents: [ParsedFinancialEvent]
     let onConfirm: ([ParsedFinancialEvent]) -> Void
+    
+    init(events: [ParsedFinancialEvent], onConfirm: @escaping ([ParsedFinancialEvent]) -> Void) {
+        self._editableEvents = State(initialValue: events)
+        self.onConfirm = onConfirm
+    }
     
     var body: some View {
         NavigationView {
@@ -25,9 +30,9 @@ struct UnifiedConfirmationView: View {
                             Text("🐼")
                                 .font(.system(size: 50))
                             
-                            Text("熊猫识别了\(events.count)条记录")
+                            Text("熊猫识别了\(editableEvents.count)条记录")
                                 .font(AppFont.body(size: 16, weight: .medium))
-                                .foregroundColor(Theme.text)
+                                 .foregroundColor(Theme.text)
                             
                             Text("请确认是否正确")
                                 .font(AppFont.body(size: 14))
@@ -37,8 +42,8 @@ struct UnifiedConfirmationView: View {
                         
                         // 事件列表
                         VStack(spacing: Spacing.medium) {
-                            ForEach(events) { event in
-                                EventConfirmCard(event: event)
+                            ForEach(editableEvents.indices, id: \.self) { index in
+                                EventConfirmCard(event: $editableEvents[index])
                             }
                         }
                         .padding(.horizontal, Spacing.medium)
@@ -58,7 +63,7 @@ struct UnifiedConfirmationView: View {
                             }
                             
                             Button(action: {
-                                onConfirm(events)
+                                onConfirm(editableEvents)
                                 dismiss()
                             }) {
                                 Text("确认保存")
@@ -83,7 +88,7 @@ struct UnifiedConfirmationView: View {
 
 // MARK: - 事件确认卡片
 struct EventConfirmCard: View {
-    let event: ParsedFinancialEvent
+    @Binding var event: ParsedFinancialEvent
     
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.medium) {
@@ -96,12 +101,25 @@ struct EventConfirmCard: View {
             // 根据事件类型显示不同内容
             switch event.eventType {
             case .transaction:
-                if let data = event.transactionData {
-                    TransactionCardContent(data: data)
+                if event.transactionData != nil {
+                    TransactionCardContent(data: Binding(
+                        get: { event.transactionData! },
+                        set: { event.transactionData = $0 }
+                    ))
                 }
             case .assetUpdate:
-                if let data = event.assetUpdateData {
-                    AssetUpdateCardContent(data: data)
+                if event.assetUpdateData != nil {
+                    AssetUpdateCardContent(data: Binding(
+                        get: { event.assetUpdateData! },
+                        set: { event.assetUpdateData = $0 }
+                    ))
+                }
+            case .creditCardUpdate:
+                if event.creditCardData != nil {
+                    CreditCardUpdateCardContent(data: Binding(
+                        get: { event.creditCardData! },
+                        set: { event.creditCardData = $0 }
+                    ))
                 }
             case .budget:
                 if let data = event.budgetData {
@@ -138,6 +156,7 @@ struct EventConfirmCard: View {
         switch event.eventType {
         case .transaction: return "交易记录"
         case .assetUpdate: return "资产更新"
+        case .creditCardUpdate: return "信用卡"
         case .budget: return "预算"
         case .nullStatement: return "无效"
         }
@@ -147,6 +166,7 @@ struct EventConfirmCard: View {
         switch event.eventType {
         case .transaction: return "arrow.left.arrow.right"
         case .assetUpdate: return "building.columns"
+        case .creditCardUpdate: return "creditcard"
         case .budget: return "target"
         case .nullStatement: return "xmark"
         }
@@ -160,6 +180,7 @@ struct EventConfirmCard: View {
             }
             return Theme.textSecondary
         case .assetUpdate: return .blue
+        case .creditCardUpdate: return .orange
         case .budget: return .purple
         case .nullStatement: return Theme.textSecondary
         }
@@ -168,7 +189,13 @@ struct EventConfirmCard: View {
 
 // MARK: - 交易卡片内容
 struct TransactionCardContent: View {
-    let data: AIRecordParsed
+    @Binding var data: AIRecordParsed
+    @State private var cardIdentifier: String = ""
+    
+    // 是否涉及信用卡（根据账户名称判断）
+    private var involvesCreditCard: Bool {
+        data.accountName.contains("信用卡") || data.cardIdentifier != nil
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
@@ -196,6 +223,29 @@ struct TransactionCardContent: View {
                     .font(AppFont.body(size: 14))
                     .foregroundColor(Theme.textSecondary)
             }
+            
+            // 信用卡标识选择器（仅当交易涉及信用卡时显示）
+            if involvesCreditCard {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("关联信用卡")
+                        .font(AppFont.body(size: 12, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    CardIdentifierPicker(
+                        cardIdentifier: $cardIdentifier,
+                        placeholder: "请输入卡片标识（如尾号）"
+                    )
+                }
+            }
+        }
+        .onAppear {
+            cardIdentifier = data.cardIdentifier ?? ""
+        }
+        .onChange(of: cardIdentifier) { newValue in
+            data.cardIdentifier = newValue.isEmpty ? nil : newValue
         }
     }
     
@@ -213,7 +263,13 @@ struct TransactionCardContent: View {
 
 // MARK: - 资产更新卡片内容
 struct AssetUpdateCardContent: View {
-    let data: AssetUpdateParsed
+    @Binding var data: AssetUpdateParsed
+    @State private var cardIdentifier: String = ""
+    
+    // 是否是信用卡类型
+    private var isCreditCard: Bool {
+        data.assetType.uppercased() == "CREDIT_CARD"
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
@@ -277,6 +333,40 @@ struct AssetUpdateCardContent: View {
                     }
                 }
             }
+            
+            // 还款计划（负债类）
+            if let repayment = data.repaymentAmount, repayment > 0 {
+                HStack(spacing: Spacing.small) {
+                    Image(systemName: "calendar.badge.clock")
+                        .foregroundColor(Theme.expense)
+                    Text("还款: \(formatRepayment(repayment))/\(formatSchedule(data.repaymentSchedule))")
+                        .font(AppFont.body(size: 13, weight: .medium))
+                        .foregroundColor(Theme.expense)
+                }
+            }
+            
+            // 信用卡标识选择器（仅当 asset_type = CREDIT_CARD 时显示）
+            if isCreditCard {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("关联信用卡")
+                        .font(AppFont.body(size: 12, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    CardIdentifierPicker(
+                        cardIdentifier: $cardIdentifier,
+                        placeholder: "请输入卡片标识（如尾号）"
+                    )
+                }
+            }
+        }
+        .onAppear {
+            cardIdentifier = data.cardIdentifier ?? ""
+        }
+        .onChange(of: cardIdentifier) { newValue in
+            data.cardIdentifier = newValue.isEmpty ? nil : newValue
         }
     }
     
@@ -286,20 +376,54 @@ struct AssetUpdateCardContent: View {
         data.interestRateAPY != nil || data.maturityDate != nil || (data.quantity ?? 0) > 0
     }
     
+    private func formatRepayment(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        let symbol = currencySymbol(data.currency)
+        return "\(symbol)\(formatter.string(from: NSNumber(value: amount)) ?? "0")"
+    }
+    
+    private func formatSchedule(_ schedule: String?) -> String {
+        switch schedule?.uppercased() {
+        case "WEEKLY": return "周"
+        case "MONTHLY": return "月"
+        case "YEARLY": return "年"
+        default: return "月"
+        }
+    }
+    
     private var assetIcon: String {
         switch data.assetType.uppercased() {
-        case "BANK_BALANCE":
+        case "BANK":
+            return "🏦"
+        case "SAVINGS":
             return data.interestRateAPY != nil ? "💰" : "🏦"
-        case "STOCK":
+        case "INVESTMENT":
             return "📈"
         case "CRYPTO":
             return "₿"
-        case "FIXED_INCOME":
-            return "📊"
-        case "PHYSICAL_ASSET":
-            return "🏠"
-        case "LIABILITY":
+        case "CASH":
+            return "💵"
+        case "CREDIT_CARD":
             return "💳"
+        case "DIGITAL_WALLET":
+            return "📱"
+        case "LOAN":
+            return "📝"
+        case "MORTGAGE":
+            return "🏠"
+        case "RETIREMENT":
+            return "👴"
+        case "PROPERTY":
+            return "🏠"
+        case "VEHICLE":
+            return "🚗"
+        case "OTHER_ASSET":
+            return "📦"
+        case "OTHER_LIABILITY":
+            return "📋"
         default:
             return "💵"
         }
@@ -307,21 +431,34 @@ struct AssetUpdateCardContent: View {
     
     private var assetCategoryLabel: String {
         switch data.assetType.uppercased() {
-        case "BANK_BALANCE":
-            if data.interestRateAPY != nil {
-                return "定期存款"
-            }
-            return "活期存款"
-        case "STOCK":
-            return "股票"
+        case "BANK":
+            return "银行账户"
+        case "SAVINGS":
+            return data.interestRateAPY != nil ? "定期存款" : "储蓄账户"
+        case "INVESTMENT":
+            return "投资账户"
         case "CRYPTO":
             return "加密货币"
-        case "FIXED_INCOME":
-            return "固定收益"
-        case "PHYSICAL_ASSET":
-            return "实物资产"
-        case "LIABILITY":
-            return "负债"
+        case "CASH":
+            return "现金"
+        case "CREDIT_CARD":
+            return "信用卡"
+        case "DIGITAL_WALLET":
+            return "电子钱包"
+        case "LOAN":
+            return "贷款"
+        case "MORTGAGE":
+            return "房贷"
+        case "RETIREMENT":
+            return "退休金"
+        case "PROPERTY":
+            return "房产"
+        case "VEHICLE":
+            return "车辆"
+        case "OTHER_ASSET":
+            return "其他资产"
+        case "OTHER_LIABILITY":
+            return "其他负债"
         default:
             return "资产"
         }
@@ -329,18 +466,26 @@ struct AssetUpdateCardContent: View {
     
     private var assetCategoryColor: Color {
         switch data.assetType.uppercased() {
-        case "BANK_BALANCE":
+        case "BANK", "SAVINGS":
             return data.interestRateAPY != nil ? .orange : .blue
-        case "STOCK":
+        case "INVESTMENT":
             return .green
         case "CRYPTO":
             return .purple
-        case "FIXED_INCOME":
-            return .teal
-        case "PHYSICAL_ASSET":
-            return .brown
-        case "LIABILITY":
+        case "CASH":
+            return .mint
+        case "CREDIT_CARD", "LOAN", "MORTGAGE", "OTHER_LIABILITY":
             return .red
+        case "DIGITAL_WALLET":
+            return .cyan
+        case "RETIREMENT":
+            return .indigo
+        case "PROPERTY":
+            return .brown
+        case "VEHICLE":
+            return .gray
+        case "OTHER_ASSET":
+            return .teal
         default:
             return .gray
         }
@@ -348,11 +493,15 @@ struct AssetUpdateCardContent: View {
     
     private var valueColor: Color {
         switch data.assetType.uppercased() {
-        case "LIABILITY":
+        case "CREDIT_CARD", "LOAN", "MORTGAGE", "OTHER_LIABILITY":
             return Theme.expense
         default:
             return .blue
         }
+    }
+    
+    private var isLiability: Bool {
+        ["CREDIT_CARD", "LOAN", "MORTGAGE", "OTHER_LIABILITY"].contains(data.assetType.uppercased())
     }
     
     private func formatValue() -> String {
@@ -362,7 +511,7 @@ struct AssetUpdateCardContent: View {
         formatter.maximumFractionDigits = 2
         
         let symbol = currencySymbol(data.currency)
-        let prefix = data.assetType.uppercased() == "LIABILITY" ? "-" : ""
+        let prefix = isLiability ? "-" : ""
         return "\(prefix)\(symbol)\(formatter.string(from: NSDecimalNumber(decimal: data.totalValue)) ?? "0.00")"
     }
     
@@ -433,18 +582,16 @@ struct BudgetCardContent: View {
     
     private var actionIcon: String {
         switch data.action {
-        case "CREATE_SAVINGS": return "banknote"
-        case "CREATE_DEBT_REPAYMENT": return "creditcard"
-        case "UPDATE_TARGET": return "pencil"
+        case "CREATE_BUDGET": return "plus.circle"
+        case "UPDATE_BUDGET": return "pencil"
         default: return "target"
         }
     }
     
     private func mapAction(_ action: String) -> String {
         switch action {
-        case "CREATE_SAVINGS": return "储蓄目标"
-        case "CREATE_DEBT_REPAYMENT": return "还债计划"
-        case "UPDATE_TARGET": return "更新目标"
+        case "CREATE_BUDGET": return "创建预算"
+        case "UPDATE_BUDGET": return "更新预算"
         default: return "预算"
         }
     }
@@ -478,6 +625,124 @@ struct BudgetCardContent: View {
     }
 }
 
+// MARK: - 信用卡更新卡片内容
+struct CreditCardUpdateCardContent: View {
+    @Binding var data: CreditCardParsed
+    @State private var cardIdentifier: String = ""
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            // 信用卡名称和待还金额
+            HStack {
+                HStack(spacing: 8) {
+                    Text("💳")
+                        .font(.system(size: 20))
+                    Text(data.name.isEmpty ? "信用卡" : data.name)
+                        .font(AppFont.body(size: 18, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                }
+                
+                Spacer()
+                
+                Text(formatBalance())
+                    .font(AppFont.monoNumber(size: 20, weight: .bold))
+                    .foregroundColor(Theme.expense)
+            }
+            
+            // 发卡银行
+            HStack(spacing: Spacing.medium) {
+                Text("信用卡")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.orange)
+                    .cornerRadius(10)
+                
+                if let institution = data.institutionName, !institution.isEmpty {
+                    Label(institution, systemImage: "building.2")
+                        .font(AppFont.body(size: 13))
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            
+            // 额度和还款日
+            HStack(spacing: Spacing.medium) {
+                if let limit = data.creditLimit, limit > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "creditcard.circle")
+                            .foregroundColor(.blue)
+                        Text("额度: \(formatCreditLimit(limit))")
+                            .font(AppFont.body(size: 13, weight: .medium))
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                if let dueDate = data.repaymentDueDate, !dueDate.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar.badge.clock")
+                            .foregroundColor(Theme.expense)
+                        Text("还款日: 每月\(dueDate)号")
+                            .font(AppFont.body(size: 13, weight: .medium))
+                            .foregroundColor(Theme.expense)
+                    }
+                }
+            }
+            
+            // 卡片标识输入
+            Divider()
+                .padding(.vertical, 4)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("卡片标识")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                
+                CardIdentifierPicker(
+                    cardIdentifier: $cardIdentifier,
+                    placeholder: "请输入卡片标识（如尾号）"
+                )
+            }
+        }
+        .onAppear {
+            cardIdentifier = data.cardIdentifier ?? ""
+        }
+        .onChange(of: cardIdentifier) { newValue in
+            data.cardIdentifier = newValue.isEmpty ? nil : newValue
+        }
+    }
+    
+    private func formatBalance() -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        
+        let symbol = currencySymbol(data.currency)
+        return "-\(symbol)\(formatter.string(from: NSDecimalNumber(decimal: data.outstandingBalance)) ?? "0.00")"
+    }
+    
+    private func formatCreditLimit(_ limit: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+        let symbol = currencySymbol(data.currency)
+        return "\(symbol)\(formatter.string(from: NSNumber(value: limit)) ?? "0")"
+    }
+    
+    private func currencySymbol(_ currency: String) -> String {
+        switch currency.uppercased() {
+        case "USD": return "$"
+        case "EUR": return "€"
+        case "GBP": return "£"
+        case "JPY": return "¥"
+        case "HKD": return "HK$"
+        default: return "¥"
+        }
+    }
+}
+
 #Preview("统一确认页面 - 全部类型") {
     UnifiedConfirmationView(
         events: [
@@ -494,6 +759,7 @@ struct BudgetCardContent: View {
                     confidence: 0.95
                 ),
                 assetUpdateData: nil,
+                creditCardData: nil,
                 budgetData: nil
             ),
             // TRANSACTION - 收入
@@ -509,6 +775,7 @@ struct BudgetCardContent: View {
                     confidence: 0.98
                 ),
                 assetUpdateData: nil,
+                creditCardData: nil,
                 budgetData: nil
             ),
             // ASSET_UPDATE - 活期存款
@@ -516,7 +783,7 @@ struct BudgetCardContent: View {
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
-                    assetType: "BANK_BALANCE",
+                    assetType: "BANK",
                     assetName: "工商银行储蓄卡",
                     totalValue: 50000,
                     currency: "CNY",
@@ -525,8 +792,15 @@ struct BudgetCardContent: View {
                     quantity: nil,
                     interestRateAPY: nil,
                     maturityDate: nil,
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: nil,
+                    repaymentSchedule: nil
                 ),
+                creditCardData: nil,
                 budgetData: nil
             ),
             // ASSET_UPDATE - 定期存款
@@ -534,7 +808,7 @@ struct BudgetCardContent: View {
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
-                    assetType: "BANK_BALANCE",
+                    assetType: "SAVINGS",
                     assetName: "招商银行定期",
                     totalValue: 100000,
                     currency: "CNY",
@@ -543,8 +817,15 @@ struct BudgetCardContent: View {
                     quantity: nil,
                     interestRateAPY: 2.85,
                     maturityDate: "2025-06-30",
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: nil,
+                    repaymentSchedule: nil
                 ),
+                creditCardData: nil,
                 budgetData: nil
             ),
             // ASSET_UPDATE - 股票
@@ -552,7 +833,7 @@ struct BudgetCardContent: View {
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
-                    assetType: "STOCK",
+                    assetType: "INVESTMENT",
                     assetName: "腾讯控股",
                     totalValue: 38500,
                     currency: "HKD",
@@ -561,19 +842,28 @@ struct BudgetCardContent: View {
                     quantity: 100,
                     interestRateAPY: nil,
                     maturityDate: nil,
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: nil,
+                    repaymentSchedule: nil
                 ),
+                creditCardData: nil,
                 budgetData: nil
             ),
-            // BUDGET - 储蓄目标
+            // BUDGET - 预算
             ParsedFinancialEvent(
                 eventType: .budget,
                 transactionData: nil,
                 assetUpdateData: nil,
+                creditCardData: nil,
                 budgetData: BudgetParsed(
-                    action: "CREATE_SAVINGS",
+                    action: "CREATE_BUDGET",
                     name: "旅游基金",
                     targetAmount: 20000,
+                    currency: "CNY",
                     targetDate: "2025-06",
                     priority: "HIGH"
                 )
@@ -586,11 +876,11 @@ struct BudgetCardContent: View {
 #Preview("资产更新卡片 - 活期存款") {
     VStack {
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
-                    assetType: "BANK_BALANCE",
+                    assetType: "BANK",
                     assetName: "工商银行储蓄卡",
                     totalValue: 50000,
                     currency: "CNY",
@@ -599,10 +889,17 @@ struct BudgetCardContent: View {
                     quantity: nil,
                     interestRateAPY: nil,
                     maturityDate: nil,
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: nil,
+                    repaymentSchedule: nil
                 ),
+                creditCardData: nil,
                 budgetData: nil
-            )
+            ))
         )
         .padding()
     }
@@ -612,11 +909,11 @@ struct BudgetCardContent: View {
 #Preview("资产更新卡片 - 定期存款") {
     VStack {
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
-                    assetType: "BANK_BALANCE",
+                    assetType: "SAVINGS",
                     assetName: "招商银行定期",
                     totalValue: 100000,
                     currency: "CNY",
@@ -625,10 +922,17 @@ struct BudgetCardContent: View {
                     quantity: nil,
                     interestRateAPY: 2.85,
                     maturityDate: "2025-06-30",
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: nil,
+                    repaymentSchedule: nil
                 ),
+                creditCardData: nil,
                 budgetData: nil
-            )
+            ))
         )
         .padding()
     }
@@ -638,11 +942,11 @@ struct BudgetCardContent: View {
 #Preview("资产更新卡片 - 股票") {
     VStack {
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
-                    assetType: "STOCK",
+                    assetType: "INVESTMENT",
                     assetName: "腾讯控股",
                     totalValue: 38500,
                     currency: "HKD",
@@ -651,10 +955,17 @@ struct BudgetCardContent: View {
                     quantity: 100,
                     interestRateAPY: nil,
                     maturityDate: nil,
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: nil,
+                    repaymentSchedule: nil
                 ),
+                creditCardData: nil,
                 budgetData: nil
-            )
+            ))
         )
         .padding()
     }
@@ -664,7 +975,7 @@ struct BudgetCardContent: View {
 #Preview("资产更新卡片 - 加密货币") {
     VStack {
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
@@ -677,24 +988,31 @@ struct BudgetCardContent: View {
                     quantity: 0.5,
                     interestRateAPY: nil,
                     maturityDate: nil,
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: nil,
+                    repaymentSchedule: nil
                 ),
+                creditCardData: nil,
                 budgetData: nil
-            )
+            ))
         )
         .padding()
     }
     .background(Theme.background)
 }
 
-#Preview("资产更新卡片 - 负债") {
+#Preview("资产更新卡片 - 信用卡") {
     VStack {
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .assetUpdate,
                 transactionData: nil,
                 assetUpdateData: AssetUpdateParsed(
-                    assetType: "LIABILITY",
+                    assetType: "CREDIT_CARD",
                     assetName: "招商信用卡",
                     totalValue: 5000,
                     currency: "CNY",
@@ -703,13 +1021,97 @@ struct BudgetCardContent: View {
                     quantity: nil,
                     interestRateAPY: nil,
                     maturityDate: nil,
-                    isInitialRecord: false
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: 5000,
+                    repaymentSchedule: "MONTHLY"
                 ),
+                creditCardData: nil,
                 budgetData: nil
-            )
+            ))
         )
         .padding()
     }
+    .background(Theme.background)
+}
+
+#Preview("资产更新卡片 - 房贷") {
+    VStack {
+        EventConfirmCard(
+            event: .constant(ParsedFinancialEvent(
+                eventType: .assetUpdate,
+                transactionData: nil,
+                assetUpdateData: AssetUpdateParsed(
+                    assetType: "MORTGAGE",
+                    assetName: "房产贷款",
+                    totalValue: 100000,
+                    currency: "USD",
+                    date: Date(),
+                    institutionName: nil,
+                    quantity: nil,
+                    interestRateAPY: nil,
+                    maturityDate: nil,
+                    isInitialRecord: false,
+                    costBasis: nil,
+                    costBasisCurrency: nil,
+                    projectedValue: nil,
+                    location: nil,
+                    repaymentAmount: 3000,
+                    repaymentSchedule: "MONTHLY"
+                ),
+                creditCardData: nil,
+                budgetData: nil
+            ))
+        )
+        .padding()
+    }
+    .background(Theme.background)
+}
+
+#Preview("信用卡更新卡片") {
+    VStack(spacing: 16) {
+        // 花旗信用卡
+        EventConfirmCard(
+            event: .constant(ParsedFinancialEvent(
+                eventType: .creditCardUpdate,
+                transactionData: nil,
+                assetUpdateData: nil,
+                creditCardData: CreditCardParsed(
+                    name: "花旗信用卡",
+                    outstandingBalance: 500,
+                    currency: "USD",
+                    date: Date(),
+                    institutionName: "花旗银行",
+                    creditLimit: 53000,
+                    repaymentDueDate: "04"
+                ),
+                budgetData: nil
+            ))
+        )
+        
+        // 招商信用卡
+        EventConfirmCard(
+            event: .constant(ParsedFinancialEvent(
+                eventType: .creditCardUpdate,
+                transactionData: nil,
+                assetUpdateData: nil,
+                creditCardData: CreditCardParsed(
+                    name: "招商信用卡",
+                    outstandingBalance: 8500,
+                    currency: "CNY",
+                    date: Date(),
+                    institutionName: "招商银行",
+                    creditLimit: 50000,
+                    repaymentDueDate: "15"
+                ),
+                budgetData: nil
+            ))
+        )
+    }
+    .padding()
     .background(Theme.background)
 }
 
@@ -717,7 +1119,7 @@ struct BudgetCardContent: View {
     VStack(spacing: 16) {
         // 支出
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .transaction,
                 transactionData: AIRecordParsed(
                     type: .expense,
@@ -729,13 +1131,14 @@ struct BudgetCardContent: View {
                     confidence: 0.95
                 ),
                 assetUpdateData: nil,
+                creditCardData: nil,
                 budgetData: nil
-            )
+            ))
         )
         
         // 收入
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .transaction,
                 transactionData: AIRecordParsed(
                     type: .income,
@@ -747,8 +1150,9 @@ struct BudgetCardContent: View {
                     confidence: 0.98
                 ),
                 assetUpdateData: nil,
+                creditCardData: nil,
                 budgetData: nil
-            )
+            ))
         )
     }
     .padding()
@@ -758,33 +1162,37 @@ struct BudgetCardContent: View {
 #Preview("预算卡片") {
     VStack(spacing: 16) {
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .budget,
                 transactionData: nil,
                 assetUpdateData: nil,
+                creditCardData: nil,
                 budgetData: BudgetParsed(
-                    action: "CREATE_SAVINGS",
+                    action: "CREATE_BUDGET",
                     name: "旅游基金",
                     targetAmount: 20000,
+                    currency: "CNY",
                     targetDate: "2025-06",
                     priority: "HIGH"
                 )
-            )
+            ))
         )
         
         EventConfirmCard(
-            event: ParsedFinancialEvent(
+            event: .constant(ParsedFinancialEvent(
                 eventType: .budget,
                 transactionData: nil,
                 assetUpdateData: nil,
+                creditCardData: nil,
                 budgetData: BudgetParsed(
-                    action: "CREATE_DEBT_REPAYMENT",
+                    action: "UPDATE_BUDGET",
                     name: "信用卡还款",
                     targetAmount: 5000,
+                    currency: "CNY",
                     targetDate: "2025-01",
                     priority: "MEDIUM"
                 )
-            )
+            ))
         )
     }
     .padding()

@@ -126,7 +126,7 @@ class RecordService: ObservableObject {
                 
                 switch eventType {
                 case .transaction:
-                    let transactionData = AIRecordParsed(
+                    var transactionData = AIRecordParsed(
                         type: self.mapTransactionType(data.transaction_type ?? ""),
                         amount: Decimal(data.amount ?? 0),
                         category: data.category ?? "OTHER",
@@ -135,46 +135,78 @@ class RecordService: ObservableObject {
                         date: self.parseDate(data.date) ?? Date(),
                         confidence: 0.95
                     )
+                    transactionData.cardIdentifier = data.card_identifier
                     return ParsedFinancialEvent(
                         eventType: .transaction,
                         transactionData: transactionData,
                         assetUpdateData: nil,
+                        creditCardData: nil,
                         budgetData: nil
                     )
                     
                 case .assetUpdate:
-                    // 使用 ASSET_UPDATE 专用字段
-                    let assetData = AssetUpdateParsed(
-                        assetType: data.asset_type ?? "BANK_BALANCE",
-                        assetName: data.asset_name ?? data.source_account ?? "",
-                        totalValue: Decimal(data.total_value ?? data.amount ?? 0),
+                    // 使用通用字段 name 和 amount
+                    var assetData = AssetUpdateParsed(
+                        assetType: data.asset_type ?? "BANK",
+                        assetName: data.name ?? data.source_account ?? "",
+                        totalValue: Decimal(data.amount ?? 0),
                         currency: data.currency ?? "CNY",
                         date: self.parseDate(data.date) ?? Date(),
                         institutionName: data.institution_name ?? data.target_account,
                         quantity: data.quantity,
                         interestRateAPY: data.interest_rate_apy,
                         maturityDate: data.maturity_date,
-                        isInitialRecord: data.is_initial_record ?? false
+                        isInitialRecord: data.is_initial_record ?? false,
+                        costBasis: data.cost_basis,
+                        costBasisCurrency: data.cost_basis_currency,
+                        projectedValue: data.projected_value,
+                        location: data.location,
+                        repaymentAmount: data.repayment_amount,
+                        repaymentSchedule: data.repayment_schedule,
+                        cardIdentifier: data.card_identifier
                     )
                     return ParsedFinancialEvent(
                         eventType: .assetUpdate,
                         transactionData: nil,
                         assetUpdateData: assetData,
+                        creditCardData: nil,
+                        budgetData: nil
+                    )
+                    
+                case .creditCardUpdate:
+                    var creditCardData = CreditCardParsed(
+                        name: data.name ?? "",
+                        outstandingBalance: Decimal(data.amount ?? 0),
+                        currency: data.currency ?? "CNY",
+                        date: self.parseDate(data.date) ?? Date(),
+                        institutionName: data.institution_name,
+                        creditLimit: data.credit_limit,
+                        repaymentDueDate: data.repayment_due_date,
+                        cardIdentifier: data.card_identifier
+                    )
+                    return ParsedFinancialEvent(
+                        eventType: .creditCardUpdate,
+                        transactionData: nil,
+                        assetUpdateData: nil,
+                        creditCardData: creditCardData,
                         budgetData: nil
                     )
                     
                 case .budget:
+                    // 使用通用字段 name, amount, date
                     let budgetData = BudgetParsed(
-                        action: data.budget_action ?? "CREATE_SAVINGS",
-                        name: data.budget_name ?? "",
-                        targetAmount: Decimal(data.target_amount ?? 0),
-                        targetDate: data.target_date,
+                        action: data.budget_action ?? "CREATE_BUDGET",
+                        name: data.name ?? "",
+                        targetAmount: Decimal(data.amount ?? 0),
+                        currency: data.currency,
+                        targetDate: data.date,
                         priority: data.priority
                     )
                     return ParsedFinancialEvent(
                         eventType: .budget,
                         transactionData: nil,
                         assetUpdateData: nil,
+                        creditCardData: nil,
                         budgetData: budgetData
                     )
                     
@@ -227,6 +259,13 @@ class RecordService: ObservableObject {
             case .budget:
                 if let data = event.budgetData {
                     let pub = saveBudget(data)
+                        .map { _ in successCount += 1 }
+                        .eraseToAnyPublisher()
+                    publishers.append(pub)
+                }
+            case .creditCardUpdate:
+                if let data = event.creditCardData {
+                    let pub = saveCreditCardUpdate(data)
                         .map { _ in successCount += 1 }
                         .eraseToAnyPublisher()
                     publishers.append(pub)
@@ -312,18 +351,42 @@ class RecordService: ObservableObject {
         )
     }
     
+    // MARK: - 保存信用卡更新
+    private func saveCreditCardUpdate(_ data: CreditCardParsed) -> AnyPublisher<Asset, APIError> {
+        logInfo("✅ 保存信用卡: \(data.name), 待还=\(data.outstandingBalance)")
+        
+        let request = AssetRequest(
+            name: data.name,
+            type: .creditCard,
+            balance: data.outstandingBalance,
+            currency: data.currency
+        )
+        
+        return networkManager.request(
+            endpoint: "/assets",
+            method: "POST",
+            body: request
+        )
+    }
+    
     // MARK: - 辅助方法
     private func mapAssetType(_ type: String) -> AssetType {
-        // AI 返回的是 category 类型，需要映射到 AssetType
+        // AI 返回的 asset_type 直接映射到 AssetType
         switch type.uppercased() {
-        case "BANK_BALANCE", "BANK", "SAVINGS": return .bank
-        case "STOCK", "INVESTMENT": return .investment
-        case "CRYPTO": return .crypto
-        case "PHYSICAL_ASSET", "PROPERTY": return .property
-        case "LIABILITY", "LOAN": return .loan
-        case "CREDIT_CARD": return .creditCard
+        case "BANK": return .bank
+        case "INVESTMENT": return .investment
         case "CASH": return .cash
+        case "CREDIT_CARD": return .creditCard
         case "DIGITAL_WALLET": return .digitalWallet
+        case "LOAN": return .loan
+        case "MORTGAGE": return .mortgage
+        case "SAVINGS": return .savings
+        case "RETIREMENT": return .retirement
+        case "CRYPTO": return .crypto
+        case "PROPERTY": return .property
+        case "VEHICLE": return .vehicle
+        case "OTHER_ASSET": return .otherAsset
+        case "OTHER_LIABILITY": return .otherLiability
         default: return .bank  // 默认为银行账户
         }
     }
@@ -524,31 +587,44 @@ struct FinancialEvent: Codable {
 
 // 统一的事件数据结构，支持所有事件类型
 struct FinancialEventData: Codable {
+    // 通用字段
+    let amount: Double?
+    let currency: String?
+    let date: String?
+    let name: String?
+    let note: String?
+    
     // TRANSACTION 字段
     let transaction_type: String?
-    let amount: Double?
     let category: String?
     let source_account: String?
     let target_account: String?
-    let note: String?
-    let date: String?
-    let currency: String?
+    let is_recurring: Bool?
+    let payment_schedule: String?
     
     // ASSET_UPDATE 字段
     let asset_type: String?
-    let asset_name: String?
-    let total_value: Double?
     let institution_name: String?
-    let quantity: Double?              // 股票/加密货币数量
-    let interest_rate_apy: Double?     // 年化利率（定期存款）
-    let maturity_date: String?         // 到期日（定期存款）
-    let is_initial_record: Bool?       // 是否初始记录
+    let quantity: Double?
+    let interest_rate_apy: Double?
+    let maturity_date: String?
+    let is_initial_record: Bool?
+    let cost_basis: Double?
+    let cost_basis_currency: String?
+    let projected_value: Double?
+    let location: String?
+    let repayment_amount: Double?
+    let repayment_schedule: String?
+    
+    // CREDIT_CARD_UPDATE 字段
+    let credit_limit: Double?
+    let repayment_due_date: String?
+    
+    // 通用信用卡标识字段（TRANSACTION/ASSET_UPDATE/CREDIT_CARD_UPDATE 共用）
+    let card_identifier: String?
     
     // BUDGET 字段
     let budget_action: String?
-    let budget_name: String?
-    let target_amount: Double?
-    let target_date: String?
     let priority: String?
 }
 
@@ -556,6 +632,7 @@ struct FinancialEventData: Codable {
 enum FinancialEventType: String, Codable {
     case transaction = "TRANSACTION"
     case assetUpdate = "ASSET_UPDATE"
+    case creditCardUpdate = "CREDIT_CARD_UPDATE"
     case budget = "BUDGET"
     case nullStatement = "NULL_STATEMENT"
 }
@@ -571,31 +648,57 @@ struct ParsedFinancialEvent: Identifiable {
     // 资产更新数据
     var assetUpdateData: AssetUpdateParsed?
     
+    // 信用卡更新数据
+    var creditCardData: CreditCardParsed?
+    
     // 预算数据
     var budgetData: BudgetParsed?
 }
 
 // 资产更新解析结果
 struct AssetUpdateParsed {
-    let assetType: String           // BANK_BALANCE, STOCK, CRYPTO, FIXED_INCOME, LIABILITY, PHYSICAL_ASSET
+    let assetType: String           // BANK, INVESTMENT, CASH, CREDIT_CARD, DIGITAL_WALLET, LOAN, MORTGAGE, SAVINGS, RETIREMENT, CRYPTO, PROPERTY, VEHICLE, OTHER_ASSET, OTHER_LIABILITY
     let assetName: String
     let totalValue: Decimal
     let currency: String
     let date: Date
     let institutionName: String?
     
-    // 新增字段
-    let quantity: Double?           // 股票/加密货币数量
-    let interestRateAPY: Double?    // 年化利率（定期存款）
-    let maturityDate: String?       // 到期日（定期存款）
-    let isInitialRecord: Bool       // 是否初始记录
+    let quantity: Double?
+    let interestRateAPY: Double?
+    let maturityDate: String?
+    let isInitialRecord: Bool
+    let costBasis: Double?
+    let costBasisCurrency: String?
+    let projectedValue: Double?
+    let location: String?
+    
+    // 还款计划（负债类）
+    let repaymentAmount: Double?
+    let repaymentSchedule: String?
+    
+    // 信用卡标识（仅当 asset_type = CREDIT_CARD 时使用）
+    var cardIdentifier: String?
 }
 
 // 预算解析结果
 struct BudgetParsed {
-    let action: String      // CREATE_SAVINGS, CREATE_DEBT_REPAYMENT, UPDATE_TARGET
+    let action: String      // CREATE_BUDGET, UPDATE_BUDGET
     let name: String
     let targetAmount: Decimal
-    let targetDate: String? // YYYY-MM 格式
+    let currency: String?
+    let targetDate: String?
     let priority: String?
+}
+
+// 信用卡解析结果
+struct CreditCardParsed {
+    let name: String                // 卡片名称
+    let outstandingBalance: Decimal // 待还金额
+    let currency: String
+    let date: Date
+    let institutionName: String?    // 发卡银行
+    let creditLimit: Double?        // 授信额度
+    let repaymentDueDate: String?   // 还款日（如 "04"）
+    var cardIdentifier: String?     // 卡片唯一标识（如尾号"1234"）
 }

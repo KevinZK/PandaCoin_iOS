@@ -81,6 +81,7 @@ struct DashboardView: View {
     @State private var showRecords = false
     @State private var showStatistics = false
     @State private var showBudget = false
+    @State private var showCreditCards = false
     @State private var showSettings = false
     
     var body: some View {
@@ -98,6 +99,10 @@ struct DashboardView: View {
                         Menu {
                             Button(action: { showAccounts = true }) {
                                 Label(L10n.TabBar.accounts, systemImage: "creditcard")
+                            }
+                            
+                            Button(action: { showCreditCards = true }) {
+                                Label("信用卡", systemImage: "creditcard.fill")
                             }
                             
                             Button(action: { showRecords = true }) {
@@ -177,6 +182,11 @@ struct DashboardView: View {
         .sheet(isPresented: $showBudget) {
             NavigationView {
                 BudgetView()
+            }
+        }
+        .sheet(isPresented: $showCreditCards) {
+            NavigationView {
+                CreditCardListView()
             }
         }
         .sheet(isPresented: $showSettings) {

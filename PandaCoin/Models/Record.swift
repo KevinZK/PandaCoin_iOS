@@ -105,6 +105,7 @@ struct AIRecordParsed: Codable {
     let description: String
     let date: Date
     let confidence: Double?
+    var cardIdentifier: String?  // 信用卡标识（仅当交易涉及信用卡时使用）
 }
 
 // MARK: - AI语音记账请求
