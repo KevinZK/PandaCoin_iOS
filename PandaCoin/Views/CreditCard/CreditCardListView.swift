@@ -90,10 +90,19 @@ struct CreditCardListView: View {
         ScrollView {
             LazyVStack(spacing: Spacing.medium) {
                 ForEach(creditCardService.creditCards) { card in
-                    CreditCardRow(card: card)
-                        .onTapGesture {
+                    NavigationLink {
+                        CreditCardTransactionsView(creditCard: card)
+                    } label: {
+                        CreditCardRow(card: card)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button {
                             selectedCard = card
+                        } label: {
+                            Label("编辑卡片", systemImage: "pencil")
                         }
+                    }
                 }
             }
             .padding()

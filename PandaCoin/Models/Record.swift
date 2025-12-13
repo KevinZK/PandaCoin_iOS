@@ -65,6 +65,34 @@ struct Record: Codable, Identifiable {
         case account
     }
     
+    // MARK: - 便捷初始化器（用于本地构造）
+    init(
+        id: String,
+        amount: Decimal,
+        type: RecordType,
+        category: String,
+        description: String?,
+        date: Date,
+        accountId: String,
+        accountName: String? = nil,
+        isConfirmed: Bool
+    ) {
+        self.id = id
+        self.amount = amount
+        self.type = type
+        self.category = category
+        self.description = description
+        self.rawText = nil
+        self.date = date
+        self.accountId = accountId
+        self.userId = ""
+        self.isConfirmed = isConfirmed
+        self.confidence = nil
+        self.createdAt = Date()
+        self.updatedAt = Date()
+        self.account = accountName.map { RecordAccount(id: accountId, name: $0, type: "") }
+    }
+    
     // 格式化金额显示
     var formattedAmount: String {
         let formatter = NumberFormatter()

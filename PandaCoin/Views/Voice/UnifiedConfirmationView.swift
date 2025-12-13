@@ -632,58 +632,42 @@ struct CreditCardUpdateCardContent: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
-            // 信用卡名称和待还金额
-            HStack {
-                HStack(spacing: 8) {
-                    Text("💳")
-                        .font(.system(size: 20))
-                    Text(data.name.isEmpty ? "信用卡" : data.name)
-                        .font(AppFont.body(size: 18, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                }
-                
-                Spacer()
-                
-                Text(formatBalance())
-                    .font(AppFont.monoNumber(size: 20, weight: .bold))
-                    .foregroundColor(Theme.expense)
-            }
             
             // 发卡银行
             HStack(spacing: Spacing.medium) {
-                Text("信用卡")
-                    .font(AppFont.body(size: 12, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.orange)
-                    .cornerRadius(10)
                 
                 if let institution = data.institutionName, !institution.isEmpty {
                     Label(institution, systemImage: "building.2")
-                        .font(AppFont.body(size: 13))
+                        .font(AppFont.body(size: 18, weight: .semibold))
                         .foregroundColor(Theme.textSecondary)
                 }
+                Spacer()
+                // 显示信用额度（正数，不是待还金额）
+                if let limit = data.creditLimit, limit > 0 {
+                    Text(formatCreditLimit(limit))
+                        .font(AppFont.monoNumber(size: 20, weight: .bold))
+                        .foregroundColor(.blue)
+                    
+                }
+            }
+
+            if data.outstandingBalance > 0 {
+                // 仅当没有额度但有待还金额时显示
+                Text("待还金额：\(formatBalance())")
+                    .font(AppFont.monoNumber(size: 16, weight: .bold))
+                    .foregroundColor(Theme.expense)
             }
             
             // 额度和还款日
             HStack(spacing: Spacing.medium) {
-                if let limit = data.creditLimit, limit > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "creditcard.circle")
-                            .foregroundColor(.blue)
-                        Text("额度: \(formatCreditLimit(limit))")
-                            .font(AppFont.body(size: 13, weight: .medium))
-                            .foregroundColor(.blue)
-                    }
-                }
                 
                 if let dueDate = data.repaymentDueDate, !dueDate.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "calendar.badge.clock")
+                            .font(AppFont.body(size: 12, weight: .medium))
                             .foregroundColor(Theme.expense)
                         Text("还款日: 每月\(dueDate)号")
-                            .font(AppFont.body(size: 13, weight: .medium))
+                            .font(AppFont.body(size: 12, weight: .medium))
                             .foregroundColor(Theme.expense)
                     }
                 }
@@ -719,7 +703,11 @@ struct CreditCardUpdateCardContent: View {
         formatter.maximumFractionDigits = 2
         
         let symbol = currencySymbol(data.currency)
-        return "-\(symbol)\(formatter.string(from: NSDecimalNumber(decimal: data.outstandingBalance)) ?? "0.00")"
+        // 待还金额显示为负数（仅当有待还金额时）
+        if data.outstandingBalance > 0 {
+            return "-\(symbol)\(formatter.string(from: NSDecimalNumber(decimal: data.outstandingBalance)) ?? "0.00")"
+        }
+        return "\(symbol)0.00"
     }
     
     private func formatCreditLimit(_ limit: Double) -> String {

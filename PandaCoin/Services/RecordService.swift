@@ -174,13 +174,16 @@ class RecordService: ObservableObject {
                     )
                     
                 case .creditCardUpdate:
+                    // CREDIT_CARD_UPDATE 中，amount 代表信用额度，outstanding_balance 代表待还金额
+                    let creditLimit = data.credit_limit ?? data.amount ?? 0
+                    let outstandingBalance = data.outstanding_balance ?? 0
                     var creditCardData = CreditCardParsed(
                         name: data.name ?? "",
-                        outstandingBalance: Decimal(data.amount ?? 0),
+                        outstandingBalance: Decimal(outstandingBalance),
                         currency: data.currency ?? "CNY",
                         date: self.parseDate(data.date) ?? Date(),
                         institutionName: data.institution_name,
-                        creditLimit: data.credit_limit,
+                        creditLimit: creditLimit,
                         repaymentDueDate: data.repayment_due_date,
                         cardIdentifier: data.card_identifier
                     )
@@ -289,6 +292,40 @@ class RecordService: ObservableObject {
     
     // MARK: - 保存交易记录
     private func saveTransaction(_ data: AIRecordParsed, accountMap: [String: String]) -> AnyPublisher<Record, APIError> {
+        // 检查是否涉及信用卡（有 cardIdentifier）
+        if let cardIdentifier = data.cardIdentifier, !cardIdentifier.isEmpty {
+            logInfo("✅ 信用卡消费: 卡号=\(cardIdentifier), 金额=\(data.amount), 类型=\(data.type)")
+            
+            // 调用信用卡消费记录接口（同时创建消费记录和更新余额）
+            let transactionType = data.type == .expense ? "EXPENSE" : "PAYMENT"
+            let request = CreateCreditCardTransactionRequest(
+                cardIdentifier: cardIdentifier,
+                amount: NSDecimalNumber(decimal: data.amount).doubleValue,
+                type: transactionType,
+                category: data.category,
+                description: data.description,
+                date: data.date
+            )
+            
+            return CreditCardService.shared.createTransaction(request)
+                .map { response -> Record in
+                    // 返回一个 Record 表示成功
+                    Record(
+                        id: response.record?.id ?? UUID().uuidString,
+                        amount: data.amount,
+                        type: data.type,
+                        category: data.category,
+                        description: data.description,
+                        date: data.date,
+                        accountId: "",
+                        accountName: data.accountName,
+                        isConfirmed: true
+                    )
+                }
+                .eraseToAnyPublisher()
+        }
+        
+        // 普通账户交易
         guard let accountId = accountMap[data.accountName] else {
             logError("❌ 找不到账户: \(data.accountName)")
             return Fail(error: APIError.serverError("找不到账户: \(data.accountName)")).eraseToAnyPublisher()
@@ -352,21 +389,11 @@ class RecordService: ObservableObject {
     }
     
     // MARK: - 保存信用卡更新
-    private func saveCreditCardUpdate(_ data: CreditCardParsed) -> AnyPublisher<Asset, APIError> {
-        logInfo("✅ 保存信用卡: \(data.name), 待还=\(data.outstandingBalance)")
+    private func saveCreditCardUpdate(_ data: CreditCardParsed) -> AnyPublisher<CreditCard, APIError> {
+        logInfo("✅ 保存信用卡配置: 银行=\(data.institutionName ?? "未知"), 额度=\(data.creditLimit ?? 0)")
         
-        let request = AssetRequest(
-            name: data.name,
-            type: .creditCard,
-            balance: data.outstandingBalance,
-            currency: data.currency
-        )
-        
-        return networkManager.request(
-            endpoint: "/assets",
-            method: "POST",
-            body: request
-        )
+        // 调用 CreditCardService 的正确方法保存到信用卡模块
+        return CreditCardService.shared.saveCreditCardFromParsed(data)
     }
     
     // MARK: - 辅助方法
@@ -619,6 +646,7 @@ struct FinancialEventData: Codable {
     // CREDIT_CARD_UPDATE 字段
     let credit_limit: Double?
     let repayment_due_date: String?
+    let outstanding_balance: Double?  // 待还金额
     
     // 通用信用卡标识字段（TRANSACTION/ASSET_UPDATE/CREDIT_CARD_UPDATE 共用）
     let card_identifier: String?

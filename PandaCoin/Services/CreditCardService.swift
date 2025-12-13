@@ -212,4 +212,41 @@ class CreditCardService: ObservableObject {
             currency: parsed.currency
         )
     }
+    
+    // MARK: - 创建信用卡消费记录
+    func createTransaction(_ request: CreateCreditCardTransactionRequest) -> AnyPublisher<CreateCreditCardTransactionResponse, APIError> {
+        logInfo("✅ 创建信用卡消费: 卡号=\(request.cardIdentifier), 金额=\(request.amount), 类型=\(request.type)")
+        
+        return networkManager.request(
+            endpoint: "/credit-cards/transactions",
+            method: "POST",
+            body: request
+        )
+        .handleEvents(
+            receiveOutput: { [weak self] (response: CreateCreditCardTransactionResponse) in
+                // 更新本地信用卡数据
+                DispatchQueue.main.async {
+                    if let index = self?.creditCards.firstIndex(where: { $0.id == response.creditCard.id }) {
+                        self?.creditCards[index] = response.creditCard
+                        self?.saveToLocalStorage()
+                    }
+                }
+                logInfo("✅ 信用卡消费记录创建成功")
+            }
+        )
+        .eraseToAnyPublisher()
+    }
+    
+    // MARK: - 获取信用卡消费记录
+    func getTransactions(creditCardId: String, month: String? = nil) -> AnyPublisher<CreditCardTransactionsResponse, APIError> {
+        var endpoint = "/credit-cards/\(creditCardId)/transactions"
+        if let month = month {
+            endpoint += "?month=\(month)"
+        }
+        
+        return networkManager.request(
+            endpoint: endpoint,
+            method: "GET"
+        )
+    }
 }

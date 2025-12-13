@@ -23,14 +23,14 @@ struct CreditCard: Identifiable, Codable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id
         case name
-        case institutionName = "institution_name"
-        case cardIdentifier = "card_identifier"
-        case creditLimit = "credit_limit"
-        case currentBalance = "current_balance"
-        case repaymentDueDate = "repayment_due_date"
+        case institutionName
+        case cardIdentifier
+        case creditLimit
+        case currentBalance
+        case repaymentDueDate
         case currency
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+        case createdAt
+        case updatedAt
     }
     
     // 可用额度
@@ -67,15 +67,7 @@ struct CreateCreditCardRequest: Codable {
     let creditLimit: Double
     let repaymentDueDate: String?
     let currency: String
-    
-    enum CodingKeys: String, CodingKey {
-        case name
-        case institutionName = "institution_name"
-        case cardIdentifier = "card_identifier"
-        case creditLimit = "credit_limit"
-        case repaymentDueDate = "repayment_due_date"
-        case currency
-    }
+    // 后端期望 camelCase，不需要 CodingKeys 映射
 }
 
 // MARK: - 更新信用卡请求
@@ -87,16 +79,7 @@ struct UpdateCreditCardRequest: Codable {
     let currentBalance: Double?
     let repaymentDueDate: String?
     let currency: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case name
-        case institutionName = "institution_name"
-        case cardIdentifier = "card_identifier"
-        case creditLimit = "credit_limit"
-        case currentBalance = "current_balance"
-        case repaymentDueDate = "repayment_due_date"
-        case currency
-    }
+    // 后端期望 camelCase，不需要 CodingKeys 映射
 }
 
 // MARK: - 信用卡列表响应
@@ -110,10 +93,5 @@ struct UpdateCreditCardBalanceRequest: Codable {
     let cardIdentifier: String
     let amount: Double
     let transactionType: String  // "EXPENSE" 增加待还, "PAYMENT" 减少待还
-    
-    enum CodingKeys: String, CodingKey {
-        case cardIdentifier = "card_identifier"
-        case amount
-        case transactionType = "transaction_type"
-    }
+    // 后端期望 camelCase，不需要 CodingKeys 映射
 }
