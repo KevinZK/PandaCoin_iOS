@@ -9,7 +9,7 @@ import SwiftUI
 import Combine
 
 struct AssetsView: View {
-    @StateObject private var accountService = AssetService()
+    @ObservedObject private var accountService = AssetService.shared
     @State private var showAddAccount = false
     
     var totalAssets: Decimal {

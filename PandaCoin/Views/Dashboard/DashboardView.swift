@@ -20,7 +20,7 @@ struct ParsedEventsWrapper: Identifiable {
 // MARK: - 首页仪表盘（重新设计）
 struct DashboardView: View {
     @StateObject private var speechService = SpeechRecognitionService()
-    @StateObject private var accountService = AssetService()
+    @ObservedObject private var accountService = AssetService.shared
     @StateObject private var recordService = RecordService()
     @StateObject private var authService = AuthService.shared
     

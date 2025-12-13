@@ -9,8 +9,8 @@ import Foundation
 
 // MARK: - 资产类型
 enum AssetType: String, Codable, CaseIterable {
-    case bank = "BANK"                   // 银行卡
-    case investment = "INVESTMENT"       // 投资账户
+    case bank = "BANK"                   // 银行卡储蓄
+    case investment = "INVESTMENT"       // 投资
     case cash = "CASH"                   // 现金
     case creditCard = "CREDIT_CARD"      // 信用卡
     case digitalWallet = "DIGITAL_WALLET" // 电子钱包（支付宝、微信支付等）

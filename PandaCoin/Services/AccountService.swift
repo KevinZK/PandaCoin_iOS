@@ -9,11 +9,15 @@ import Foundation
 import Combine
 
 class AssetService: ObservableObject {
+    static let shared = AssetService()
+    
     @Published var accounts: [Asset] = []
     @Published var isLoading = false
     
     private let networkManager = NetworkManager.shared
     var cancellables = Set<AnyCancellable>()
+    
+    public init() {}
     
     // MARK: - 获取所有资产
     func fetchAccounts() {
