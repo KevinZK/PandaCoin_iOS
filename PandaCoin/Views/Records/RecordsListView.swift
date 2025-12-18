@@ -124,47 +124,73 @@ struct RecordsListView: View {
     
     // MARK: - 记录列表
     private var recordsList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(groupedRecords, id: \.0) { date, records in
-                    Section {
-                        VStack(spacing: 0) {
-                            ForEach(records) { record in
-                                RecordRowView(record: record)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button(role: .destructive) {
-                                            deleteRecord(record)
-                                        } label: {
-                                            Label("删除", systemImage: "trash")
-                                        }
-                                    }
-                                
-                                if record.id != records.last?.id {
-                                    Divider()
-                                        .padding(.leading, 60)
+        List {
+            ForEach(groupedRecords, id: \.0) { date, records in
+                Section {
+                    ForEach(records) { record in
+                        RecordRowView(record: record)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(
+                                RoundedRectangle(cornerRadius: record.id == records.first?.id ? CornerRadius.medium : 0)
+                                    .fill(Color.white)
+                                    .clipShape(
+                                        RecordRowShape(
+                                            isFirst: record.id == records.first?.id,
+                                            isLast: record.id == records.last?.id,
+                                            cornerRadius: CornerRadius.medium
+                                        )
+                                    )
+                            )
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    deleteRecord(record)
+                                } label: {
+                                    Label("删除", systemImage: "trash")
                                 }
                             }
-                        }
-                        .background(Color.white)
-                        .cornerRadius(CornerRadius.medium)
-                        .padding(.horizontal)
-                    } header: {
-                        HStack {
-                            Text(formatDateHeader(date))
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, Spacing.medium)
-                        .padding(.bottom, Spacing.small)
                     }
+                } header: {
+                    Text(formatDateHeader(date))
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .textCase(nil)
                 }
             }
-            .padding(.bottom, Spacing.large)
         }
+        .listStyle(.plain)
+        .background(Theme.background)
     }
+}
+
+// MARK: - 圆角裁剪 Shape
+struct RecordRowShape: Shape {
+    let isFirst: Bool
+    let isLast: Bool
+    let cornerRadius: CGFloat
     
+    func path(in rect: CGRect) -> Path {
+        var corners: UIRectCorner = []
+        if isFirst {
+            corners.insert(.topLeft)
+            corners.insert(.topRight)
+        }
+        if isLast {
+            corners.insert(.bottomLeft)
+            corners.insert(.bottomRight)
+        }
+        
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: cornerRadius, height: cornerRadius)
+        )
+        return Path(path.cgPath)
+    }
+}
+
+// MARK: - RecordsListView 续
+extension RecordsListView {
     // MARK: - 空状态
     private var emptyState: some View {
         VStack(spacing: Spacing.large) {

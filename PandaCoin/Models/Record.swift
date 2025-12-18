@@ -38,7 +38,7 @@ struct Record: Codable, Identifiable {
     let description: String?
     let rawText: String?        // AI语音原始文本
     let date: Date
-    let accountId: String
+    let accountId: String?
     let userId: String
     let isConfirmed: Bool       // 是否已确认(AI记账需要)
     let confidence: Double?     // AI解析置信度
@@ -73,7 +73,7 @@ struct Record: Codable, Identifiable {
         category: String,
         description: String?,
         date: Date,
-        accountId: String,
+        accountId: String?,
         accountName: String? = nil,
         isConfirmed: Bool
     ) {
@@ -90,7 +90,11 @@ struct Record: Codable, Identifiable {
         self.confidence = nil
         self.createdAt = Date()
         self.updatedAt = Date()
-        self.account = accountName.map { RecordAccount(id: accountId, name: $0, type: "") }
+        if let accountId = accountId, let accountName = accountName {
+            self.account = RecordAccount(id: accountId, name: accountName, type: "")
+        } else {
+            self.account = nil
+        }
     }
     
     // 格式化金额显示

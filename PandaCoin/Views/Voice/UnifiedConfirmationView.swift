@@ -278,9 +278,18 @@ struct AssetUpdateCardContent: View {
                 HStack(spacing: 8) {
                     Text(assetIcon)
                         .font(.system(size: 20))
-                    Text(data.assetName)
-                        .font(AppFont.body(size: 18, weight: .semibold))
-                        .foregroundColor(Theme.text)
+                    if data.assetName.isEmpty {
+                        if let institution = data.institutionName, !institution.isEmpty {
+                            Text(institution + "储蓄卡") // en: deposit card
+                                .font(AppFont.body(size: 18, weight: .semibold))
+                                .foregroundColor(Theme.text)
+                        }
+                        
+                    } else {
+                        Text(data.assetName)
+                            .font(AppFont.body(size: 18, weight: .semibold))
+                            .foregroundColor(Theme.text)
+                    }
                 }
                 
                 Spacer()

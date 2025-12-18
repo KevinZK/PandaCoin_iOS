@@ -22,9 +22,10 @@ struct DashboardView: View {
     @StateObject private var speechService = SpeechRecognitionService()
     @ObservedObject private var accountService = AssetService.shared
     @StateObject private var recordService = RecordService()
+    @StateObject private var transactionService = TransactionService()
     @StateObject private var authService = AuthService.shared
     
-    @State private var totalAssets: Decimal = 0
+    @State private var netWorthValue: Decimal = 0
     @State private var unifiedEventsWrapper: ParsedEventsWrapper? = nil
     @State private var chartData: [(String, Double)] = [
         ("12/10", 2300),
@@ -198,21 +199,22 @@ struct DashboardView: View {
             loadData()
             startBreathingAnimation()
         }
-        .onReceive(accountService.$accounts) { accounts in
-            // 账户数据加载完成后计算总资产
-            let total = accounts.reduce(Decimal(0)) { $0 + $1.balance }
-            totalAssets = total
+        .onReceive(transactionService.$netWorth) { netWorth in
+            // 从后端获取完整的净资产数据
+            if let nw = netWorth {
+                netWorthValue = Decimal(nw.net_worth)
+            }
         }
     }
     
-    // MARK: - 总资产区域
+    // MARK: - 净资产区域
     private var totalAssetsSection: some View {
         VStack(spacing: Spacing.small) {
-            Text(formatCurrency(totalAssets))
+            Text(formatCurrency(netWorthValue))
                 .font(.system(size: 48, weight: .thin, design: .serif))
                 .foregroundColor(.black.opacity(0.85))
             
-            Text("Total Assets")
+            Text(L10n.Dashboard.netAssets)
                 .font(.system(size: 14, weight: .regular))
                 .foregroundColor(.black.opacity(0.5))
                 .tracking(2)
@@ -493,6 +495,7 @@ struct DashboardView: View {
     private func loadData() {
         accountService.fetchAccounts()
         recordService.fetchRecords()
+        transactionService.fetchNetWorth()
     }
     
     private func handleVoiceInput(_ text: String) {

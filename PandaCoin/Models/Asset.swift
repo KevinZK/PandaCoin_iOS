@@ -24,6 +24,34 @@ enum AssetType: String, Codable, CaseIterable {
     case otherAsset = "OTHER_ASSET"      // 其他资产
     case otherLiability = "OTHER_LIABILITY" // 其他负债
     
+    /// 是否为负债类型
+    var isLiability: Bool {
+        switch self {
+        case .creditCard, .loan, .mortgage, .otherLiability:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    /// 负债子分类
+    enum LiabilityCategory {
+        case debt      // 债务类（信用卡消费、其他负债）
+        case loan      // 贷款类（贷款、房贷）
+    }
+    
+    /// 获取负债分类（仅负债类型有值）
+    var liabilityCategory: LiabilityCategory? {
+        switch self {
+        case .creditCard, .otherLiability:
+            return .debt
+        case .loan, .mortgage:
+            return .loan
+        default:
+            return nil
+        }
+    }
+    
     var displayName: String {
         switch self {
         case .bank: return L10n.Account.typeBank
@@ -59,16 +87,6 @@ enum AssetType: String, Codable, CaseIterable {
         case .vehicle: return "car.fill"
         case .otherAsset: return "dollarsign.circle.fill"
         case .otherLiability: return "minus.circle.fill"
-        }
-    }
-    
-    /// 是否为负债类型
-    var isLiability: Bool {
-        switch self {
-        case .creditCard, .loan, .mortgage, .otherLiability:
-            return true
-        default:
-            return false
         }
     }
 }

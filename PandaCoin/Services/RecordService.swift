@@ -325,13 +325,14 @@ class RecordService: ObservableObject {
                 .eraseToAnyPublisher()
         }
         
-        // 普通账户交易
-        guard let accountId = accountMap[data.accountName] else {
-            logError("❌ 找不到账户: \(data.accountName)")
-            return Fail(error: APIError.serverError("找不到账户: \(data.accountName)")).eraseToAnyPublisher()
+        // 普通账户交易 - 账户为可选
+        let accountId = data.accountName.isEmpty ? nil : accountMap[data.accountName]
+        
+        if !data.accountName.isEmpty && accountId == nil {
+            logInfo("⚠️ 未匹配到账户: \(data.accountName)，将不关联账户保存")
         }
         
-        logInfo("✅ 保存交易: 账户=\(data.accountName), 金额=\(data.amount), 类型=\(data.type)")
+        logInfo("✅ 保存交易: 账户=\(data.accountName.isEmpty ? "未指定" : data.accountName), 金额=\(data.amount), 类型=\(data.type)")
         
         let request = CreateRecordRequest(
             amount: data.amount,
@@ -566,7 +567,7 @@ struct CreateRecordRequest: Codable {
     let amount: Decimal
     let type: RecordType
     let category: String
-    let accountId: String
+    let accountId: String?
     let description: String?
     let date: Date
 }

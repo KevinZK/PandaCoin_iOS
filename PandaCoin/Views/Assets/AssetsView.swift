@@ -12,8 +12,41 @@ struct AssetsView: View {
     @ObservedObject private var accountService = AssetService.shared
     @State private var showAddAccount = false
     
-    var totalAssets: Decimal {
-        accountService.accounts.reduce(0) { $0 + $1.balance }
+    // MARK: - 资产分类计算属性
+    
+    /// 净资产列表（非负债）
+    private var netAssets: [Asset] {
+        accountService.accounts.filter { !$0.type.isLiability }
+    }
+    
+    /// 负债列表
+    private var liabilities: [Asset] {
+        accountService.accounts.filter { $0.type.isLiability }
+    }
+    
+    /// 债务类负债（CREDIT_CARD, OTHER_LIABILITY）
+    private var debtLiabilities: [Asset] {
+        liabilities.filter { $0.type.liabilityCategory == .debt }
+    }
+    
+    /// 贷款类负债（LOAN, MORTGAGE）
+    private var loanLiabilities: [Asset] {
+        liabilities.filter { $0.type.liabilityCategory == .loan }
+    }
+    
+    /// 净资产总额
+    private var totalNetAssets: Decimal {
+        netAssets.reduce(0) { $0 + $1.balance }
+    }
+    
+    /// 负债总额（取绝对值）
+    private var totalLiabilities: Decimal {
+        liabilities.reduce(0) { $0 + abs($1.balance) }
+    }
+    
+    /// 真实净值 = 资产 - 负债
+    private var netWorth: Decimal {
+        totalNetAssets - totalLiabilities
     }
     
     var body: some View {
@@ -23,11 +56,23 @@ struct AssetsView: View {
                 
                 ScrollView {
                     VStack(spacing: Spacing.large) {
-                        // 总资产卡片
-                        totalAssetsCard
+                        // 净值概览卡片
+                        netWorthCard
                         
-                        // 账户列表
-                        accountsList
+                        // 净资产区块
+                        if !netAssets.isEmpty {
+                            sectionView(title: "净资产", assets: netAssets, titleColor: Theme.bambooGreen)
+                        }
+                        
+                        // 负债区块
+                        if !liabilities.isEmpty {
+                            liabilitySectionView
+                        }
+                        
+                        // 空状态
+                        if accountService.accounts.isEmpty {
+                            emptyState
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, Spacing.medium)
@@ -52,19 +97,43 @@ struct AssetsView: View {
         }
     }
     
-    // MARK: - 总资产卡片
-    private var totalAssetsCard: some View {
+    // MARK: - 净值概览卡片
+    private var netWorthCard: some View {
         VStack(spacing: Spacing.medium) {
-            Text("总资产")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.8))
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("总资产")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("¥\(totalNetAssets as NSDecimalNumber, formatter: currencyFormatter)")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("总负债")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                    Text("-¥\(totalLiabilities as NSDecimalNumber, formatter: currencyFormatter)")
+                        .font(.headline)
+                        .foregroundColor(.red.opacity(0.9))
+                }
+            }
             
-            Text("¥\(totalAssets as NSDecimalNumber, formatter: currencyFormatter)")
-                .font(.system(size: 36, weight: .bold))
-                .foregroundColor(.white)
+            Divider().background(Color.white.opacity(0.3))
+            
+            VStack(spacing: 4) {
+                Text("净值")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                Text("¥\(netWorth as NSDecimalNumber, formatter: currencyFormatter)")
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundColor(.white)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(Spacing.extraLarge)
+        .padding(Spacing.large)
         .background(
             LinearGradient(
                 colors: [Theme.bambooGreen, Theme.bambooGreen.opacity(0.7)],
@@ -76,15 +145,52 @@ struct AssetsView: View {
         .shadow(color: Theme.bambooGreen.opacity(0.3), radius: 10, x: 0, y: 5)
     }
     
-    // MARK: - 账户列表
-    private var accountsList: some View {
-        VStack(spacing: Spacing.medium) {
-            ForEach(accountService.accounts) { account in
+    // MARK: - 通用区块视图
+    private func sectionView(title: String, assets: [Asset], titleColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(titleColor)
+            
+            ForEach(assets) { account in
                 AccountCard(account: account, accountService: accountService)
             }
+        }
+    }
+    
+    // MARK: - 负债区块视图（含子分类）
+    private var liabilitySectionView: some View {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            Text("负债")
+                .font(.headline)
+                .foregroundColor(.red)
             
-            if accountService.accounts.isEmpty {
-                emptyState
+            // 债务类（DEBT）
+            if !debtLiabilities.isEmpty {
+                VStack(alignment: .leading, spacing: Spacing.small) {
+                    Text("债务 (DEBT)")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding(.leading, 4)
+                    
+                    ForEach(debtLiabilities) { account in
+                        AccountCard(account: account, accountService: accountService)
+                    }
+                }
+            }
+            
+            // 贷款类（LOAN）
+            if !loanLiabilities.isEmpty {
+                VStack(alignment: .leading, spacing: Spacing.small) {
+                    Text("贷款 (LOAN)")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding(.leading, 4)
+                    
+                    ForEach(loanLiabilities) { account in
+                        AccountCard(account: account, accountService: accountService)
+                    }
+                }
             }
         }
     }
