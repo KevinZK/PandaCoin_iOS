@@ -62,11 +62,12 @@ class BudgetViewModel: ObservableObject {
     }
     
     // MARK: - 创建预算
-    func createBudget(category: String?, amount: Double, completion: @escaping (Bool) -> Void) {
+    func createBudget(category: String?, amount: Double, isRecurring: Bool = false, completion: @escaping (Bool) -> Void) {
         let request = CreateBudgetRequest(
             month: currentMonth,
             category: category,
-            amount: amount
+            amount: amount,
+            isRecurring: isRecurring
         )
         
         networkManager.request(
@@ -87,8 +88,8 @@ class BudgetViewModel: ObservableObject {
     }
     
     // MARK: - 更新预算
-    func updateBudget(id: String, amount: Double, completion: @escaping (Bool) -> Void) {
-        let request = UpdateBudgetRequest(amount: amount)
+    func updateBudget(id: String, amount: Double, isRecurring: Bool? = nil, completion: @escaping (Bool) -> Void) {
+        let request = UpdateBudgetRequest(amount: amount, isRecurring: isRecurring)
         
         networkManager.request(
             endpoint: "/budgets/\(id)",
@@ -107,7 +108,7 @@ class BudgetViewModel: ObservableObject {
         .store(in: &cancellables)
     }
     
-    // MARK: - 删除预算
+    // MARK: - 删除预算（仅删除当月）
     func deleteBudget(id: String, completion: @escaping (Bool) -> Void) {
         networkManager.request(
             endpoint: "/budgets/\(id)",
@@ -119,6 +120,24 @@ class BudgetViewModel: ObservableObject {
                 completion(false)
             }
         } receiveValue: { [weak self] (_: EmptyResponse) in
+            completion(true)
+            self?.fetchProgress(for: self?.currentMonth ?? "")
+        }
+        .store(in: &cancellables)
+    }
+    
+    // MARK: - 取消循环预算（删除当月及所有未来月份）
+    func cancelRecurringBudget(id: String, completion: @escaping (Bool) -> Void) {
+        networkManager.request(
+            endpoint: "/budgets/\(id)/cancel-recurring",
+            method: "DELETE"
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { (result: Subscribers.Completion<APIError>) in
+            if case .failure = result {
+                completion(false)
+            }
+        } receiveValue: { [weak self] (_: CancelRecurringResponse) in
             completion(true)
             self?.fetchProgress(for: self?.currentMonth ?? "")
         }
@@ -186,4 +205,8 @@ class BudgetViewModel: ObservableObject {
 // MARK: - Helper Types
 struct CopyBudgetResponse: Codable {
     let copiedCount: Int
+}
+
+struct CancelRecurringResponse: Codable {
+    let deletedCount: Int
 }

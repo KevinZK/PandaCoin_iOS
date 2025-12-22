@@ -5,6 +5,8 @@ struct BudgetView: View {
     @State private var showingAddBudget = false
     @State private var showingEditBudget = false
     @State private var selectedBudget: BudgetProgress?
+    @State private var budgetToDelete: BudgetProgress?
+    @State private var showingDeleteAlert = false
     
     init(viewModel: BudgetViewModel = BudgetViewModel()) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -184,8 +186,44 @@ struct BudgetView: View {
                             selectedBudget = budget
                             showingEditBudget = true
                         }
+                        .contextMenu {
+                            Button {
+                                selectedBudget = budget
+                                showingEditBudget = true
+                            } label: {
+                                Label("编辑", systemImage: "pencil")
+                            }
+                            
+                            Divider()
+                            
+                            if budget.isRecurring {
+                                Button(role: .destructive) {
+                                    budgetToDelete = budget
+                                    showingDeleteAlert = true
+                                } label: {
+                                    Label("删除预算", systemImage: "trash")
+                                }
+                            } else {
+                                Button(role: .destructive) {
+                                    deleteBudget(budget, cancelRecurring: false)
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            }
+                        }
                 }
             }
+        }
+        .alert("删除循环预算", isPresented: $showingDeleteAlert, presenting: budgetToDelete) { budget in
+            Button("只删除本月", role: .destructive) {
+                deleteBudget(budget, cancelRecurring: false)
+            }
+            Button("取消所有循环", role: .destructive) {
+                deleteBudget(budget, cancelRecurring: true)
+            }
+            Button("取消", role: .cancel) {}
+        } message: { budget in
+            Text("「\(budget.displayCategory)」是循环预算，请选择删除方式")
         }
     }
     
@@ -233,6 +271,14 @@ struct BudgetView: View {
             // 可以添加提示
         }
     }
+    
+    private func deleteBudget(_ budget: BudgetProgress, cancelRecurring: Bool) {
+        if cancelRecurring {
+            viewModel.cancelRecurringBudget(id: budget.id) { _ in }
+        } else {
+            viewModel.deleteBudget(id: budget.id) { _ in }
+        }
+    }
 }
 
 // MARK: - 预算进度行 (CFO 风格升级)
@@ -242,9 +288,26 @@ struct BudgetProgressRow: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack {
-                Text(budget.displayCategory)
-                    .font(AppFont.body(size: 15, weight: .semibold))
-                    .foregroundColor(Theme.text)
+                HStack(spacing: 6) {
+                    Text(budget.displayCategory)
+                        .font(AppFont.body(size: 15, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                    
+                    // 循环标记
+                    if budget.isRecurring {
+                        HStack(spacing: 2) {
+                            Image(systemName: "repeat.circle.fill")
+                                .font(.system(size: 10))
+                            Text("每月")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundColor(Theme.bambooGreen)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Theme.bambooGreen.opacity(0.15))
+                        .cornerRadius(8)
+                    }
+                }
                 
                 Spacer()
                 
@@ -314,6 +377,7 @@ struct AddBudgetSheet: View {
     @State private var category = ""
     @State private var amount = ""
     @State private var isTotal = false
+    @State private var isRecurring = false
     
     var body: some View {
         NavigationView {
@@ -327,6 +391,23 @@ struct AddBudgetSheet: View {
                     
                     TextField("预算金额", text: $amount)
                         .keyboardType(.decimalPad)
+                }
+                
+                Section {
+                    Toggle(isOn: $isRecurring) {
+                        HStack {
+                            Image(systemName: "repeat.circle.fill")
+                                .foregroundColor(isRecurring ? Theme.bambooGreen : Theme.textSecondary)
+                            Text("每月自动应用")
+                        }
+                    }
+                    .tint(Theme.bambooGreen)
+                    
+                    if isRecurring {
+                        Text("预算将在每个月自动创建")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
                 
                 Section {
@@ -352,7 +433,8 @@ struct AddBudgetSheet: View {
         guard let amountValue = Double(amount) else { return }
         viewModel.createBudget(
             category: isTotal ? nil : category,
-            amount: amountValue
+            amount: amountValue,
+            isRecurring: isRecurring
         ) { success in
             if success {
                 dismiss()
@@ -436,9 +518,9 @@ struct EditBudgetSheet: View {
         totalRemaining: 3500,
         overallUsagePercent: 65.0,
         categoryBudgets: [
-            BudgetProgress(id: "1", month: "2025-12", category: "餐饮", budgetAmount: 3000, spentAmount: 2800, remainingAmount: 200, usagePercent: 93.3, isOverBudget: false),
-            BudgetProgress(id: "2", month: "2025-12", category: "交通", budgetAmount: 1000, spentAmount: 1200, remainingAmount: -200, usagePercent: 120.0, isOverBudget: true),
-            BudgetProgress(id: "3", month: "2025-12", category: "购物", budgetAmount: 2000, spentAmount: 800, remainingAmount: 1200, usagePercent: 40.0, isOverBudget: false)
+            BudgetProgress(id: "1", month: "2025-12", category: "餐饮", name: "每月餐饮预算", budgetAmount: 3000, spentAmount: 2800, remainingAmount: 200, usagePercent: 93.3, isOverBudget: false, isRecurring: true),
+            BudgetProgress(id: "2", month: "2025-12", category: "交通", name: nil, budgetAmount: 1000, spentAmount: 1200, remainingAmount: -200, usagePercent: 120.0, isOverBudget: true, isRecurring: true),
+            BudgetProgress(id: "3", month: "2025-12", category: "购物", name: nil, budgetAmount: 2000, spentAmount: 800, remainingAmount: 1200, usagePercent: 40.0, isOverBudget: false, isRecurring: false)
         ]
     )
     

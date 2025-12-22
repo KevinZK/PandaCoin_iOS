@@ -208,7 +208,8 @@ class RecordService: ObservableObject {
                         targetAmount: Decimal(data.amount ?? 0),
                         currency: data.currency,
                         targetDate: data.date,
-                        priority: data.priority
+                        priority: data.priority,
+                        isRecurring: data.budget_is_recurring ?? false
                     )
                     return ParsedFinancialEvent(
                         eventType: .budget,
@@ -391,7 +392,8 @@ class RecordService: ObservableObject {
         let request = CreateBudgetRequest(
             month: targetMonth,
             category: data.name.isEmpty ? nil : data.name,
-            amount: NSDecimalNumber(decimal: data.targetAmount).doubleValue
+            amount: NSDecimalNumber(decimal: data.targetAmount).doubleValue,
+            isRecurring: data.isRecurring
         )
         
         return networkManager.request(
@@ -696,6 +698,7 @@ struct FinancialEventData: Codable {
     // BUDGET 字段
     let budget_action: String?
     let priority: String?
+    let budget_is_recurring: Bool?  // 是否每月循环
 }
 
 // MARK: - 统一解析结果类型
@@ -759,6 +762,7 @@ struct BudgetParsed {
     let currency: String?
     let targetDate: String?
     let priority: String?
+    var isRecurring: Bool   // 是否每月循环
 }
 
 // 信用卡解析结果

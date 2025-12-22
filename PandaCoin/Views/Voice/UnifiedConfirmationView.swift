@@ -122,8 +122,11 @@ struct EventConfirmCard: View {
                     ))
                 }
             case .budget:
-                if let data = event.budgetData {
-                    BudgetCardContent(data: data)
+                if event.budgetData != nil {
+                    BudgetCardContent(data: Binding(
+                        get: { event.budgetData! },
+                        set: { event.budgetData = $0 }
+                    ))
                 }
             case .nullStatement:
                 EmptyView()
@@ -537,7 +540,7 @@ struct AssetUpdateCardContent: View {
 
 // MARK: - 预算卡片内容
 struct BudgetCardContent: View {
-    let data: BudgetParsed
+    @Binding var data: BudgetParsed
     
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
@@ -569,6 +572,26 @@ struct BudgetCardContent: View {
                 if let priority = data.priority {
                     priorityBadge(priority)
                 }
+            }
+            
+            // 每月循环开关
+            Divider()
+                .padding(.vertical, 4)
+            
+            HStack {
+                Image(systemName: data.isRecurring ? "repeat.circle.fill" : "repeat.circle")
+                    .foregroundColor(data.isRecurring ? Theme.bambooGreen : Theme.textSecondary)
+                    .font(.system(size: 16))
+                
+                Text("每月自动应用")
+                    .font(AppFont.body(size: 14))
+                    .foregroundColor(Theme.text)
+                
+                Spacer()
+                
+                Toggle("", isOn: $data.isRecurring)
+                    .labelsHidden()
+                    .tint(Theme.bambooGreen)
             }
         }
     }
@@ -854,7 +877,8 @@ struct CreditCardUpdateCardContent: View {
                     targetAmount: 20000,
                     currency: "CNY",
                     targetDate: "2025-06",
-                    priority: "HIGH"
+                    priority: "HIGH",
+                    isRecurring: false
                 )
             )
         ],
@@ -1162,7 +1186,8 @@ struct CreditCardUpdateCardContent: View {
                     targetAmount: 20000,
                     currency: "CNY",
                     targetDate: "2025-06",
-                    priority: "HIGH"
+                    priority: "HIGH",
+                    isRecurring: true
                 )
             ))
         )
@@ -1179,7 +1204,8 @@ struct CreditCardUpdateCardContent: View {
                     targetAmount: 5000,
                     currency: "CNY",
                     targetDate: "2025-01",
-                    priority: "MEDIUM"
+                    priority: "MEDIUM",
+                    isRecurring: false
                 )
             ))
         )
