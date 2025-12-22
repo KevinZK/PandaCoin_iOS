@@ -112,7 +112,7 @@ struct StatisticsView: View {
             
             if categoryData.isEmpty {
                 Text("暂无数据")
-                    .foregroundColor(.gray)
+                    .foregroundColor(Theme.textSecondary)
                     .frame(height: 200)
                     .frame(maxWidth: .infinity)
             } else {
@@ -131,18 +131,18 @@ struct StatisticsView: View {
                 } else if #available(iOS 16.0, *) {
                     // iOS 16 不支持 SectorMark
                     Text("饼图功能需要 iOS 17.0 或更高版本")
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                         .frame(height: 250)
                         .frame(maxWidth: .infinity)
                 } else {
                     Text("图表功能需要 iOS 16.0 或更高版本")
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                         .frame(height: 250)
                         .frame(maxWidth: .infinity)
                 }
             }
         }
-        .background(Color.white)
+        .background(Theme.cardBackground)
         .cornerRadius(CornerRadius.large)
     }
     
@@ -168,7 +168,7 @@ struct StatisticsView: View {
                 }
             }
         }
-        .background(Color.white)
+        .background(Theme.cardBackground)
         .cornerRadius(CornerRadius.large)
     }
     
@@ -176,7 +176,7 @@ struct StatisticsView: View {
         VStack {
             ProgressView()
             Text("加载中...")
-                .foregroundColor(.gray)
+                .foregroundColor(Theme.textSecondary)
                 .padding(.top)
         }
         .frame(height: 200)
@@ -210,7 +210,7 @@ struct StatCard: View {
                 // 模拟趋势小图标 (财务官洞察)
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.system(size: 10))
-                    .foregroundColor(.gray.opacity(0.5))
+                    .foregroundColor(Theme.textSecondary.opacity(0.5))
             }
             
             VStack(alignment: .leading, spacing: 4) {
@@ -224,9 +224,9 @@ struct StatCard: View {
             }
         }
         .padding(Spacing.medium)
-        .background(Color.white)
+        .background(Theme.cardBackground)
         .cornerRadius(CornerRadius.medium)
-        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
+        .shadow(color: Theme.cfoShadow, radius: 10, x: 0, y: 5)
     }
     
     private var currencyFormatter: NumberFormatter {
@@ -276,7 +276,7 @@ struct CategoryRankRow: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Capsule()
-                            .fill(Color.gray.opacity(0.1))
+                            .fill(Theme.separator)
                             .frame(height: 6)
                         
                         LinearGradient(

@@ -50,17 +50,17 @@ struct UnifiedConfirmationView: View {
                         
                         // 按钮
                         HStack(spacing: Spacing.medium) {
-                            Button(action: {
-                                dismiss()
-                            }) {
-                                Text("取消")
-                                    .font(AppFont.body(size: 16, weight: .medium))
-                                    .foregroundColor(Theme.textSecondary)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 50)
-                                    .background(Color.white)
-                                    .cornerRadius(CornerRadius.medium)
-                            }
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            Text("取消")
+                                .font(AppFont.body(size: 16, weight: .medium))
+                                .foregroundColor(Theme.textSecondary)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(Theme.cardBackground)
+                                .cornerRadius(CornerRadius.medium)
+                        }
                             
                             Button(action: {
                                 onConfirm(editableEvents)
@@ -130,7 +130,7 @@ struct EventConfirmCard: View {
             }
         }
         .padding(Spacing.medium)
-        .background(Color.white)
+        .background(Theme.cardBackground)
         .cornerRadius(CornerRadius.medium)
         .overlay(
             RoundedRectangle(cornerRadius: CornerRadius.medium)

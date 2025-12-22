@@ -132,7 +132,7 @@ struct DashboardView: View {
                         } label: {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 22))
-                                .foregroundColor(.black.opacity(0.7))
+                                .foregroundColor(Theme.textSecondary)
                                 .frame(width: 44, height: 44)
                         }
                     }
@@ -220,11 +220,11 @@ struct DashboardView: View {
         VStack(spacing: Spacing.small) {
             Text(formatCurrency(netWorthValue))
                 .font(.system(size: 48, weight: .thin, design: .serif))
-                .foregroundColor(.black.opacity(0.85))
+                .foregroundColor(Theme.textSecondary)
             
             Text(L10n.Dashboard.netAssets)
                 .font(.system(size: 14, weight: .regular))
-                .foregroundColor(.black.opacity(0.5))
+                .foregroundColor(Theme.textSecondary)
                 .tracking(2)
         }
     }
@@ -236,7 +236,7 @@ struct DashboardView: View {
                 Text("暂无数据")
                     .frame(height: 220)
                     .frame(maxWidth: .infinity)
-                    .foregroundColor(.gray)
+                    .foregroundColor(Theme.textSecondary)
             } else {
                 if #available(iOS 16.0, *) {
                     Chart {
@@ -319,7 +319,7 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity)
                 } else {
                     Text("图表功能需要 iOS 16.0 或更高版本")
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                         .frame(height: 220)
                         .frame(maxWidth: .infinity)
                 }
@@ -439,7 +439,7 @@ struct DashboardView: View {
             
             Text(speechService.isRecording ? "Recording..." : "Voice Input")
                 .font(.system(size: 14, weight: .regular))
-                .foregroundColor(.black.opacity(0.5))
+                .foregroundColor(Theme.textSecondary)
                 .tracking(1)
         }
     }

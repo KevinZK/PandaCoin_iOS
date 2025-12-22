@@ -212,7 +212,7 @@ struct AssetsView: View {
                 VStack(alignment: .leading, spacing: Spacing.small) {
                     Text("债务 (DEBT)")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                         .padding(.leading, 4)
                     
                     ForEach(debtLiabilities) { account in
@@ -226,7 +226,7 @@ struct AssetsView: View {
                 VStack(alignment: .leading, spacing: Spacing.small) {
                     Text("贷款 (LOAN)")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                         .padding(.leading, 4)
                     
                     ForEach(loanLiabilities) { account in
@@ -243,10 +243,10 @@ struct AssetsView: View {
                 .font(.system(size: 60))
             Text("还没有资产")
                 .font(.headline)
-                .foregroundColor(.gray)
+                .foregroundColor(Theme.textSecondary)
             Text("点击右上角 + 添加资产")
                 .font(.subheadline)
-                .foregroundColor(.gray)
+                .foregroundColor(Theme.textSecondary)
         }
         .frame(height: 200)
     }
@@ -306,9 +306,9 @@ struct AccountCard: View {
                 }
             }
             .padding(Spacing.medium)
-            .background(Color.white)
+            .background(Theme.cardBackground)
             .cornerRadius(CornerRadius.medium)
-            .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
+            .shadow(color: Theme.cfoShadow, radius: 8, x: 0, y: 4)
         }
         .sheet(isPresented: $showEditSheet) {
             EditAccountView(account: account, accountService: accountService)
@@ -464,7 +464,7 @@ struct EditAccountView: View {
                             Text("类型")
                             Spacer()
                             Label(account.type.displayName, systemImage: account.type.icon)
-                                .foregroundColor(.gray)
+                                .foregroundColor(Theme.textSecondary)
                         }
                     }
                     

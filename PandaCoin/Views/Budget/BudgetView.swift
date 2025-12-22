@@ -118,7 +118,7 @@ struct BudgetView: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         Capsule()
-                            .fill(Color.gray.opacity(0.1))
+                            .fill(Theme.separator)
                             .frame(height: 12)
                         
                         LinearGradient(
@@ -156,9 +156,9 @@ struct BudgetView: View {
             }
         }
         .padding(24)
-        .background(Color.white)
+        .background(Theme.cardBackground)
         .cornerRadius(24)
-        .shadow(color: Color.black.opacity(0.04), radius: 15, x: 0, y: 10)
+        .shadow(color: Theme.cfoShadow, radius: 15, x: 0, y: 10)
         .overlay(
             RoundedRectangle(cornerRadius: 24)
                 .stroke(summary.overallUsagePercent >= 100 ? Color.red.opacity(0.3) : Color.clear, lineWidth: 2)
@@ -174,7 +174,7 @@ struct BudgetView: View {
             
             if budgets.isEmpty {
                 Text("暂无分类预算")
-                    .foregroundColor(.secondary)
+                    .foregroundColor(Theme.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding()
             } else {
@@ -194,22 +194,22 @@ struct BudgetView: View {
         VStack(spacing: 16) {
             Image(systemName: "chart.pie")
                 .font(.system(size: 60))
-                .foregroundColor(.gray)
+                .foregroundColor(Theme.textSecondary)
             
             Text("暂无预算")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
             
             Text("点击右上角添加本月预算")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(Theme.textSecondary)
             
             Button(action: { showingAddBudget = true }) {
                 Text("添加预算")
                     .fontWeight(.medium)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(Color.green)
+                    .background(Theme.bambooGreen)
                     .foregroundColor(.white)
                     .cornerRadius(10)
             }
@@ -261,7 +261,7 @@ struct BudgetProgressRow: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.gray.opacity(0.1))
+                        .fill(Theme.separator)
                         .frame(height: 6)
                     
                     Capsule()
@@ -290,9 +290,9 @@ struct BudgetProgressRow: View {
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(Theme.cardBackground)
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.02), radius: 8, x: 0, y: 4)
+        .shadow(color: Theme.cfoShadow, radius: 8, x: 0, y: 4)
     }
     
     private var progressColor: Color {
@@ -331,7 +331,7 @@ struct AddBudgetSheet: View {
                 
                 Section {
                     Text("月份: \(viewModel.displayMonth)")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textSecondary)
                 }
             }
             .navigationTitle("添加预算")
@@ -377,7 +377,7 @@ struct EditBudgetSheet: View {
                         Text("分类")
                         Spacer()
                         Text(budget.displayCategory)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textSecondary)
                     }
                     
                     TextField("预算金额", text: $amount)

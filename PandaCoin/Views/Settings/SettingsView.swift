@@ -46,17 +46,17 @@ struct SettingsView: View {
                         }
                         
                         Text(L10n.Settings.language)
-                            .foregroundColor(.primary)
+                            .foregroundColor(Theme.text)
                         
                         Spacer()
                         
                         Text(languageManager.currentLanguage.displayName)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.textSecondary)
                         
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.gray.opacity(0.5))
+                            .foregroundColor(Theme.textSecondary.opacity(0.5))
                     }
                 }
             }
@@ -72,7 +72,7 @@ struct SettingsView: View {
                     Spacer()
                     Text("v1.0.0")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Theme.textSecondary)
                 }
                 
                 HStack {
@@ -84,7 +84,7 @@ struct SettingsView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.gray.opacity(0.5))
+                        .foregroundColor(Theme.textSecondary.opacity(0.5))
                 }
             }
             
@@ -134,12 +134,12 @@ struct LanguagePickerView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(language.displayName)
-                                    .foregroundColor(.primary)
+                                    .foregroundColor(Theme.text)
                                 
                                 if language != .system {
                                     Text(language.localizedName)
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(Theme.textSecondary)
                                 }
                             }
                             

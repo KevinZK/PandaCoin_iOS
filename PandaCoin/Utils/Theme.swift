@@ -9,18 +9,60 @@ import SwiftUI
 
 // MARK: - 颜色主题配置
 struct Theme {
-    // MARK: - 主色调
+    // MARK: - 主色调 (固定色)
     static let bambooGreen = Color(hex: "#2ECC71")
     static let pandaBlack = Color(hex: "#2C3E50")
     static let offWhite = Color(hex: "#F5F7FA")
     static let coralRed = Color(hex: "#FF6B6B")
     
-    // MARK: - 语义化颜色
+    // MARK: - 语义化颜色 (支持深色模式)
     static let income = bambooGreen
     static let expense = coralRed
-    static let background = offWhite
-    static let text = pandaBlack
-    static let textSecondary = Color.gray
+    
+    /// 主背景色 - 适配深色模式
+    static var background: Color {
+        Color(uiColor: UIColor { traitCollection in
+            traitCollection.userInterfaceStyle == .dark
+                ? UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1) // #1C1C1E
+                : UIColor(red: 0.96, green: 0.97, blue: 0.98, alpha: 1) // #F5F7FA
+        })
+    }
+    
+    /// 卡片背景色 - 适配深色模式
+    static var cardBackground: Color {
+        Color(uiColor: UIColor { traitCollection in
+            traitCollection.userInterfaceStyle == .dark
+                ? UIColor(red: 0.17, green: 0.17, blue: 0.18, alpha: 1) // #2C2C2E
+                : UIColor.white
+        })
+    }
+    
+    /// 主文本色 - 适配深色模式
+    static var text: Color {
+        Color(uiColor: UIColor { traitCollection in
+            traitCollection.userInterfaceStyle == .dark
+                ? UIColor.white
+                : UIColor(red: 0.17, green: 0.24, blue: 0.31, alpha: 1) // #2C3E50
+        })
+    }
+    
+    /// 次要文本色 - 适配深色模式
+    static var textSecondary: Color {
+        Color(uiColor: UIColor { traitCollection in
+            traitCollection.userInterfaceStyle == .dark
+                ? UIColor(red: 0.56, green: 0.56, blue: 0.58, alpha: 1) // #8E8E93
+                : UIColor(red: 0.56, green: 0.56, blue: 0.58, alpha: 1) // #8E8E93
+        })
+    }
+    
+    /// 分割线/边框色 - 适配深色模式
+    static var separator: Color {
+        Color(uiColor: UIColor { traitCollection in
+            traitCollection.userInterfaceStyle == .dark
+                ? UIColor(red: 0.23, green: 0.23, blue: 0.26, alpha: 1) // #3A3A3C
+                : UIColor(red: 0.90, green: 0.90, blue: 0.92, alpha: 1) // #E5E5EA
+        })
+    }
     
     // MARK: - CFO 设计令牌
     static let cfoShadow = Color.black.opacity(0.08)

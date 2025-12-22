@@ -83,12 +83,13 @@ struct RecordsListView: View {
             // 搜索框
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
+                    .foregroundColor(Theme.textSecondary)
                 
                 TextField("搜索分类或备注", text: $searchText)
+                    .foregroundColor(Theme.text)
             }
             .padding(Spacing.medium)
-            .background(Color.white)
+            .background(Theme.cardBackground)
             .cornerRadius(CornerRadius.medium)
             .padding(.horizontal)
             
@@ -137,7 +138,7 @@ struct RecordsListView: View {
                             .listRowSeparator(.hidden)
                             .listRowBackground(
                                 RoundedRectangle(cornerRadius: record.id == records.first?.id ? CornerRadius.medium : 0)
-                                    .fill(Color.white)
+                                    .fill(Theme.cardBackground)
                                     .clipShape(
                                         RecordRowShape(
                                             isFirst: record.id == records.first?.id,
@@ -157,7 +158,7 @@ struct RecordsListView: View {
                 } header: {
                     Text(formatDateHeader(date))
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                         .textCase(nil)
                 }
             }
@@ -203,10 +204,10 @@ extension RecordsListView {
                 .font(.system(size: 60))
             Text("还没有记账记录")
                 .font(.headline)
-                .foregroundColor(.gray)
+                .foregroundColor(Theme.textSecondary)
             Text("点击右上角 + 开始记账")
                 .font(.subheadline)
-                .foregroundColor(.gray)
+                .foregroundColor(Theme.textSecondary)
             Spacer()
         }
     }
@@ -260,7 +261,7 @@ struct RecordRowView: View {
                     .frame(width: 8, height: 8)
                 
                 Rectangle()
-                    .fill(Color.gray.opacity(0.15))
+                    .fill(Theme.separator.opacity(0.5))
                     .frame(width: 2)
             }
             .padding(.trailing, 16)
@@ -306,9 +307,9 @@ struct RecordRowView: View {
                 }
             }
             .padding(Spacing.medium)
-            .background(Color.white)
+            .background(Theme.cardBackground)
             .cornerRadius(CornerRadius.medium)
-            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
+            .shadow(color: Theme.cfoShadow, radius: 5, x: 0, y: 2)
         }
         .padding(.vertical, 4)
     }
@@ -321,7 +322,7 @@ struct RecordRowView: View {
         switch record.type {
         case .expense: return Theme.expense
         case .income: return Theme.income
-        case .transfer: return .gray
+        case .transfer: return Theme.textSecondary
         }
     }
     
@@ -343,8 +344,8 @@ struct FilterChip: View {
                 .font(.subheadline)
                 .padding(.horizontal, Spacing.medium)
                 .padding(.vertical, Spacing.small)
-                .background(isSelected ? Theme.bambooGreen : Color.white)
-                .foregroundColor(isSelected ? .white : .gray)
+                .background(isSelected ? Theme.bambooGreen : Theme.cardBackground)
+                .foregroundColor(isSelected ? .white : Theme.textSecondary)
                 .cornerRadius(CornerRadius.medium)
         }
     }

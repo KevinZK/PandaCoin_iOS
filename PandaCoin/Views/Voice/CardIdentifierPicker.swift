@@ -27,17 +27,17 @@ struct CardIdentifierPicker: View {
                     .foregroundColor(Theme.textSecondary)
                     .font(.system(size: 14))
                 
-                TextField("", text: $cardIdentifier, prompt: Text(placeholder).foregroundColor(.gray.opacity(0.6)))
+                TextField("", text: $cardIdentifier, prompt: Text(placeholder).foregroundColor(Theme.textSecondary.opacity(0.6)))
                     .font(AppFont.body(size: 14))
                     .foregroundColor(Theme.text)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color.white)
+            .background(Theme.cardBackground)
             .cornerRadius(CornerRadius.small)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.small)
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    .stroke(Theme.separator, lineWidth: 1)
             )
             
             // 右侧选择器按钮 - 始终显示
@@ -66,7 +66,7 @@ struct CardIdentifierPicker: View {
                 .foregroundColor(creditCardService.creditCards.isEmpty ? Theme.textSecondary : .white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(creditCardService.creditCards.isEmpty ? Color.gray.opacity(0.3) : Theme.bambooGreen)
+                .background(creditCardService.creditCards.isEmpty ? Theme.separator : Theme.bambooGreen)
                 .cornerRadius(CornerRadius.small)
             }
             .disabled(creditCardService.creditCards.isEmpty)
@@ -204,7 +204,7 @@ struct CreditCardPickerRow: View {
                     .foregroundColor(.gray)
             }
             .padding()
-            .background(Color.white)
+            .background(Theme.cardBackground)
         }
     }
     
@@ -223,7 +223,7 @@ struct CreditCardPickerRow: View {
                 )
             }
             .padding()
-            .background(Color.white)
+            .background(Theme.cardBackground)
         }
     }
     
