@@ -37,14 +37,14 @@ struct AppConfig {
         switch AppEnvironment.current {
         case .development:
             // 模拟器使用localhost
-            return "http://localhost:3000/api"
+            return "http://localhost:3001/api"
             
         case .staging:
             // 真机调试：使用Mac的局域网IP地址
             // 🔧 修改这里为你Mac的实际IP地址
             // 在Mac终端运行: ifconfig | grep "inet " | grep -v 127.0.0.1
             // 或者在系统设置 -> 网络 中查看
-            return "http://192.168.199.241:3000/api"  // ⚠️ 替换为你的Mac IP
+            return "http://192.168.199.241:3001/api"  // ⚠️ 替换为你的Mac IP
             
         case .production:
             // 生产环境：使用实际的服务器地址

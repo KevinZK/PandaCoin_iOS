@@ -373,8 +373,15 @@ class RecordService: ObservableObject {
     private func saveBudget(_ data: BudgetParsed) -> AnyPublisher<Budget, APIError> {
         logInfo("✅ 保存预算: \(data.name), 目标金额=\(data.targetAmount)")
         
-        // 获取目标月份，默认当前月
-        let targetMonth = data.targetDate ?? getCurrentMonth()
+        // 获取目标月份，需要转换为 YYYY-MM 格式
+        let targetMonth: String
+        if let dateStr = data.targetDate, let date = parseDate(dateStr) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM"
+            targetMonth = formatter.string(from: date)
+        } else {
+            targetMonth = getCurrentMonth()
+        }
         
         let request = CreateBudgetRequest(
             month: targetMonth,

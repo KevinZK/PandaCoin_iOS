@@ -6,13 +6,16 @@ struct Budget: Codable, Identifiable {
     let month: String
     let category: String?
     let amount: Double
-    let user_id: String
-    let created_at: String
-    let updated_at: String
+    let userId: String
+    let createdAt: String
+    let updatedAt: String
     
-    var userId: String { user_id }
-    var createdAt: String { created_at }
-    var updatedAt: String { updated_at }
+    enum CodingKeys: String, CodingKey {
+        case id, month, category, amount
+        case userId
+        case createdAt
+        case updatedAt
+    }
 }
 
 // MARK: - Budget Progress
@@ -20,17 +23,20 @@ struct BudgetProgress: Codable, Identifiable {
     let id: String
     let month: String
     let category: String?
-    let budget_amount: Double
-    let spent_amount: Double
-    let remaining_amount: Double
-    let usage_percent: Double
-    let is_over_budget: Bool
+    let budgetAmount: Double
+    let spentAmount: Double
+    let remainingAmount: Double
+    let usagePercent: Double
+    let isOverBudget: Bool
     
-    var budgetAmount: Double { budget_amount }
-    var spentAmount: Double { spent_amount }
-    var remainingAmount: Double { remaining_amount }
-    var usagePercent: Double { usage_percent }
-    var isOverBudget: Bool { is_over_budget }
+    enum CodingKeys: String, CodingKey {
+        case id, month, category
+        case budgetAmount
+        case spentAmount
+        case remainingAmount
+        case usagePercent
+        case isOverBudget
+    }
     
     // 显示用的分类名
     var displayCategory: String {
@@ -41,17 +47,20 @@ struct BudgetProgress: Codable, Identifiable {
 // MARK: - Monthly Budget Summary
 struct MonthlyBudgetSummary: Codable {
     let month: String
-    let total_budget: Double
-    let total_spent: Double
-    let total_remaining: Double
-    let overall_usage_percent: Double
-    let category_budgets: [BudgetProgress]
+    let totalBudget: Double
+    let totalSpent: Double
+    let totalRemaining: Double
+    let overallUsagePercent: Double
+    let categoryBudgets: [BudgetProgress]
     
-    var totalBudget: Double { total_budget }
-    var totalSpent: Double { total_spent }
-    var totalRemaining: Double { total_remaining }
-    var overallUsagePercent: Double { overall_usage_percent }
-    var categoryBudgets: [BudgetProgress] { category_budgets }
+    enum CodingKeys: String, CodingKey {
+        case month
+        case totalBudget
+        case totalSpent
+        case totalRemaining
+        case overallUsagePercent
+        case categoryBudgets
+    }
 }
 
 // MARK: - Create Budget Request
