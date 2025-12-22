@@ -165,12 +165,18 @@ struct DashboardView: View {
                 }
             )
         }
-        .sheet(isPresented: $showAccounts) {
+        .sheet(isPresented: $showAccounts, onDismiss: {
+            // 资产页面关闭后刷新净资产数据
+            loadData()
+        }) {
             NavigationView {
                 AssetsView()
             }
         }
-        .sheet(isPresented: $showRecords) {
+        .sheet(isPresented: $showRecords, onDismiss: {
+            // 记录页面关闭后刷新数据
+            loadData()
+        }) {
             NavigationView {
                 RecordsListView()
             }
@@ -185,7 +191,10 @@ struct DashboardView: View {
                 BudgetView()
             }
         }
-        .sheet(isPresented: $showCreditCards) {
+        .sheet(isPresented: $showCreditCards, onDismiss: {
+            // 信用卡页面关闭后刷新数据
+            loadData()
+        }) {
             NavigationView {
                 CreditCardListView()
             }

@@ -146,9 +146,14 @@ class RecordService: ObservableObject {
                     
                 case .assetUpdate:
                     // 使用通用字段 name 和 amount
+                    let assetType = data.asset_type ?? "BANK"
+                    let defaultName = self.generateDefaultAssetName(
+                        type: assetType,
+                        institution: data.institution_name
+                    )
                     var assetData = AssetUpdateParsed(
-                        assetType: data.asset_type ?? "BANK",
-                        assetName: data.name ?? data.source_account ?? "",
+                        assetType: assetType,
+                        assetName: data.name ?? data.source_account ?? defaultName,
                         totalValue: Decimal(data.amount ?? 0),
                         currency: data.currency ?? "CNY",
                         date: self.parseDate(data.date) ?? Date(),
@@ -405,6 +410,35 @@ class RecordService: ObservableObject {
     }
     
     // MARK: - 辅助方法
+    
+    /// 根据资产类型和机构名称生成默认资产名称
+    private func generateDefaultAssetName(type: String, institution: String?) -> String {
+        let typeName: String
+        switch type.uppercased() {
+        case "BANK": typeName = "银行账户"
+        case "INVESTMENT": typeName = "投资账户"
+        case "CASH": typeName = "现金"
+        case "CREDIT_CARD": typeName = "信用卡"
+        case "DIGITAL_WALLET": typeName = "电子钱包"
+        case "LOAN": typeName = "贷款"
+        case "MORTGAGE": typeName = "房贷"
+        case "SAVINGS": typeName = "储蓄账户"
+        case "RETIREMENT": typeName = "养老金"
+        case "CRYPTO": typeName = "加密货币"
+        case "PROPERTY": typeName = "房产"
+        case "VEHICLE": typeName = "车辆"
+        case "OTHER_ASSET": typeName = "其他资产"
+        case "OTHER_LIABILITY": typeName = "其他负债"
+        default: typeName = "资产"
+        }
+        
+        // 如果有机构名称，拼接机构名 + 类型
+        if let inst = institution, !inst.isEmpty {
+            return "\(inst)\(typeName)"
+        }
+        return typeName
+    }
+    
     private func mapAssetType(_ type: String) -> AssetType {
         // AI 返回的 asset_type 直接映射到 AssetType
         switch type.uppercased() {
