@@ -22,6 +22,26 @@ struct Theme {
     static let text = pandaBlack
     static let textSecondary = Color.gray
     
+    // MARK: - CFO 设计令牌
+    static let cfoShadow = Color.black.opacity(0.08)
+    static let cardGradient = LinearGradient(
+        colors: [bambooGreen, Color(hex: "#27AE60")],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    
+    // 银行卡品牌渐变映射
+    static func cardGradient(for institution: String) -> LinearGradient {
+        if institution.contains("招商") {
+            return LinearGradient(colors: [Color(hex: "#E74C3C"), Color(hex: "#C0392B")], startPoint: .topLeading, endPoint: .bottomTrailing)
+        } else if institution.contains("工") || institution.contains("建设") || institution.contains("中") {
+            return LinearGradient(colors: [Color(hex: "#2980B9"), Color(hex: "#2C3E50")], startPoint: .topLeading, endPoint: .bottomTrailing)
+        } else if institution.contains("支付宝") || institution.contains("Digital") {
+            return LinearGradient(colors: [Color(hex: "#00A0E9"), Color(hex: "#007BB1")], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
+        return LinearGradient(colors: [Color(hex: "#444444"), Color(hex: "#222222")], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
     // MARK: - 渐变色
     static let incomeGradient = LinearGradient(
         colors: [bambooGreen, bambooGreen.opacity(0.7)],

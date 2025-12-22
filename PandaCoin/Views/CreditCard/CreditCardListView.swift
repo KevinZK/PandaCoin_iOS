@@ -110,113 +110,111 @@ struct CreditCardListView: View {
     }
 }
 
-// MARK: - 信用卡行视图
+// MARK: - 信用卡行视图 (拟物化 CFO 升级)
 struct CreditCardRow: View {
     let card: CreditCard
     
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.small) {
+        VStack(alignment: .leading, spacing: 20) {
             // 顶部：卡名和银行
-            HStack {
-                HStack(spacing: 8) {
-                    Text("💳")
-                        .font(.system(size: 24))
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(card.name)
-                            .font(AppFont.body(size: 16, weight: .semibold))
-                            .foregroundColor(Theme.text)
-                        
-                        HStack(spacing: 8) {
-                            Text(card.institutionName)
-                                .font(AppFont.body(size: 12))
-                                .foregroundColor(Theme.textSecondary)
-                            
-                            if !card.cardIdentifier.isEmpty {
-                                Text("尾号 \(card.cardIdentifier)")
-                                    .font(AppFont.body(size: 12, weight: .medium))
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                    }
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(card.institutionName)
+                        .font(AppFont.body(size: 18, weight: .bold))
+                    Text(card.name)
+                        .font(AppFont.body(size: 12))
+                        .opacity(0.8)
                 }
                 
                 Spacer()
                 
-                // 还款日
-                if let dueDate = card.formattedDueDate {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("还款日")
-                            .font(AppFont.body(size: 10))
-                            .foregroundColor(Theme.textSecondary)
-                        Text(dueDate)
-                            .font(AppFont.body(size: 12, weight: .medium))
-                            .foregroundColor(Theme.expense)
-                    }
-                }
+                // 尾号胶囊
+                Text("尾号 \(card.cardIdentifier)")
+                    .font(AppFont.monoNumber(size: 13, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.15))
+                    .cornerRadius(8)
             }
             
-            Divider()
+            Spacer(minLength: 10)
             
-            // 底部：额度信息
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("待还金额")
-                        .font(AppFont.body(size: 11))
-                        .foregroundColor(Theme.textSecondary)
+            // 中间：还款信息
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("本期应还")
+                        .font(AppFont.body(size: 11, weight: .medium))
+                        .opacity(0.7)
                     Text(formatCurrency(card.currentBalance, currency: card.currency))
-                        .font(AppFont.monoNumber(size: 18, weight: .bold))
-                        .foregroundColor(Theme.expense)
+                        .font(AppFont.monoNumber(size: 28, weight: .bold))
                 }
                 
                 Spacer()
                 
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("可用额度")
-                        .font(AppFont.body(size: 11))
-                        .foregroundColor(Theme.textSecondary)
-                    Text(formatCurrency(card.availableCredit, currency: card.currency))
-                        .font(AppFont.monoNumber(size: 16, weight: .medium))
-                        .foregroundColor(Theme.income)
+                // 还款日提醒
+                if let dueDate = card.repaymentDueDate {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("还款日")
+                            .font(AppFont.body(size: 10, weight: .medium))
+                            .opacity(0.7)
+                        Text("\(dueDate)号")
+                            .font(AppFont.body(size: 18, weight: .bold))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black.opacity(0.1))
+                    )
                 }
+            }
+            
+            // 底部：额度进度
+            VStack(spacing: 8) {
+                // 自定义进度条
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white.opacity(0.2))
+                        
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.white)
+                            .frame(width: geo.size.width * min(card.usageRate, 1.0))
+                    }
+                }
+                .frame(height: 6)
                 
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("总额度")
-                        .font(AppFont.body(size: 11))
-                        .foregroundColor(Theme.textSecondary)
-                    Text(formatCurrency(card.creditLimit, currency: card.currency))
-                        .font(AppFont.monoNumber(size: 16, weight: .medium))
-                        .foregroundColor(.blue)
+                HStack {
+                    Text("可用额度: \(formatCurrency(card.availableCredit, currency: card.currency))")
+                    Spacer()
+                    Text("已用 \(Int(card.usageRate * 100))%")
                 }
-            }
-            
-            // 使用率进度条
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 6)
-                        .cornerRadius(3)
-                    
-                    Rectangle()
-                        .fill(usageColor(card.usageRate))
-                        .frame(width: geometry.size.width * min(card.usageRate, 1.0), height: 6)
-                        .cornerRadius(3)
-                }
-            }
-            .frame(height: 6)
-            
-            HStack {
-                Text("使用率 \(Int(card.usageRate * 100))%")
-                    .font(AppFont.body(size: 10))
-                    .foregroundColor(Theme.textSecondary)
-                Spacer()
+                .font(AppFont.body(size: 10, weight: .medium))
+                .opacity(0.8)
             }
         }
-        .padding(Spacing.medium)
-        .background(Color.white)
-        .cornerRadius(CornerRadius.medium)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .padding(24)
+        .foregroundColor(.white)
+        .background(
+            ZStack {
+                Theme.cardGradient(for: card.institutionName)
+                
+                // 装饰：卡片芯片感
+                VStack {
+                    HStack {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(0.1))
+                            .frame(width: 40, height: 30)
+                            .padding(.top, 40)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .padding(.leading, 24)
+            }
+        )
+        .cornerRadius(24)
+        .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 8)
     }
     
     private func formatCurrency(_ amount: Double, currency: String) -> String {
@@ -248,25 +246,48 @@ struct CreditCardRow: View {
 }
 
 // MARK: - Preview
-#Preview("信用卡列表 - 有数据") {
-    NavigationView {
+#Preview("信用卡管理 - CFO 风格") {
+    let service = CreditCardService.shared
+    service.creditCards = [
+        CreditCard(
+            id: "1",
+            name: "个人生活卡",
+            institutionName: "招商银行",
+            cardIdentifier: "2323",
+            creditLimit: 84000,
+            currentBalance: 12500,
+            repaymentDueDate: "10",
+            currency: "CNY",
+            createdAt: Date(),
+            updatedAt: Date()
+        ),
+        CreditCard(
+            id: "2",
+            name: "商务差旅卡",
+            institutionName: "工商银行",
+            cardIdentifier: "8888",
+            creditLimit: 150000,
+            currentBalance: 45000,
+            repaymentDueDate: "25",
+            currency: "CNY",
+            createdAt: Date(),
+            updatedAt: Date()
+        ),
+        CreditCard(
+            id: "3",
+            name: "备用卡",
+            institutionName: "汇丰银行",
+            cardIdentifier: "4567",
+            creditLimit: 50000,
+            currentBalance: 500,
+            repaymentDueDate: "05",
+            currency: "CNY",
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    ]
+    
+    return NavigationView {
         CreditCardListView()
     }
-}
-
-#Preview("信用卡行") {
-    CreditCardRow(card: CreditCard(
-        id: "1",
-        name: "招商信用卡",
-        institutionName: "招商银行",
-        cardIdentifier: "1234",
-        creditLimit: 50000,
-        currentBalance: 8500,
-        repaymentDueDate: "15",
-        currency: "CNY",
-        createdAt: Date(),
-        updatedAt: Date()
-    ))
-    .padding()
-    .background(Theme.background)
 }

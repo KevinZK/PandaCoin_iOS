@@ -50,99 +50,141 @@ struct AssetsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: Spacing.large) {
-                        // 净值概览卡片
-                        netWorthCard
-                        
-                        // 净资产区块
-                        if !netAssets.isEmpty {
-                            sectionView(title: "净资产", assets: netAssets, titleColor: Theme.bambooGreen)
-                        }
-                        
-                        // 负债区块
-                        if !liabilities.isEmpty {
-                            liabilitySectionView
-                        }
-                        
-                        // 空状态
-                        if accountService.accounts.isEmpty {
-                            emptyState
-                        }
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: Spacing.large) {
+                    // 净值概览卡片
+                    netWorthCard
+                    
+                    // 净资产区块
+                    if !netAssets.isEmpty {
+                        sectionView(title: "净资产", assets: netAssets, titleColor: Theme.bambooGreen)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, Spacing.medium)
-                }
-            }
-            .navigationTitle("资产管理")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showAddAccount = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(Theme.bambooGreen)
+                    
+                    // 负债区块
+                    if !liabilities.isEmpty {
+                        liabilitySectionView
+                    }
+                    
+                    // 空状态
+                    if accountService.accounts.isEmpty {
+                        emptyState
                     }
                 }
+                .padding(.horizontal)
+                .padding(.top, Spacing.medium)
             }
-            .sheet(isPresented: $showAddAccount) {
-                AddAccountView(accountService: accountService)
+        }
+        .navigationTitle("资产管理")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showAddAccount = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(Theme.bambooGreen)
+                }
             }
-            .onAppear {
-                accountService.fetchAccounts()
-            }
+        }
+        .sheet(isPresented: $showAddAccount) {
+            AddAccountView(accountService: accountService)
+        }
+        .onAppear {
+            accountService.fetchAccounts()
         }
     }
     
-    // MARK: - 净值概览卡片
+    // MARK: - 净值概览卡片 (CFO 风格升级)
     private var netWorthCard: some View {
-        VStack(spacing: Spacing.medium) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("总资产")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                    Text("¥\(totalNetAssets as NSDecimalNumber, formatter: currencyFormatter)")
-                        .font(.headline)
+        VStack(spacing: 20) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("资产净值")
+                        .font(AppFont.body(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                    
+                    Text("¥\(netWorth as NSDecimalNumber, formatter: currencyFormatter)")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                 }
                 
                 Spacer()
                 
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("总负债")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                    Text("-¥\(totalLiabilities as NSDecimalNumber, formatter: currencyFormatter)")
-                        .font(.headline)
-                        .foregroundColor(.red.opacity(0.9))
+                // 财务官徽章图标
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.white.opacity(0.9))
                 }
             }
             
-            Divider().background(Color.white.opacity(0.3))
+            // 财务健康比例条 (资产 vs 负债)
+            VStack(spacing: 8) {
+                let total = totalNetAssets + totalLiabilities
+                let assetRatio = total > 0 ? Double(truncating: totalNetAssets as NSDecimalNumber) / Double(truncating: total as NSDecimalNumber) : 1.0
+                
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.white.opacity(0.2))
+                        
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.white)
+                            .frame(width: geo.size.width * max(0, min(1, assetRatio)))
+                    }
+                }
+                .frame(height: 6)
+                
+                HStack {
+                    Text("资产占比 \(Int(assetRatio * 100))%")
+                    Spacer()
+                    Text("负债率 \(Int((1 - assetRatio) * 100))%")
+                }
+                .font(AppFont.body(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+            }
             
-            VStack(spacing: 4) {
-                Text("净值")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
-                Text("¥\(netWorth as NSDecimalNumber, formatter: currencyFormatter)")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.white)
+            HStack(spacing: 20) {
+                summaryMiniItem(title: "总资产", amount: totalNetAssets, color: .white)
+                Divider().background(Color.white.opacity(0.3)).frame(height: 30)
+                summaryMiniItem(title: "总负债", amount: totalLiabilities, color: .red.opacity(0.8))
             }
         }
-        .padding(Spacing.large)
+        .padding(24)
         .background(
-            LinearGradient(
-                colors: [Theme.bambooGreen, Theme.bambooGreen.opacity(0.7)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            ZStack {
+                Theme.cardGradient
+                
+                // 装饰性装饰
+                VStack {
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(Color.white.opacity(0.05))
+                            .frame(width: 150, height: 150)
+                            .offset(x: 50, y: -50)
+                    }
+                    Spacer()
+                }
+            }
         )
-        .cornerRadius(CornerRadius.large)
-        .shadow(color: Theme.bambooGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+        .cornerRadius(28)
+        .shadow(color: Theme.bambooGreen.opacity(0.3), radius: 15, x: 0, y: 10)
+    }
+    
+    private func summaryMiniItem(title: String, amount: Decimal, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+            Text("¥\(amount as NSDecimalNumber, formatter: currencyFormatter)")
+                .font(AppFont.body(size: 16, weight: .bold))
+                .foregroundColor(color)
+        }
     }
     
     // MARK: - 通用区块视图
@@ -218,7 +260,7 @@ struct AssetsView: View {
     }
 }
 
-// MARK: - 账户卡片
+// MARK: - 账户卡片 (CFO 风格升级)
 struct AccountCard: View {
     let account: Asset
     @ObservedObject var accountService: AssetService
@@ -228,34 +270,45 @@ struct AccountCard: View {
         Button(action: { showEditSheet = true }) {
             HStack(spacing: Spacing.medium) {
                 // 图标
-                Image(systemName: account.type.icon)
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 50, height: 50)
-                    .background(accountColor)
-                    .clipShape(Circle())
+                ZStack {
+                    Circle()
+                        .fill(accountColor.opacity(0.12))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: account.type.icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(accountColor)
+                }
                 
                 // 信息
                 VStack(alignment: .leading, spacing: 4) {
                     Text(account.name)
-                        .font(.headline)
+                        .font(AppFont.body(size: 16, weight: .semibold))
                         .foregroundColor(Theme.text)
                     
                     Text(account.type.displayName)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                 }
                 
                 Spacer()
                 
                 // 余额
-                Text("¥\(account.balance as NSDecimalNumber, formatter: currencyFormatter)")
-                    .font(.headline)
-                    .foregroundColor(Theme.text)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("¥\(account.balance as NSDecimalNumber, formatter: currencyFormatter)")
+                        .font(AppFont.monoNumber(size: 17, weight: .bold))
+                        .foregroundColor(Theme.text)
+                    
+                    if account.type.isLiability {
+                        Text("待还金额")
+                            .font(.system(size: 10))
+                            .foregroundColor(.red.opacity(0.7))
+                    }
+                }
             }
             .padding(Spacing.medium)
             .background(Color.white)
             .cornerRadius(CornerRadius.medium)
+            .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
         }
         .sheet(isPresented: $showEditSheet) {
             EditAccountView(account: account, accountService: accountService)
@@ -489,6 +542,36 @@ struct EditAccountView: View {
     }
 }
 
-#Preview {
-    AssetsView()
+#Preview("资产管理 - 私人财务官风格") {
+    let service = AssetService.shared
+    service.accounts = [
+        Asset.mock(name: "招商银行储蓄卡", type: .bank, balance: 50000),
+        Asset.mock(name: "支付宝余额", type: .digitalWallet, balance: 12000),
+        Asset.mock(name: "现金", type: .cash, balance: 2500),
+        Asset.mock(name: "车贷", type: .loan, balance: -180000),
+        Asset.mock(name: "招商信用卡", type: .creditCard, balance: -8500)
+    ]
+    
+    return NavigationView {
+        AssetsView()
+    }
+}
+
+// MARK: - Mock 扩展 (仅用于预览)
+extension Asset {
+    static func mock(name: String, type: AssetType, balance: Decimal) -> Asset {
+        let json = """
+        {
+            "id": "\(UUID().uuidString)",
+            "name": "\(name)",
+            "type": "\(type.rawValue)",
+            "balance": \(balance),
+            "currency": "CNY",
+            "userId": "user123",
+            "createdAt": "\(ISO8601DateFormatter().string(from: Date()))",
+            "updatedAt": "\(ISO8601DateFormatter().string(from: Date()))"
+        }
+        """.data(using: .utf8)!
+        return try! JSONDecoder().decode(Asset.self, from: json)
+    }
 }

@@ -1,59 +1,63 @@
 import SwiftUI
 
 struct BudgetView: View {
-    @StateObject private var viewModel = BudgetViewModel()
+    @StateObject private var viewModel: BudgetViewModel
     @State private var showingAddBudget = false
     @State private var showingEditBudget = false
     @State private var selectedBudget: BudgetProgress?
     
+    init(viewModel: BudgetViewModel = BudgetViewModel()) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+    
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // 月份选择器
-                    monthSelector
+        ScrollView {
+            VStack(spacing: 20) {
+                // 月份选择器
+                monthSelector
+                
+                if viewModel.isLoading {
+                    ProgressView()
+                        .frame(height: 200)
+                } else if let summary = viewModel.summary {
+                    // 总体进度卡片
+                    overallProgressCard(summary: summary)
                     
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .frame(height: 200)
-                    } else if let summary = viewModel.summary {
-                        // 总体进度卡片
-                        overallProgressCard(summary: summary)
-                        
-                        // 分类预算列表
-                        categoryBudgetsList(budgets: summary.categoryBudgets)
-                    } else {
-                        emptyState
+                    // 分类预算列表
+                    categoryBudgetsList(budgets: summary.categoryBudgets)
+                } else {
+                    emptyState
+                }
+            }
+            .padding()
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("预算管理")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(action: { showingAddBudget = true }) {
+                        Label("添加预算", systemImage: "plus")
                     }
-                }
-                .padding()
-            }
-            .navigationTitle("预算管理")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: { showingAddBudget = true }) {
-                            Label("添加预算", systemImage: "plus")
-                        }
-                        Button(action: copyFromPrevious) {
-                            Label("复制上月预算", systemImage: "doc.on.doc")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                    Button(action: copyFromPrevious) {
+                        Label("复制上月预算", systemImage: "doc.on.doc")
                     }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
-            .sheet(isPresented: $showingAddBudget) {
-                AddBudgetSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingAddBudget) {
+            AddBudgetSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingEditBudget) {
+            if let budget = selectedBudget {
+                EditBudgetSheet(viewModel: viewModel, budget: budget)
             }
-            .sheet(isPresented: $showingEditBudget) {
-                if let budget = selectedBudget {
-                    EditBudgetSheet(viewModel: viewModel, budget: budget)
-                }
-            }
-            .onAppear {
-                viewModel.fetchCurrentProgress()
-            }
+        }
+        .onAppear {
+            viewModel.fetchCurrentProgress()
         }
     }
     
@@ -81,67 +85,84 @@ struct BudgetView: View {
         .padding(.horizontal)
     }
     
-    // MARK: - 总体进度卡片
+    // MARK: - 总体进度卡片 (CFO 风格升级)
     private func overallProgressCard(summary: MonthlyBudgetSummary) -> some View {
-        VStack(spacing: 16) {
-            HStack {
-                Text("本月预算")
-                    .font(.headline)
+        VStack(spacing: 24) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("本月预算水位")
+                        .font(AppFont.body(size: 14, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    Text("¥\(String(format: "%.0f", summary.totalBudget))")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.text)
+                }
+                
                 Spacer()
-                Text("¥\(String(format: "%.0f", summary.totalBudget))")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                
+                // 水位百分比球 (模拟)
+                ZStack {
+                    Circle()
+                        .fill(progressColor(percent: summary.overallUsagePercent).opacity(0.1))
+                        .frame(width: 64, height: 64)
+                    
+                    Text("\(Int(summary.overallUsagePercent))%")
+                        .font(AppFont.monoNumber(size: 16, weight: .bold))
+                        .foregroundColor(progressColor(percent: summary.overallUsagePercent))
+                }
             }
             
-            // 进度条
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 24)
-                    
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(progressColor(percent: summary.overallUsagePercent))
-                        .frame(
-                            width: min(CGFloat(summary.overallUsagePercent / 100) * geometry.size.width, geometry.size.width),
-                            height: 24
+            // 高级进度条
+            VStack(spacing: 10) {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.gray.opacity(0.1))
+                            .frame(height: 12)
+                        
+                        LinearGradient(
+                            colors: [progressColor(percent: summary.overallUsagePercent), progressColor(percent: summary.overallUsagePercent).opacity(0.7)],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
+                        .frame(width: min(CGFloat(summary.overallUsagePercent / 100) * geometry.size.width, geometry.size.width), height: 12)
+                        .clipShape(Capsule())
+                    }
+                }
+                .frame(height: 12)
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("已消耗")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                        Text("¥\(String(format: "%.0f", summary.totalSpent))")
+                            .font(AppFont.monoNumber(size: 16, weight: .semibold))
+                            .foregroundColor(progressColor(percent: summary.overallUsagePercent))
+                    }
                     
-                    Text("\(String(format: "%.1f", summary.overallUsagePercent))%")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                }
-            }
-            .frame(height: 24)
-            
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("已支出")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("¥\(String(format: "%.0f", summary.totalSpent))")
-                        .font(.headline)
-                        .foregroundColor(.red)
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing) {
-                    Text("剩余")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("¥\(String(format: "%.0f", summary.totalRemaining))")
-                        .font(.headline)
-                        .foregroundColor(summary.totalRemaining >= 0 ? .green : .red)
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("剩余额度")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary)
+                        Text("¥\(String(format: "%.0f", summary.totalRemaining))")
+                            .font(AppFont.monoNumber(size: 16, weight: .semibold))
+                            .foregroundColor(summary.totalRemaining >= 0 ? Theme.bambooGreen : .red)
+                    }
                 }
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 10)
+        .padding(24)
+        .background(Color.white)
+        .cornerRadius(24)
+        .shadow(color: Color.black.opacity(0.04), radius: 15, x: 0, y: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(summary.overallUsagePercent >= 100 ? Color.red.opacity(0.3) : Color.clear, lineWidth: 2)
+        )
     }
     
     // MARK: - 分类预算列表
@@ -214,62 +235,64 @@ struct BudgetView: View {
     }
 }
 
-// MARK: - 预算进度行
+// MARK: - 预算进度行 (CFO 风格升级)
 struct BudgetProgressRow: View {
     let budget: BudgetProgress
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             HStack {
                 Text(budget.displayCategory)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(AppFont.body(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.text)
                 
                 Spacer()
                 
-                Text("¥\(String(format: "%.0f", budget.spentAmount)) / ¥\(String(format: "%.0f", budget.budgetAmount))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
+                    Text("¥\(String(format: "%.0f", budget.spentAmount))")
+                        .foregroundColor(Theme.text)
+                    Text("/ ¥\(String(format: "%.0f", budget.budgetAmount))")
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .font(AppFont.monoNumber(size: 13))
             }
             
+            // 细进度条
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 8)
+                    Capsule()
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(height: 6)
                     
-                    RoundedRectangle(cornerRadius: 4)
+                    Capsule()
                         .fill(progressColor)
-                        .frame(
-                            width: min(CGFloat(budget.usagePercent / 100) * geometry.size.width, geometry.size.width),
-                            height: 8
-                        )
+                        .frame(width: min(CGFloat(budget.usagePercent / 100) * geometry.size.width, geometry.size.width), height: 6)
                 }
             }
-            .frame(height: 8)
+            .frame(height: 6)
             
             HStack {
                 if budget.isOverBudget {
-                    Text("超支 ¥\(String(format: "%.0f", -budget.remainingAmount))")
-                        .font(.caption)
+                    Label("超支 ¥\(String(format: "%.0f", -budget.remainingAmount))", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.red)
                 } else {
                     Text("剩余 ¥\(String(format: "%.0f", budget.remainingAmount))")
-                        .font(.caption)
-                        .foregroundColor(.green)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.bambooGreen)
                 }
                 
                 Spacer()
                 
-                Text("\(String(format: "%.1f", budget.usagePercent))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text("\(Int(budget.usagePercent))%")
+                    .font(AppFont.monoNumber(size: 11, weight: .bold))
+                    .foregroundColor(progressColor)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.03), radius: 5)
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.02), radius: 8, x: 0, y: 4)
     }
     
     private var progressColor: Color {
@@ -404,6 +427,22 @@ struct EditBudgetSheet: View {
     }
 }
 
-#Preview {
-    BudgetView()
+#Preview("预算管理 - CFO 风格") {
+    let viewModel = BudgetViewModel()
+    viewModel.summary = MonthlyBudgetSummary(
+        month: "2025-12",
+        totalBudget: 10000,
+        totalSpent: 6500,
+        totalRemaining: 3500,
+        overallUsagePercent: 65.0,
+        categoryBudgets: [
+            BudgetProgress(id: "1", month: "2025-12", category: "餐饮", budgetAmount: 3000, spentAmount: 2800, remainingAmount: 200, usagePercent: 93.3, isOverBudget: false),
+            BudgetProgress(id: "2", month: "2025-12", category: "交通", budgetAmount: 1000, spentAmount: 1200, remainingAmount: -200, usagePercent: 120.0, isOverBudget: true),
+            BudgetProgress(id: "3", month: "2025-12", category: "购物", budgetAmount: 2000, spentAmount: 800, remainingAmount: 1200, usagePercent: 40.0, isOverBudget: false)
+        ]
+    )
+    
+    return NavigationView {
+        BudgetView(viewModel: viewModel)
+    }
 }

@@ -14,40 +14,97 @@ struct SettingsView: View {
     
     var body: some View {
         List {
-            // MARK: - 语言设置
+            // MARK: - 个人资料头部
             Section {
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(Theme.cardGradient)
+                            .frame(width: 64, height: 64)
+                        Text("🐼")
+                            .font(.system(size: 32))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("私人财务官用户")
+                            .font(AppFont.body(size: 18, weight: .bold))
+                        Text("PandaCoin 专业版")
+                            .font(.system(size: 13))
+                            .foregroundColor(Theme.bambooGreen)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            
+            // MARK: - 偏好设置
+            Section("偏好设置") {
                 Button(action: { showLanguagePicker = true }) {
                     HStack {
-                        Label(L10n.Settings.language, systemImage: "globe")
+                        ZStack {
+                            Circle().fill(Color.blue.opacity(0.1)).frame(width: 30, height: 30)
+                            Image(systemName: "globe").foregroundColor(.blue).font(.system(size: 14))
+                        }
+                        
+                        Text(L10n.Settings.language)
                             .foregroundColor(.primary)
                         
                         Spacer()
                         
                         Text(languageManager.currentLanguage.displayName)
+                            .font(.subheadline)
                             .foregroundColor(.secondary)
                         
                         Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.gray.opacity(0.5))
                     }
                 }
-            } footer: {
-                Text(L10n.Settings.languageHint)
-                    .font(.caption)
             }
             
-            // MARK: - 关于
-            Section {
+            // MARK: - 关于与支持
+            Section("关于与支持") {
                 HStack {
-                    Label(L10n.Settings.about, systemImage: "info.circle")
+                    ZStack {
+                        Circle().fill(Color.orange.opacity(0.1)).frame(width: 30, height: 30)
+                        Image(systemName: "info.circle").foregroundColor(.orange).font(.system(size: 14))
+                    }
+                    Text(L10n.Settings.about)
                     Spacer()
                     Text("v1.0.0")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    ZStack {
+                        Circle().fill(Color.purple.opacity(0.1)).frame(width: 30, height: 30)
+                        Image(systemName: "heart.fill").foregroundColor(.purple).font(.system(size: 14))
+                    }
+                    Text("评价我们")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.gray.opacity(0.5))
+                }
+            }
+            
+            // MARK: - 退出登录
+            Section {
+                Button(role: .destructive, action: {
+                    AuthService.shared.logout()
+                }) {
+                    HStack {
+                        Spacer()
+                        Text(L10n.Auth.logout)
+                            .fontWeight(.semibold)
+                        Spacer()
+                    }
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(L10n.Settings.settings)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(L10n.Common.done) {
@@ -109,7 +166,7 @@ struct LanguagePickerView: View {
     }
 }
 
-#Preview {
+#Preview("设置页面 - CFO 风格") {
     NavigationView {
         SettingsView()
     }

@@ -11,8 +11,12 @@ import Charts
 #endif
 
 struct StatisticsView: View {
-    @StateObject private var recordService = RecordService()
+    @StateObject private var recordService: RecordService
     @State private var selectedPeriod: Period = .month
+    
+    init(recordService: RecordService = RecordService()) {
+        _recordService = StateObject(wrappedValue: recordService)
+    }
     
     enum Period: String, CaseIterable {
         case month = "本月"
@@ -26,37 +30,35 @@ struct StatisticsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: Spacing.large) {
-                        // 周期选择
-                        periodPicker
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: Spacing.large) {
+                    // 周期选择
+                    periodPicker
+                    
+                    // 总览卡片
+                    if let stats = recordService.statistics {
+                        overviewCards(stats: stats)
                         
-                        // 总览卡片
-                        if let stats = recordService.statistics {
-                            overviewCards(stats: stats)
-                            
-                            // 分类占比图表
-                            categoryChart
-                            
-                            // 分类排行
-                            categoryRanking
-                        } else {
-                            loadingView
-                        }
+                        // 分类占比图表
+                        categoryChart
+                        
+                        // 分类排行
+                        categoryRanking
+                    } else {
+                        loadingView
                     }
-                    .padding(.horizontal)
-                    .padding(.top, Spacing.medium)
                 }
+                .padding(.horizontal)
+                .padding(.top, Spacing.medium)
             }
-            .navigationTitle("统计报表")
-            .navigationBarTitleDisplayMode(.large)
-            .onAppear {
-                loadStatistics()
-            }
+        }
+        .navigationTitle("统计报表")
+        .navigationBarTitleDisplayMode(.large)
+        .onAppear {
+            loadStatistics()
         }
     }
     
@@ -185,7 +187,7 @@ struct StatisticsView: View {
     }
 }
 
-// MARK: - 统计卡片
+// MARK: - 统计卡片 (CFO 风格升级)
 struct StatCard: View {
     let title: String
     let amount: Decimal
@@ -193,28 +195,38 @@ struct StatCard: View {
     let icon: String
     
     var body: some View {
-        VStack(spacing: Spacing.small) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: icon)
-                    .foregroundColor(color)
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.1))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(color)
+                }
                 Spacer()
+                
+                // 模拟趋势小图标 (财务官洞察)
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 10))
+                    .foregroundColor(.gray.opacity(0.5))
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
                 
                 Text("¥\(amount as NSDecimalNumber, formatter: currencyFormatter)")
-                    .font(.title3)
-                    .fontWeight(.bold)
+                    .font(AppFont.monoNumber(size: 20, weight: .bold))
                     .foregroundColor(Theme.text)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(Spacing.medium)
         .background(Color.white)
         .cornerRadius(CornerRadius.medium)
+        .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
     }
     
     private var currencyFormatter: NumberFormatter {
@@ -226,7 +238,7 @@ struct StatCard: View {
     }
 }
 
-// MARK: - 分类排行行
+// MARK: - 分类排行行 (CFO 风格升级)
 struct CategoryRankRow: View {
     let rank: Int
     let category: String
@@ -240,44 +252,53 @@ struct CategoryRankRow: View {
     
     var body: some View {
         HStack(spacing: Spacing.medium) {
-            // 排名
-            Text("\(rank)")
-                .font(.headline)
-                .foregroundColor(rankColor)
-                .frame(width: 30)
+            // 排名和图标
+            ZStack {
+                Circle()
+                    .fill(rankColor.opacity(0.1))
+                    .frame(width: 36, height: 36)
+                
+                Text(CategoryMapper.icon(for: category))
+                    .font(.system(size: 18))
+            }
             
             // 分类信息
-            VStack(alignment: .leading, spacing: 4) {
-                Text(category)
-                    .font(.body)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(CategoryMapper.displayName(for: category))
+                        .font(AppFont.body(size: 15, weight: .medium))
+                    Spacer()
+                    Text("¥\(amount as NSDecimalNumber, formatter: currencyFormatter)")
+                        .font(AppFont.monoNumber(size: 15, weight: .bold))
+                }
                 
+                // 渐变进度条
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 4)
-                            .cornerRadius(2)
+                        Capsule()
+                            .fill(Color.gray.opacity(0.1))
+                            .frame(height: 6)
                         
-                        Rectangle()
-                            .fill(Theme.expense)
-                            .frame(width: geometry.size.width * (percentage / 100), height: 4)
-                            .cornerRadius(2)
+                        LinearGradient(
+                            colors: [Theme.expense, Theme.expense.opacity(0.6)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: geometry.size.width * (percentage / 100), height: 6)
+                        .clipShape(Capsule())
                     }
                 }
-                .frame(height: 4)
+                .frame(height: 6)
             }
             
-            // 金额和占比
-            VStack(alignment: .trailing, spacing: 4) {
-                Text("¥\(amount as NSDecimalNumber, formatter: currencyFormatter)")
-                    .font(.headline)
-                
-                Text("\(String(format: "%.1f", percentage))%")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
+            // 占比
+            Text("\(String(format: "%.1f", percentage))%")
+                .font(AppFont.monoNumber(size: 12, weight: .medium))
+                .foregroundColor(Theme.textSecondary)
+                .frame(width: 45, alignment: .trailing)
         }
-        .padding(Spacing.medium)
+        .padding(.vertical, 12)
+        .padding(.horizontal, Spacing.medium)
     }
     
     private var rankColor: Color {
@@ -298,6 +319,24 @@ struct CategoryRankRow: View {
     }
 }
 
-#Preview {
-    StatisticsView()
+#Preview("统计报表 - CFO 风格") {
+    let service = RecordService()
+    service.statistics = RecordStatistics(
+        period: "month",
+        totalIncome: 12000,
+        totalExpense: 4500,
+        balance: 7500,
+        categoryStats: [
+            "FOOD": 1500,
+            "TRANSPORT": 800,
+            "SHOPPING": 1200,
+            "ENTERTAINMENT": 500,
+            "OTHER": 500
+        ],
+        recordCount: 25
+    )
+    
+    return NavigationView {
+        StatisticsView(recordService: service)
+    }
 }

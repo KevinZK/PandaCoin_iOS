@@ -9,11 +9,15 @@ import SwiftUI
 import Combine
 
 struct RecordsListView: View {
-    @StateObject private var recordService = RecordService()
+    @StateObject private var recordService: RecordService
     @StateObject private var accountService = AssetService()
     @State private var showAddRecord = false
     @State private var selectedType: RecordType? = nil
     @State private var searchText = ""
+    
+    init(recordService: RecordService = RecordService()) {
+        _recordService = StateObject(wrappedValue: recordService)
+    }
     
     var filteredRecords: [Record] {
         var filtered = recordService.records
@@ -33,42 +37,42 @@ struct RecordsListView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Theme.background.ignoresSafeArea()
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // 筛选栏
+                filterBar
                 
-                VStack(spacing: 0) {
-                    // 筛选栏
-                    filterBar
-                    
-                    // 记录列表
-                    if filteredRecords.isEmpty {
-                        emptyState
-                    } else {
-                        recordsList
-                    }
+                // 记录列表
+                if filteredRecords.isEmpty {
+                    emptyState
+                } else {
+                    recordsList
                 }
             }
-            .navigationTitle("记账记录")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showAddRecord = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(Theme.bambooGreen)
-                    }
+        }
+        .navigationTitle("记账记录")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showAddRecord = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(Theme.bambooGreen)
                 }
             }
-            .sheet(isPresented: $showAddRecord) {
-                AddRecordView(accountService: accountService, recordService: recordService)
-                    .onAppear {
-                        // 只有打开添加记账页面时才加载账户列表
-                        accountService.fetchAccounts()
-                    }
-            }
-            .onAppear {
+        }
+        .sheet(isPresented: $showAddRecord) {
+            AddRecordView(accountService: accountService, recordService: recordService)
+                .onAppear {
+                    // 只有打开添加记账页面时才加载账户列表
+                    accountService.fetchAccounts()
+                }
+        }
+        .onAppear {
+            // CFO 风格优化：如果已经有数据（如预览数据），不再重复抓取
+            if recordService.records.isEmpty {
                 recordService.fetchRecords()
-                // 账户列表在打开添加记账页面时加载
             }
         }
     }
@@ -243,43 +247,70 @@ extension RecordsListView {
     }
 }
 
-// MARK: - 记录行视图
+// MARK: - 记录行视图 (CFO 风格升级)
 struct RecordRowView: View {
     let record: Record
     
     var body: some View {
-        HStack(spacing: Spacing.medium) {
-            // 分类图标 - 使用映射工具
-            Text(CategoryMapper.icon(for: record.category))
-                .font(.system(size: 24))
-                .frame(width: 44, height: 44)
-                .background(categoryColor.opacity(0.1))
-                .clipShape(Circle())
-            
-            // 信息
-            VStack(alignment: .leading, spacing: 4) {
-                // 显示映射后的中文名称
-                Text(CategoryMapper.displayName(for: record.category))
-                    .font(.body)
-                    .foregroundColor(Theme.text)
+        HStack(spacing: 0) {
+            // 时间线连接器
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(categoryColor.opacity(0.8))
+                    .frame(width: 8, height: 8)
                 
-                // 显示描述（如果有）
-                if let description = record.description, !description.isEmpty {
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .lineLimit(1)
+                Rectangle()
+                    .fill(Color.gray.opacity(0.15))
+                    .frame(width: 2)
+            }
+            .padding(.trailing, 16)
+            
+            // 主卡片内容
+            HStack(spacing: Spacing.medium) {
+                // 分类图标
+                ZStack {
+                    Circle()
+                        .fill(categoryColor.opacity(0.1))
+                        .frame(width: 44, height: 44)
+                    Text(CategoryMapper.icon(for: record.category))
+                        .font(.system(size: 22))
+                }
+                
+                // 信息
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(CategoryMapper.displayName(for: record.category))
+                        .font(AppFont.body(size: 16, weight: .semibold))
+                        .foregroundColor(Theme.text)
+                    
+                    if let description = record.description, !description.isEmpty {
+                        Text(description)
+                            .font(.system(size: 13))
+                            .foregroundColor(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                Spacer()
+                
+                // 金额
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(formatAmount(record.amount, type: record.type))
+                        .font(AppFont.monoNumber(size: 17, weight: .bold))
+                        .foregroundColor(amountColor)
+                    
+                    if let accountName = record.rawText, !accountName.isEmpty {
+                        Text(accountName)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textSecondary.opacity(0.8))
+                    }
                 }
             }
-            
-            Spacer()
-            
-            // 金额
-            Text(formatAmount(record.amount, type: record.type))
-                .font(.headline)
-                .foregroundColor(amountColor)
+            .padding(Spacing.medium)
+            .background(Color.white)
+            .cornerRadius(CornerRadius.medium)
+            .shadow(color: Color.black.opacity(0.02), radius: 5, x: 0, y: 2)
         }
-        .padding(Spacing.medium)
+        .padding(.vertical, 4)
     }
     
     private var categoryColor: Color {
@@ -432,6 +463,18 @@ struct AddRecordView: View {
     }
 }
 
-#Preview {
-    RecordsListView()
+#Preview("记账记录 - CFO 风格") {
+    let service = RecordService()
+    let now = Date()
+    service.records = [
+        Record(id: "1", amount: 35.5, type: .expense, category: "FOOD", description: "午餐吃了个汉堡", date: now, accountId: "acc1", accountName: "支付宝", isConfirmed: true),
+        Record(id: "2", amount: 15.0, type: .expense, category: "TRANSPORT", description: "打车去公司", date: now, accountId: "acc1", accountName: "支付宝", isConfirmed: true),
+        Record(id: "3", amount: 8000.0, type: .income, category: "INCOME_SALARY", description: "12月工资", date: Calendar.current.date(byAdding: .day, value: -1, to: now)!, accountId: "acc2", accountName: "招商银行", isConfirmed: true),
+        Record(id: "4", amount: 200.0, type: .expense, category: "SHOPPING", description: "超市采购", date: Calendar.current.date(byAdding: .day, value: -1, to: now)!, accountId: "acc3", accountName: "招商信用卡", isConfirmed: true),
+        Record(id: "5", amount: 500.0, type: .transfer, category: "OTHER", description: "转账给备用金", date: Calendar.current.date(byAdding: .day, value: -2, to: now)!, accountId: "acc1", accountName: "支付宝", isConfirmed: true)
+    ]
+    
+    return NavigationView {
+        RecordsListView(recordService: service)
+    }
 }

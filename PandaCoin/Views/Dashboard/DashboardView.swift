@@ -141,14 +141,13 @@ struct DashboardView: View {
                     
                     // 总资产显示
                     totalAssetsSection
-                        .padding(.top, 40)
+                        .padding(.top, 20)
                     
                     Spacer()
                     
                     // 图表区域
                     chartSection
-                    
-                    Spacer()
+                        .padding(.vertical, 20)
                     
                     // 语音输入按钮
                     voiceButton
