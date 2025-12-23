@@ -209,7 +209,7 @@ class RecordService: ObservableObject {
                         currency: data.currency,
                         targetDate: data.date,
                         priority: data.priority,
-                        isRecurring: data.budget_is_recurring ?? false
+                        isRecurring: data.is_recurring ?? false
                     )
                     return ParsedFinancialEvent(
                         eventType: .budget,
@@ -505,6 +505,7 @@ class RecordService: ObservableObject {
         case "EXPENSE": return .expense
         case "INCOME": return .income
         case "TRANSFER": return .transfer
+        case "PAYMENT": return .payment
         default: return .expense
         }
     }
@@ -698,7 +699,8 @@ struct FinancialEventData: Codable {
     // BUDGET 字段
     let budget_action: String?
     let priority: String?
-    let budget_is_recurring: Bool?  // 是否每月循环
+    
+    // is_recurring 用于 BUDGET 和 TRANSACTION（复用同一个字段）
 }
 
 // MARK: - 统一解析结果类型

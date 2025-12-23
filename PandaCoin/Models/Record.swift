@@ -12,12 +12,14 @@ enum RecordType: String, Codable {
     case expense = "EXPENSE"   // 支出
     case income = "INCOME"     // 收入
     case transfer = "TRANSFER" // 转账
+    case payment = "PAYMENT"   // 还款（信用卡/贷款）
     
     var displayName: String {
         switch self {
         case .expense: return "支出"
         case .income: return "收入"
         case .transfer: return "转账"
+        case .payment: return "还款"
         }
     }
 }
@@ -114,6 +116,8 @@ struct Record: Codable, Identifiable {
             return "+¥\(amountStr)"
         case .transfer:
             return "¥\(amountStr)"
+        case .payment:
+            return "-¥\(amountStr)"  // 还款显示为负（资金流出）
         }
     }
 }
