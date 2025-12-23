@@ -149,6 +149,7 @@ struct AddCreditCardView: View {
 struct EditCreditCardView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var creditCardService = CreditCardService.shared
+    @ObservedObject private var authService = AuthService.shared
     
     let card: CreditCard
     
@@ -176,6 +177,10 @@ struct EditCreditCardView: View {
     
     private var isFormValid: Bool {
         !name.isEmpty && !institutionName.isEmpty && !cardIdentifier.isEmpty && !creditLimit.isEmpty
+    }
+    
+    private var isDefaultCard: Bool {
+        authService.isDefaultExpenseAccount(accountId: card.id, type: .creditCard)
     }
     
     var body: some View {
@@ -213,6 +218,45 @@ struct EditCreditCardView: View {
             Section(header: Text("还款信息")) {
                 TextField("还款日（每月几号）", text: $repaymentDueDate)
                     .keyboardType(.numberPad)
+            }
+            
+            // 默认支出账户设置
+            Section {
+                Button(action: toggleDefaultCard) {
+                    HStack {
+                        Image(systemName: isDefaultCard ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(isDefaultCard ? Theme.bambooGreen : Theme.textSecondary)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("设为默认支出账户")
+                                .foregroundColor(Theme.text)
+                            
+                            if isDefaultCard {
+                                Text("消费时将自动使用此信用卡")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.bambooGreen)
+                            } else {
+                                Text("未设置默认账户时需手动选择")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        if isDefaultCard {
+                            Text("默认")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Theme.bambooGreen)
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
             }
             
             Section {
@@ -266,6 +310,18 @@ struct EditCreditCardView: View {
             }
         } message: {
             Text("确定要删除「\(card.name)」吗？此操作不可撤销。")
+        }
+    }
+    
+    private func toggleDefaultCard() {
+        if isDefaultCard {
+            authService.clearDefaultExpenseAccount()
+                .sink(receiveCompletion: { _ in }, receiveValue: { })
+                .store(in: &creditCardService.cancellables)
+        } else {
+            authService.setDefaultExpenseAccount(accountId: card.id, accountType: .creditCard)
+                .sink(receiveCompletion: { _ in }, receiveValue: { })
+                .store(in: &creditCardService.cancellables)
         }
     }
     

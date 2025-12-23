@@ -13,6 +13,7 @@ class AuthService: ObservableObject {
     
     @Published var isAuthenticated = false
     @Published var currentUser: User?
+    @Published var defaultExpenseAccount: DefaultExpenseAccountResponse?
     
     private let networkManager = NetworkManager.shared
     private var cancellables = Set<AnyCancellable>()
@@ -22,6 +23,7 @@ class AuthService: ObservableObject {
         isAuthenticated = networkManager.accessToken != nil
         if isAuthenticated {
             fetchCurrentUser()
+            fetchDefaultExpenseAccount()
         }
     }
     
@@ -78,6 +80,69 @@ class AuthService: ObservableObject {
         networkManager.logout()
         isAuthenticated = false
         currentUser = nil
+        defaultExpenseAccount = nil
+    }
+    
+    // MARK: - 默认支出账户
+    
+    /// 获取默认支出账户
+    func fetchDefaultExpenseAccount() {
+        networkManager.request(endpoint: "/auth/default-expense-account", method: "GET")
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [weak self] (response: DefaultExpenseAccountResponse?) in
+                    self?.defaultExpenseAccount = response
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    /// 设置默认支出账户
+    func setDefaultExpenseAccount(accountId: String, accountType: DefaultAccountType) -> AnyPublisher<Void, APIError> {
+        let request = SetDefaultAccountRequest(accountId: accountId, accountType: accountType.rawValue)
+        
+        return networkManager.request(
+            endpoint: "/auth/default-expense-account",
+            method: "PUT",
+            body: request
+        )
+        .handleEvents(receiveOutput: { [weak self] (_: SetDefaultAccountRequest) in
+            self?.fetchDefaultExpenseAccount()
+            self?.fetchCurrentUser()
+        })
+        .map { _ in () }
+        .eraseToAnyPublisher()
+    }
+    
+    /// 清除默认支出账户
+    func clearDefaultExpenseAccount() -> AnyPublisher<Void, APIError> {
+        return networkManager.request(
+            endpoint: "/auth/default-expense-account",
+            method: "DELETE"
+        )
+        .handleEvents(receiveOutput: { [weak self] (_: EmptyResponse) in
+            self?.defaultExpenseAccount = nil
+            self?.fetchCurrentUser()
+        })
+        .map { _ in () }
+        .eraseToAnyPublisher()
+    }
+    
+    /// 获取推荐账户（基于机构名称）
+    func getRecommendedAccount(institutionName: String) -> AnyPublisher<RecommendedAccountResponse, APIError> {
+        let encodedName = institutionName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? institutionName
+        return networkManager.request(
+            endpoint: "/auth/recommended-account?institutionName=\(encodedName)",
+            method: "GET"
+        )
+    }
+    
+    /// 检查指定账户是否为默认账户
+    func isDefaultExpenseAccount(accountId: String, type: DefaultAccountType) -> Bool {
+        guard let user = currentUser else { return false }
+        return user.defaultExpenseAccountId == accountId &&
+               user.defaultExpenseAccountType == type.rawValue
     }
     
     // MARK: - Private
@@ -85,5 +150,6 @@ class AuthService: ObservableObject {
         networkManager.accessToken = response.accessToken
         currentUser = response.user
         isAuthenticated = true
+        fetchDefaultExpenseAccount()
     }
 }

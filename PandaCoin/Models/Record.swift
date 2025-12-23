@@ -133,7 +133,7 @@ struct AIRecordParsed: Codable {
     let type: RecordType
     let amount: Decimal
     let category: String
-    let accountName: String
+    var accountName: String  // 改为 var，支持用户选择账户后更新
     let description: String
     let date: Date
     let confidence: Double?

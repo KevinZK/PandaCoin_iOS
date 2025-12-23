@@ -436,17 +436,33 @@ struct EditAccountView: View {
     @Environment(\.dismiss) var dismiss
     let account: Asset
     @ObservedObject var accountService: AssetService
+    @ObservedObject var authService = AuthService.shared
     
     @State private var name: String
     @State private var balance: String
     @State private var isLoading = false
     @State private var showDeleteAlert = false
+    private var cancellables = Set<AnyCancellable>()
     
     init(account: Asset, accountService: AssetService) {
         self.account = account
         self.accountService = accountService
         _name = State(initialValue: account.name)
         _balance = State(initialValue: "\(account.balance)")
+    }
+    
+    private var isDefaultAccount: Bool {
+        authService.isDefaultExpenseAccount(accountId: account.id, type: .account)
+    }
+    
+    /// 是否可以设为默认支出账户（只有净资产类型才可以）
+    private var canBeDefaultAccount: Bool {
+        switch account.type {
+        case .bank, .cash, .digitalWallet, .savings:
+            return true
+        default:
+            return false
+        }
     }
     
     var body: some View {
@@ -471,6 +487,47 @@ struct EditAccountView: View {
                     Section("当前余额") {
                         TextField("余额", text: $balance)
                             .keyboardType(.decimalPad)
+                    }
+                    
+                    // 默认支出账户设置（只有净资产类型才显示）
+                    if canBeDefaultAccount {
+                        Section {
+                            Button(action: toggleDefaultAccount) {
+                                HStack {
+                                    Image(systemName: isDefaultAccount ? "checkmark.circle.fill" : "circle")
+                                        .foregroundColor(isDefaultAccount ? Theme.bambooGreen : Theme.textSecondary)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("设为默认支出账户")
+                                            .foregroundColor(Theme.text)
+                                        
+                                        if isDefaultAccount {
+                                            Text("消费时将自动从此账户扣款")
+                                                .font(.caption)
+                                                .foregroundColor(Theme.bambooGreen)
+                                        } else {
+                                            Text("未设置默认账户时需手动选择")
+                                                .font(.caption)
+                                                .foregroundColor(Theme.textSecondary)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if isDefaultAccount {
+                                        Text("默认")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Theme.bambooGreen)
+                                            .cornerRadius(8)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     
                     Section {
@@ -506,6 +563,20 @@ struct EditAccountView: View {
             } message: {
                 Text("确定要删除这个资产吗？相关的记账记录也将被删除。")
             }
+        }
+    }
+    
+    private func toggleDefaultAccount() {
+        if isDefaultAccount {
+            // 取消默认
+            authService.clearDefaultExpenseAccount()
+                .sink(receiveCompletion: { _ in }, receiveValue: { })
+                .store(in: &accountService.cancellables)
+        } else {
+            // 设为默认
+            authService.setDefaultExpenseAccount(accountId: account.id, accountType: .account)
+                .sink(receiveCompletion: { _ in }, receiveValue: { })
+                .store(in: &accountService.cancellables)
         }
     }
     

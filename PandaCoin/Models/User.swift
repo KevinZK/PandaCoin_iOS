@@ -15,14 +15,18 @@ struct User: Codable, Identifiable {
     let avatar: String?
     let createdAt: Date
     let updatedAt: Date
+    let defaultExpenseAccountId: String?
+    let defaultExpenseAccountType: String?  // "ACCOUNT" 或 "CREDIT_CARD"
     
     enum CodingKeys: String, CodingKey {
         case id
         case email
         case name
         case avatar
-        case createdAt  // 后端返回的是驼峰命名
-        case updatedAt  // 后端返回的是驼峰命名
+        case createdAt
+        case updatedAt
+        case defaultExpenseAccountId
+        case defaultExpenseAccountType
     }
 }
 
@@ -48,4 +52,26 @@ struct AuthResponse: Codable {
         case tokenType
         case user
     }
+}
+
+// MARK: - 默认账户相关
+enum DefaultAccountType: String, Codable {
+    case account = "ACCOUNT"
+    case creditCard = "CREDIT_CARD"
+}
+
+struct SetDefaultAccountRequest: Codable {
+    let accountId: String
+    let accountType: String
+}
+
+struct DefaultExpenseAccountResponse: Codable {
+    let type: String?
+    let account: Asset?
+    let creditCard: CreditCard?
+}
+
+struct RecommendedAccountResponse: Codable {
+    let matches: [CreditCard]
+    let recommended: CreditCard?
 }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct UnifiedConfirmationView: View {
     @Environment(\.dismiss) var dismiss
@@ -194,10 +195,43 @@ struct EventConfirmCard: View {
 struct TransactionCardContent: View {
     @Binding var data: AIRecordParsed
     @State private var cardIdentifier: String = ""
+    @State private var showAccountPicker = false
+    @State private var selectedAccountType: SelectedAccountInfo?
     
-    // 是否涉及信用卡（根据账户名称判断）
+    @ObservedObject private var authService = AuthService.shared
+    @ObservedObject private var accountService = AssetService.shared
+    @ObservedObject private var creditCardService = CreditCardService.shared
+    
+    // 是否涉及信用卡（根据账户名称判断）- 用于 AI 识别出信用卡但没有具体尾号的情况
     private var involvesCreditCard: Bool {
         data.accountName.contains("信用卡") || data.cardIdentifier != nil
+    }
+    
+    // 是否需要显示账户选择器（支出类型且 AI 未识别出账户）
+    private var shouldShowAccountPicker: Bool {
+        data.type == .expense && data.accountName.isEmpty
+    }
+    
+    // 是否已经选择了账户（通过选择器）
+    private var hasSelectedAccount: Bool {
+        selectedAccountType != nil
+    }
+    
+    // 是否需要显示信用卡标识选择器
+    // 只有当：AI 识别出涉及信用卡，但用户没有通过选择器选择过，且没有明确的卡片标识
+    private var needsCreditCardIdentifier: Bool {
+        involvesCreditCard &&
+        selectedAccountType == nil &&  // 用户没有通过选择器选择（选择器已包含完整卡片信息）
+        !shouldShowAccountPicker &&    // 不是需要选择账户的状态
+        (data.cardIdentifier == nil || data.cardIdentifier?.isEmpty == true)  // 没有明确的卡片标识
+    }
+    
+    // 显示的账户名称
+    private var displayAccountName: String {
+        if let selected = selectedAccountType {
+            return selected.displayName
+        }
+        return data.accountName
     }
     
     var body: some View {
@@ -213,8 +247,8 @@ struct TransactionCardContent: View {
                     .font(AppFont.body(size: 14))
                     .foregroundColor(Theme.text)
                 
-                if !data.accountName.isEmpty {
-                    Label(data.accountName, systemImage: "creditcard")
+                if !displayAccountName.isEmpty {
+                    Label(displayAccountName, systemImage: "creditcard")
                         .font(AppFont.body(size: 14))
                         .foregroundColor(Theme.textSecondary)
                 }
@@ -227,8 +261,62 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.textSecondary)
             }
             
-            // 信用卡标识选择器（仅当交易涉及信用卡时显示）
-            if involvesCreditCard {
+            // 支出账户选择（当 AI 未识别出账户时显示）
+            if shouldShowAccountPicker {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    if !hasSelectedAccount {
+                        HStack {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.orange)
+                                .font(.system(size: 14))
+                            Text("请选择支出账户")
+                                .font(AppFont.body(size: 12, weight: .medium))
+                                .foregroundColor(.orange)
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(Theme.bambooGreen)
+                                .font(.system(size: 14))
+                            Text("已选择支出账户")
+                                .font(AppFont.body(size: 12, weight: .medium))
+                                .foregroundColor(Theme.bambooGreen)
+                        }
+                    }
+                    
+                    Button(action: { showAccountPicker = true }) {
+                        HStack {
+                            Image(systemName: selectedAccountType == nil ? "wallet.pass" : selectedAccountType!.icon)
+                                .foregroundColor(selectedAccountType == nil ? Theme.textSecondary : Theme.bambooGreen)
+                            
+                            Text(selectedAccountType?.displayName ?? "选择账户或信用卡")
+                                .font(AppFont.body(size: 14))
+                                .foregroundColor(selectedAccountType == nil ? Theme.textSecondary : Theme.text)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Theme.cardBackground)
+                        .cornerRadius(CornerRadius.small)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: CornerRadius.small)
+                                .stroke(hasSelectedAccount ? Theme.bambooGreen.opacity(0.5) : Color.orange.opacity(0.5), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            
+            // 信用卡标识选择器（仅当 AI 识别出信用卡但没有具体尾号，且用户没有通过选择器选择时显示）
+            if needsCreditCardIdentifier {
                 Divider()
                     .padding(.vertical, 4)
                 
@@ -246,10 +334,97 @@ struct TransactionCardContent: View {
         }
         .onAppear {
             cardIdentifier = data.cardIdentifier ?? ""
+            loadDefaultAccountIfNeeded()
+            trySmartRecommendation()
         }
         .onChange(of: cardIdentifier) { newValue in
             data.cardIdentifier = newValue.isEmpty ? nil : newValue
         }
+        .onChange(of: selectedAccountType) { newValue in
+            if let account = newValue {
+                data.accountName = account.displayName
+                if account.type == .creditCard {
+                    data.cardIdentifier = account.cardIdentifier
+                }
+            }
+        }
+        .sheet(isPresented: $showAccountPicker) {
+            ExpenseAccountPickerSheet(
+                selectedAccount: $selectedAccountType,
+                accounts: accountService.accounts,
+                creditCards: creditCardService.creditCards
+            )
+        }
+    }
+    
+    private func loadDefaultAccountIfNeeded() {
+        guard shouldShowAccountPicker, selectedAccountType == nil else { return }
+        
+        // 尝试加载默认账户
+        if let user = authService.currentUser,
+           let accountId = user.defaultExpenseAccountId,
+           let accountType = user.defaultExpenseAccountType {
+            if accountType == "ACCOUNT" {
+                if let account = accountService.accounts.first(where: { $0.id == accountId }) {
+                    selectedAccountType = SelectedAccountInfo(
+                        id: account.id,
+                        displayName: account.name,
+                        type: .account,
+                        icon: account.type.icon,
+                        cardIdentifier: nil
+                    )
+                }
+            } else if accountType == "CREDIT_CARD" {
+                if let card = creditCardService.creditCards.first(where: { $0.id == accountId }) {
+                    selectedAccountType = SelectedAccountInfo(
+                        id: card.id,
+                        displayName: card.displayName,
+                        type: .creditCard,
+                        icon: "creditcard.circle.fill",
+                        cardIdentifier: card.cardIdentifier
+                    )
+                }
+            }
+        }
+    }
+    
+    /// 尝试智能推荐信用卡（当账户名称包含机构名称但没有卡片标识时）
+    private func trySmartRecommendation() {
+        // 如果账户名称不为空且包含"信用卡"，尝试智能推荐
+        guard !data.accountName.isEmpty,
+              data.accountName.contains("信用卡"),
+              data.cardIdentifier == nil else { return }
+        
+        // 提取机构名称（去掉"信用卡"后缀）
+        let institutionName = data.accountName
+            .replacingOccurrences(of: "信用卡", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        
+        guard !institutionName.isEmpty else { return }
+        
+        // 调用后端 API 获取推荐的信用卡
+        authService.getRecommendedAccount(institutionName: institutionName)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [self] response in
+                    if let recommended = response.recommended {
+                        // 自动选择推荐的信用卡
+                        self.selectedAccountType = SelectedAccountInfo(
+                            id: recommended.id,
+                            displayName: recommended.displayName,
+                            type: .creditCard,
+                            icon: "creditcard.circle.fill",
+                            cardIdentifier: recommended.cardIdentifier
+                        )
+                        self.cardIdentifier = recommended.cardIdentifier
+                    } else if response.matches.count > 1 {
+                        // 多张匹配卡，需要用户手动选择
+                        // 可以在这里设置一个状态来显示选择提示
+                    }
+                }
+            )
+            .store(in: &creditCardService.cancellables)
     }
     
     private func formatAmount() -> String {
@@ -261,6 +436,144 @@ struct TransactionCardContent: View {
         let amountStr = formatter.string(from: NSDecimalNumber(decimal: data.amount)) ?? "0.00"
         let prefix = data.type == .expense ? "-" : "+"
         return "\(prefix)¥\(amountStr)"
+    }
+}
+
+// MARK: - 选中的账户信息
+struct SelectedAccountInfo: Equatable {
+    let id: String
+    let displayName: String
+    let type: DefaultAccountType
+    let icon: String
+    let cardIdentifier: String?
+}
+
+// MARK: - 支出账户选择器 Sheet
+struct ExpenseAccountPickerSheet: View {
+    @Environment(\.dismiss) var dismiss
+    @Binding var selectedAccount: SelectedAccountInfo?
+    
+    let accounts: [Asset]
+    let creditCards: [CreditCard]
+    
+    // 过滤出可用于支出的账户（排除房产、车辆等）
+    private var expenseAccounts: [Asset] {
+        accounts.filter { account in
+            switch account.type {
+            case .bank, .cash, .digitalWallet, .savings:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            List {
+                if !expenseAccounts.isEmpty {
+                    Section("储蓄账户") {
+                        ForEach(expenseAccounts) { account in
+                            Button(action: {
+                                selectedAccount = SelectedAccountInfo(
+                                    id: account.id,
+                                    displayName: account.name,
+                                    type: .account,
+                                    icon: account.type.icon,
+                                    cardIdentifier: nil
+                                )
+                                dismiss()
+                            }) {
+                                HStack {
+                                    Image(systemName: account.type.icon)
+                                        .foregroundColor(Theme.bambooGreen)
+                                        .frame(width: 30)
+                                    
+                                    VStack(alignment: .leading) {
+                                        Text(account.name)
+                                            .foregroundColor(Theme.text)
+                                        Text("余额: ¥\(account.formattedBalance)")
+                                            .font(.caption)
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if selectedAccount?.id == account.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(Theme.bambooGreen)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                
+                if !creditCards.isEmpty {
+                    Section("信用卡") {
+                        ForEach(creditCards) { card in
+                            Button(action: {
+                                selectedAccount = SelectedAccountInfo(
+                                    id: card.id,
+                                    displayName: card.displayName,
+                                    type: .creditCard,
+                                    icon: "creditcard.circle.fill",
+                                    cardIdentifier: card.cardIdentifier
+                                )
+                                dismiss()
+                            }) {
+                                HStack {
+                                    Image(systemName: "creditcard.circle.fill")
+                                        .foregroundColor(.purple)
+                                        .frame(width: 30)
+                                    
+                                    VStack(alignment: .leading) {
+                                        Text(card.displayName)
+                                            .foregroundColor(Theme.text)
+                                        Text("可用额度: ¥\(String(format: "%.0f", card.availableCredit))")
+                                            .font(.caption)
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if selectedAccount?.id == card.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(Theme.bambooGreen)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                
+                if expenseAccounts.isEmpty && creditCards.isEmpty {
+                    Section {
+                        VStack(spacing: 12) {
+                            Image(systemName: "wallet.pass")
+                                .font(.system(size: 40))
+                                .foregroundColor(Theme.textSecondary)
+                            Text("暂无可用账户")
+                                .foregroundColor(Theme.textSecondary)
+                            Text("请先添加储蓄账户或信用卡")
+                                .font(.caption)
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                    }
+                }
+            }
+            .navigationTitle("选择支出账户")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+            }
+        }
     }
 }
 
