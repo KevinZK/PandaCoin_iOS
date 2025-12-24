@@ -39,6 +39,17 @@ class AssetService: ObservableObject {
             .store(in: &cancellables)
     }
     
+    // MARK: - 获取所有资产（返回 Publisher）
+    func fetchAssets() -> AnyPublisher<[Asset], APIError> {
+        return networkManager.request(endpoint: "/assets", method: "GET")
+            .handleEvents(receiveOutput: { [weak self] (assets: [Asset]) in
+                DispatchQueue.main.async {
+                    self?.accounts = assets
+                }
+            })
+            .eraseToAnyPublisher()
+    }
+    
     // MARK: - 创建资产
     func createAccount(name: String, type: AssetType, balance: Decimal) -> AnyPublisher<Asset, APIError> {
         let request = AssetRequest(name: name, type: type, balance: balance, currency: "CNY")

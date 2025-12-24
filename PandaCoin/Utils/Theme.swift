@@ -14,6 +14,7 @@ struct Theme {
     static let pandaBlack = Color(hex: "#2C3E50")
     static let offWhite = Color(hex: "#F5F7FA")
     static let coralRed = Color(hex: "#FF6B6B")
+    static let warning = Color(hex: "#F39C12")  // 警告/还款橙色
     
     // MARK: - 语义化颜色 (支持深色模式)
     static let income = bambooGreen

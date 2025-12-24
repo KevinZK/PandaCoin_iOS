@@ -289,6 +289,21 @@ struct RecordRowView: View {
                             .foregroundColor(Theme.textSecondary)
                             .lineLimit(1)
                     }
+                    
+                    // 资金流动提示
+                    if let flowDesc = record.flowDescription {
+                        HStack(spacing: 4) {
+                            Text(record.flowIcon)
+                                .font(.system(size: 11))
+                            Text(flowDesc)
+                                .font(.system(size: 11))
+                        }
+                        .foregroundColor(flowColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(flowColor.opacity(0.1))
+                        .cornerRadius(4)
+                    }
                 }
                 
                 Spacer()
@@ -299,11 +314,10 @@ struct RecordRowView: View {
                         .font(AppFont.monoNumber(size: 17, weight: .bold))
                         .foregroundColor(amountColor)
                     
-                    if let accountName = record.rawText, !accountName.isEmpty {
-                        Text(accountName)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textSecondary.opacity(0.8))
-                    }
+                    // 显示日期时间
+                    Text(formatTime(record.date))
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.textSecondary.opacity(0.8))
                 }
             }
             .padding(Spacing.medium)
@@ -323,12 +337,28 @@ struct RecordRowView: View {
         case .expense: return Theme.expense
         case .income: return Theme.income
         case .transfer: return Theme.textSecondary
+        case .payment: return Theme.expense
+        }
+    }
+    
+    private var flowColor: Color {
+        switch record.type {
+        case .expense: return Theme.expense
+        case .income: return Theme.income
+        case .transfer: return Theme.bambooGreen
+        case .payment: return Theme.warning
         }
     }
     
     private func formatAmount(_ amount: Decimal, type: RecordType) -> String {
         let prefix = type == .expense ? "-" : (type == .income ? "+" : "")
         return "\(prefix)¥\(amount)"
+    }
+    
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 }
 

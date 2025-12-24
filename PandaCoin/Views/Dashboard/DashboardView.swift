@@ -542,8 +542,8 @@ struct DashboardView: View {
             logInfo("📌 事件类型: \(event.eventType.rawValue)")
         }
         
-        // 统一保存所有事件
-        recordService.saveFinancialEvents(events, accountMap: accountMap)
+        // 统一保存所有事件（传入 accountService 以便刷新账户映射）
+        recordService.saveFinancialEvents(events, accountMap: accountMap, assetService: accountService)
             .receive(on: DispatchQueue.main)
             .sink { completion in
                 if case .failure(let error) = completion {

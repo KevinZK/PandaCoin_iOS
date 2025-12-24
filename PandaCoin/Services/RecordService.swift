@@ -242,57 +242,120 @@ class RecordService: ObservableObject {
     }
     
     // MARK: - 统一保存事件（支持多类型）
+    // 重要：先保存资产更新，再保存交易，确保账户映射正确
     func saveFinancialEvents(
         _ events: [ParsedFinancialEvent],
-        accountMap: [String: String]
+        accountMap: [String: String],
+        assetService: AssetService? = nil
     ) -> AnyPublisher<Int, APIError> {
-        var successCount = 0
-        var publishers: [AnyPublisher<Void, APIError>] = []
         
-        for event in events {
-            switch event.eventType {
-            case .transaction:
-                if let data = event.transactionData {
-                    let pub = saveTransaction(data, accountMap: accountMap)
-                        .map { _ in successCount += 1 }
-                        .eraseToAnyPublisher()
-                    publishers.append(pub)
-                }
-            case .assetUpdate:
-                if let data = event.assetUpdateData {
-                    let pub = saveAssetUpdate(data)
-                        .map { _ in successCount += 1 }
-                        .eraseToAnyPublisher()
-                    publishers.append(pub)
-                }
-            case .budget:
-                if let data = event.budgetData {
-                    let pub = saveBudget(data)
-                        .map { _ in successCount += 1 }
-                        .eraseToAnyPublisher()
-                    publishers.append(pub)
-                }
-            case .creditCardUpdate:
-                if let data = event.creditCardData {
-                    let pub = saveCreditCardUpdate(data)
-                        .map { _ in successCount += 1 }
-                        .eraseToAnyPublisher()
-                    publishers.append(pub)
-                }
-            case .nullStatement:
-                break
+        // 分离事件类型
+        let assetEvents = events.filter { $0.eventType == .assetUpdate }
+        let creditCardEvents = events.filter { $0.eventType == .creditCardUpdate }
+        let transactionEvents = events.filter { $0.eventType == .transaction }
+        let budgetEvents = events.filter { $0.eventType == .budget }
+        
+        // 第一阶段：先保存资产和信用卡更新（创建新账户）
+        var phase1Publishers: [AnyPublisher<Void, APIError>] = []
+        
+        for event in assetEvents {
+            if let data = event.assetUpdateData {
+                let pub = saveAssetUpdate(data)
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+                phase1Publishers.append(pub)
             }
         }
         
-        guard !publishers.isEmpty else {
-            return Just(0)
-                .setFailureType(to: APIError.self)
+        for event in creditCardEvents {
+            if let data = event.creditCardData {
+                let pub = saveCreditCardUpdate(data)
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+                phase1Publishers.append(pub)
+            }
+        }
+        
+        // 同时保存预算（不依赖账户）
+        for event in budgetEvents {
+            if let data = event.budgetData {
+                let pub = saveBudget(data)
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+                phase1Publishers.append(pub)
+            }
+        }
+        
+        // 如果没有资产/信用卡更新，直接保存交易
+        if phase1Publishers.isEmpty {
+            return saveTransactionEvents(transactionEvents, accountMap: accountMap)
+                .map { events.count }
                 .eraseToAnyPublisher()
+        }
+        
+        // 第一阶段完成后，刷新账户列表，再保存交易
+        return Publishers.MergeMany(phase1Publishers)
+            .collect()
+            .flatMap { [weak self] _ -> AnyPublisher<Int, APIError> in
+                guard let self = self else {
+                    return Just(0).setFailureType(to: APIError.self).eraseToAnyPublisher()
+                }
+                
+                // 如果没有交易事件，直接返回
+                if transactionEvents.isEmpty {
+                    return Just(events.count).setFailureType(to: APIError.self).eraseToAnyPublisher()
+                }
+                
+                // 刷新账户列表获取新的 accountMap
+                guard let assetService = assetService else {
+                    // 没有 assetService，使用原来的 accountMap
+                    logInfo("⚠️ 无法刷新账户列表，使用原始 accountMap")
+                    return self.saveTransactionEvents(transactionEvents, accountMap: accountMap)
+                        .map { events.count }
+                        .eraseToAnyPublisher()
+                }
+                
+                return assetService.fetchAssets()
+                    .flatMap { assets -> AnyPublisher<Int, APIError> in
+                        // 构建新的账户映射
+                        var newAccountMap = accountMap
+                        for asset in assets {
+                            newAccountMap[asset.name] = asset.id
+                        }
+                        logInfo("✅ 刷新账户映射，共 \(newAccountMap.count) 个账户")
+                        
+                        return self.saveTransactionEvents(transactionEvents, accountMap: newAccountMap)
+                            .map { events.count }
+                            .eraseToAnyPublisher()
+                    }
+                    .eraseToAnyPublisher()
+            }
+            .eraseToAnyPublisher()
+    }
+    
+    // MARK: - 保存交易事件（辅助方法）
+    private func saveTransactionEvents(
+        _ events: [ParsedFinancialEvent],
+        accountMap: [String: String]
+    ) -> AnyPublisher<Void, APIError> {
+        var publishers: [AnyPublisher<Void, APIError>] = []
+        
+        for event in events {
+            if let data = event.transactionData {
+                let pub = saveTransaction(data, accountMap: accountMap)
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+                publishers.append(pub)
+            }
+        }
+        
+        if publishers.isEmpty {
+            return Just(()).setFailureType(to: APIError.self).eraseToAnyPublisher()
         }
         
         return Publishers.MergeMany(publishers)
             .collect()
-            .map { _ in events.count }
+            .map { _ in () }
             .eraseToAnyPublisher()
     }
     

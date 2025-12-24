@@ -47,8 +47,16 @@ struct Record: Codable, Identifiable {
     let createdAt: Date
     let updatedAt: Date
     
+    // 转账/还款场景
+    let targetAccountId: String?
+    
+    // 信用卡场景
+    let creditCardId: String?
+    let cardIdentifier: String?
+    
     // 关联数据（后端只返回部分字段）
     var account: RecordAccount?
+    var targetAccount: RecordAccount?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -64,7 +72,11 @@ struct Record: Codable, Identifiable {
         case confidence
         case createdAt
         case updatedAt
+        case targetAccountId
+        case creditCardId
+        case cardIdentifier
         case account
+        case targetAccount
     }
     
     // MARK: - 便捷初始化器（用于本地构造）
@@ -77,6 +89,10 @@ struct Record: Codable, Identifiable {
         date: Date,
         accountId: String?,
         accountName: String? = nil,
+        targetAccountId: String? = nil,
+        targetAccountName: String? = nil,
+        creditCardId: String? = nil,
+        cardIdentifier: String? = nil,
         isConfirmed: Bool
     ) {
         self.id = id
@@ -92,10 +108,64 @@ struct Record: Codable, Identifiable {
         self.confidence = nil
         self.createdAt = Date()
         self.updatedAt = Date()
+        self.targetAccountId = targetAccountId
+        self.creditCardId = creditCardId
+        self.cardIdentifier = cardIdentifier
+        
         if let accountId = accountId, let accountName = accountName {
             self.account = RecordAccount(id: accountId, name: accountName, type: "")
         } else {
             self.account = nil
+        }
+        
+        if let targetAccountId = targetAccountId, let targetAccountName = targetAccountName {
+            self.targetAccount = RecordAccount(id: targetAccountId, name: targetAccountName, type: "")
+        } else {
+            self.targetAccount = nil
+        }
+    }
+    
+    // MARK: - 资金流动描述
+    var flowDescription: String? {
+        switch type {
+        case .expense:
+            if let cardId = cardIdentifier, !cardId.isEmpty {
+                // 信用卡消费
+                return "从 信用卡(\(cardId)) 扣款"
+            } else if let accountName = account?.name, !accountName.isEmpty {
+                return "从 \(accountName) 扣款"
+            }
+            return nil
+            
+        case .income:
+            if let accountName = account?.name, !accountName.isEmpty {
+                return "存入 \(accountName)"
+            }
+            return nil
+            
+        case .transfer:
+            let from = account?.name ?? "未知"
+            let to = targetAccount?.name ?? "未知"
+            return "\(from) → \(to)"
+            
+        case .payment:
+            let from = account?.name ?? "未知"
+            if let cardId = cardIdentifier, !cardId.isEmpty {
+                return "\(from) → 信用卡(\(cardId))"
+            } else if let targetName = targetAccount?.name {
+                return "\(from) → \(targetName)"
+            }
+            return "还款"
+        }
+    }
+    
+    // MARK: - 资金流动图标
+    var flowIcon: String {
+        switch type {
+        case .expense: return "↓"
+        case .income: return "↑"
+        case .transfer: return "⇄"
+        case .payment: return "↩"
         }
     }
     
