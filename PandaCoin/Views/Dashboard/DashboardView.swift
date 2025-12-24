@@ -171,6 +171,8 @@ struct DashboardView: View {
             NavigationView {
                 AssetsView()
             }
+            .navigationViewStyle(.stack)
+            .accentColor(Theme.bambooGreen)
         }
         .sheet(isPresented: $showRecords, onDismiss: {
             // 记录页面关闭后刷新数据

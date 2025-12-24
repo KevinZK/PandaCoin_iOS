@@ -9,6 +9,8 @@ import Foundation
 import Combine
 
 class RecordService: ObservableObject {
+    static let shared = RecordService()
+    
     @Published var records: [Record] = []
     @Published var isLoading = false
     @Published var statistics: RecordStatistics?
@@ -48,6 +50,31 @@ class RecordService: ObservableObject {
                 }
             )
             .store(in: &cancellables)
+    }
+    
+    // MARK: - 获取记录（返回 Publisher，支持按账户和日期筛选）
+    func fetchRecords(
+        accountId: String? = nil,
+        startDate: String? = nil,
+        endDate: String? = nil
+    ) -> AnyPublisher<[Record], APIError> {
+        var params: [String: String] = [:]
+        
+        if let accountId = accountId {
+            params["accountId"] = accountId
+        }
+        if let startDate = startDate {
+            params["startDate"] = startDate
+        }
+        if let endDate = endDate {
+            params["endDate"] = endDate
+        }
+        
+        let queryString = params.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
+        let endpoint = "/records" + (queryString.isEmpty ? "" : "?\(queryString)")
+        
+        return networkManager.request(endpoint: endpoint, method: "GET")
+            .eraseToAnyPublisher()
     }
     
     // MARK: - AI语音记账（新流程：只解析不存储）

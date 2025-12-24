@@ -28,8 +28,22 @@ struct PandaCoinApp: App {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(Theme.background)
+        appearance.shadowColor = .clear
+        
+        // 设置大标题颜色（Large Title）
+        appearance.largeTitleTextAttributes = [
+            .foregroundColor: UIColor(Theme.text)
+        ]
+        // 设置普通标题颜色
+        appearance.titleTextAttributes = [
+            .foregroundColor: UIColor(Theme.text)
+        ]
         
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+        
+        // 导航栏按钮颜色
+        UINavigationBar.appearance().tintColor = UIColor(Theme.bambooGreen)
     }
 }

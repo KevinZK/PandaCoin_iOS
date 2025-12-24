@@ -50,35 +50,80 @@ struct AssetsView: View {
     }
     
     var body: some View {
-        ZStack {
-            Theme.background.ignoresSafeArea()
+        List {
+            // 净值概览卡片
+            Section {
+                netWorthCard
+            } header: {
+                // 留出空间给 large title
+                Color.clear.frame(height: 0)
+            }
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
             
-            ScrollView {
-                VStack(spacing: Spacing.large) {
-                    // 净值概览卡片
-                    netWorthCard
-                    
-                    // 净资产区块
-                    if !netAssets.isEmpty {
-                        sectionView(title: "净资产", assets: netAssets, titleColor: Theme.bambooGreen)
+            // 净资产区块
+            if !netAssets.isEmpty {
+                Section {
+                    ForEach(netAssets) { account in
+                        AccountCard(account: account, accountService: accountService)
                     }
-                    
-                    // 负债区块
-                    if !liabilities.isEmpty {
-                        liabilitySectionView
-                    }
-                    
-                    // 空状态
-                    if accountService.accounts.isEmpty {
-                        emptyState
-                    }
+                } header: {
+                    Text("净资产")
+                        .font(.headline)
+                        .foregroundColor(Theme.bambooGreen)
                 }
-                .padding(.horizontal)
-                .padding(.top, Spacing.medium)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowSeparator(.hidden)
+            }
+            
+            // 负债区块 - 债务类
+            if !debtLiabilities.isEmpty {
+                Section {
+                    ForEach(debtLiabilities) { account in
+                        AccountCard(account: account, accountService: accountService)
+                    }
+                } header: {
+                    Text("负债 - 债务")
+                        .font(.headline)
+                        .foregroundColor(.red)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowSeparator(.hidden)
+            }
+            
+            // 负债区块 - 贷款类
+            if !loanLiabilities.isEmpty {
+                Section {
+                    ForEach(loanLiabilities) { account in
+                        AccountCard(account: account, accountService: accountService)
+                    }
+                } header: {
+                    Text("负债 - 贷款")
+                        .font(.headline)
+                        .foregroundColor(.red)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .listRowSeparator(.hidden)
+            }
+            
+            // 空状态
+            if accountService.accounts.isEmpty {
+                Section {
+                    emptyState
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
         }
+        .listStyle(.insetGrouped)
+        .modifier(ListBackgroundModifier())
         .navigationTitle("资产管理")
         .navigationBarTitleDisplayMode(.large)
+        .background(Theme.background)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddAccount = true }) {
@@ -260,14 +305,22 @@ struct AssetsView: View {
     }
 }
 
-// MARK: - 账户卡片 (CFO 风格升级)
+// MARK: - 账户卡片 (CFO 风格升级 + 左滑编辑)
 struct AccountCard: View {
     let account: Asset
     @ObservedObject var accountService: AssetService
     @State private var showEditSheet = false
+    @State private var navigateToDetail = false
     
     var body: some View {
-        Button(action: { showEditSheet = true }) {
+        ZStack {
+            // 隐藏的 NavigationLink
+            NavigationLink(destination: AssetDetailView(asset: account), isActive: $navigateToDetail) {
+                EmptyView()
+            }
+            .opacity(0)
+            
+            // 可见的卡片内容
             HStack(spacing: Spacing.medium) {
                 // 图标
                 ZStack {
@@ -309,10 +362,40 @@ struct AccountCard: View {
             .background(Theme.cardBackground)
             .cornerRadius(CornerRadius.medium)
             .shadow(color: Theme.cfoShadow, radius: 8, x: 0, y: 4)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                navigateToDetail = true
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button {
+                showEditSheet = true
+            } label: {
+                Label("编辑", systemImage: "pencil")
+            }
+            .tint(Theme.bambooGreen)
+            
+            Button(role: .destructive) {
+                deleteAccount()
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
         }
         .sheet(isPresented: $showEditSheet) {
             EditAccountView(account: account, accountService: accountService)
         }
+    }
+    
+    private func deleteAccount() {
+        accountService.deleteAccount(id: account.id)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { _ in
+                    accountService.fetchAccounts()
+                }
+            )
+            .store(in: &accountService.cancellables)
     }
     
     private var accountColor: Color {
@@ -339,6 +422,379 @@ struct AccountCard: View {
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
+        return formatter
+    }
+}
+
+// MARK: - 资产详情视图
+struct AssetDetailView: View {
+    let asset: Asset
+    @StateObject private var recordService = RecordService.shared
+    @State private var records: [Record] = []
+    @State private var isLoading = true
+    @State private var selectedMonth: Date = Date()
+    
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // 资产概览卡片
+                assetOverviewCard
+                    .padding(.horizontal)
+                    .padding(.top)
+                
+                // 月份选择器
+                monthSelector
+                    .padding(.top, Spacing.medium)
+                
+                // 记录列表
+                if isLoading {
+                    Spacer()
+                    ProgressView("加载中...")
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                } else if records.isEmpty {
+                    Spacer()
+                    emptyState
+                    Spacer()
+                } else {
+                    recordsList
+                }
+            }
+        }
+        .navigationTitle(asset.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            fetchRecords()
+        }
+        .onChange(of: selectedMonth) { _ in
+            fetchRecords()
+        }
+    }
+    
+    // MARK: - 资产概览卡片
+    private var assetOverviewCard: some View {
+        VStack(spacing: 16) {
+            HStack {
+                // 图标
+                ZStack {
+                    Circle()
+                        .fill(assetColor.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: asset.type.icon)
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundColor(assetColor)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(asset.name)
+                        .font(AppFont.body(size: 18, weight: .bold))
+                        .foregroundColor(Theme.text)
+                    
+                    Text(asset.type.displayName)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                
+                Spacer()
+                
+                // 当前余额
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(asset.type.isLiability ? "待还金额" : "当前余额")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                    
+                    Text("¥\(asset.balance as NSDecimalNumber, formatter: currencyFormatter)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(asset.type.isLiability ? Theme.expense : Theme.income)
+                }
+            }
+            
+            // 本月统计
+            HStack(spacing: 20) {
+                monthStatItem(title: "本月收入", amount: monthlyIncome, color: Theme.income)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                monthStatItem(title: "本月支出", amount: monthlyExpense, color: Theme.expense)
+                
+                Divider()
+                    .frame(height: 30)
+                
+                monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.warning)
+            }
+        }
+        .padding(20)
+        .background(Theme.cardBackground)
+        .cornerRadius(CornerRadius.large)
+        .shadow(color: Theme.cfoShadow, radius: 10, x: 0, y: 5)
+    }
+    
+    private func monthStatItem(title: String, amount: Decimal, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+            
+            Text("¥\(amount as NSDecimalNumber, formatter: currencyFormatter)")
+                .font(AppFont.monoNumber(size: 14, weight: .semibold))
+                .foregroundColor(color)
+        }
+    }
+    
+    // MARK: - 月份选择器
+    private var monthSelector: some View {
+        HStack {
+            Button(action: previousMonth) {
+                Image(systemName: "chevron.left")
+                    .foregroundColor(Theme.bambooGreen)
+                    .padding(8)
+            }
+            
+            Spacer()
+            
+            Text(monthFormatter.string(from: selectedMonth))
+                .font(AppFont.body(size: 16, weight: .semibold))
+                .foregroundColor(Theme.text)
+            
+            Spacer()
+            
+            Button(action: nextMonth) {
+                Image(systemName: "chevron.right")
+                    .foregroundColor(Theme.bambooGreen)
+                    .padding(8)
+            }
+            .disabled(Calendar.current.isDate(selectedMonth, equalTo: Date(), toGranularity: .month))
+            .opacity(Calendar.current.isDate(selectedMonth, equalTo: Date(), toGranularity: .month) ? 0.3 : 1)
+        }
+        .padding(.horizontal, 24)
+    }
+    
+    // MARK: - 记录列表
+    private var recordsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(groupedRecords.keys.sorted(by: >), id: \.self) { date in
+                    Section {
+                        ForEach(groupedRecords[date] ?? []) { record in
+                            AssetRecordRow(record: record)
+                        }
+                    } header: {
+                        HStack {
+                            Text(dateSectionFormatter.string(from: date))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
+        }
+    }
+    
+    // MARK: - 空状态
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundColor(Theme.textSecondary.opacity(0.5))
+            
+            Text("本月暂无记录")
+                .font(.headline)
+                .foregroundColor(Theme.textSecondary)
+            
+            Text("该资产在本月没有收支记录")
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary.opacity(0.7))
+        }
+    }
+    
+    // MARK: - 数据计算
+    private var monthlyIncome: Decimal {
+        records.filter { $0.type == .income }.reduce(0) { $0 + $1.amount }
+    }
+    
+    private var monthlyExpense: Decimal {
+        records.filter { $0.type == .expense }.reduce(0) { $0 + $1.amount }
+    }
+    
+    private var monthlyPayment: Decimal {
+        records.filter { $0.type == .payment }.reduce(0) { $0 + $1.amount }
+    }
+    
+    private var groupedRecords: [Date: [Record]] {
+        let calendar = Calendar.current
+        return Dictionary(grouping: records) { record in
+            calendar.startOfDay(for: record.date)
+        }
+    }
+    
+    // MARK: - 格式化器
+    private var currencyFormatter: NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter
+    }
+    
+    private var monthFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月"
+        return formatter
+    }
+    
+    private var dateSectionFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月d日 EEEE"
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter
+    }
+    
+    private var assetColor: Color {
+        switch asset.type {
+        case .bank: return Theme.bambooGreen
+        case .investment: return .orange
+        case .cash: return .purple
+        case .creditCard: return .blue
+        case .digitalWallet: return .green
+        case .loan: return .red
+        case .mortgage: return .brown
+        case .savings: return .teal
+        case .retirement: return .indigo
+        case .crypto: return .yellow
+        case .property: return .gray
+        case .vehicle: return .mint
+        case .otherAsset: return .cyan
+        case .otherLiability: return .pink
+        }
+    }
+    
+    // MARK: - 方法
+    private func fetchRecords() {
+        isLoading = true
+        
+        let calendar = Calendar.current
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth))!
+        let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth)!
+        
+        let startDateStr = ISO8601DateFormatter().string(from: startOfMonth)
+        let endDateStr = ISO8601DateFormatter().string(from: endOfMonth)
+        
+        recordService.fetchRecords(accountId: asset.id, startDate: startDateStr, endDate: endDateStr)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isLoading = false
+                    if case .failure(let error) = completion {
+                        print("获取记录失败: \(error)")
+                    }
+                },
+                receiveValue: { fetchedRecords in
+                    self.records = fetchedRecords
+                }
+            )
+            .store(in: &recordService.cancellables)
+    }
+    
+    private func previousMonth() {
+        if let newDate = Calendar.current.date(byAdding: .month, value: -1, to: selectedMonth) {
+            selectedMonth = newDate
+        }
+    }
+    
+    private func nextMonth() {
+        if let newDate = Calendar.current.date(byAdding: .month, value: 1, to: selectedMonth) {
+            selectedMonth = newDate
+        }
+    }
+}
+
+// MARK: - 资产详情记录行
+struct AssetRecordRow: View {
+    let record: Record
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // 分类图标
+            ZStack {
+                Circle()
+                    .fill(typeColor.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                Text(CategoryMapper.icon(for: record.category))
+                    .font(.system(size: 18))
+            }
+            
+            // 信息
+            VStack(alignment: .leading, spacing: 4) {
+                Text(CategoryMapper.displayName(for: record.category))
+                    .font(AppFont.body(size: 15, weight: .medium))
+                    .foregroundColor(Theme.text)
+                
+                if let description = record.description, !description.isEmpty {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer()
+            
+            // 金额和时间
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(formattedAmount)
+                    .font(AppFont.monoNumber(size: 16, weight: .bold))
+                    .foregroundColor(typeColor)
+                
+                Text(timeFormatter.string(from: record.date))
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .padding(12)
+        .background(Theme.cardBackground)
+        .cornerRadius(12)
+        .shadow(color: Theme.cfoShadow, radius: 4, x: 0, y: 2)
+    }
+    
+    private var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let amountStr = formatter.string(from: record.amount as NSDecimalNumber) ?? "0.00"
+        
+        switch record.type {
+        case .expense, .payment:
+            return "-¥\(amountStr)"
+        case .income:
+            return "+¥\(amountStr)"
+        case .transfer:
+            return "¥\(amountStr)"
+        }
+    }
+    
+    private var typeColor: Color {
+        switch record.type {
+        case .expense: return Theme.expense
+        case .income: return Theme.income
+        case .transfer: return Theme.textSecondary
+        case .payment: return Theme.warning
+        }
+    }
+    
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
         return formatter
     }
 }
@@ -646,3 +1102,22 @@ extension Asset {
         return try! JSONDecoder().decode(Asset.self, from: json)
     }
 }
+
+// MARK: - List 背景修饰符（兼容 iOS 15+）
+struct ListBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content
+                .scrollContentBackground(.hidden)
+                .background(Theme.background)
+        } else {
+            content
+                .background(Theme.background)
+                .onAppear {
+                    UITableView.appearance().backgroundColor = .clear
+                }
+        }
+    }
+}
+
+// MARK: - 导航栏背景修饰符
