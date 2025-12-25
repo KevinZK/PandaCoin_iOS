@@ -13,53 +13,53 @@ struct BudgetView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // 月份选择器
-                monthSelector
-                
-                if viewModel.isLoading {
-                    ProgressView()
-                        .frame(height: 200)
-                } else if let summary = viewModel.summary {
-                    // 总体进度卡片
-                    overallProgressCard(summary: summary)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // 月份选择器
+                    monthSelector
                     
-                    // 分类预算列表
-                    categoryBudgetsList(budgets: summary.categoryBudgets)
-                } else {
-                    emptyState
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .frame(height: 200)
+                    } else if let summary = viewModel.summary {
+                        // 总体进度卡片
+                        overallProgressCard(summary: summary)
+                        
+                        // 分类预算列表
+                        categoryBudgetsList(budgets: summary.categoryBudgets)
+                    } else {
+                        emptyState
+                    }
                 }
+                .padding()
             }
-            .padding()
-        }
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("预算管理")
+            .navigationTitle("预算管理")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button(action: { showingAddBudget = true }) {
-                        Label("添加预算", systemImage: "plus")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button(action: { showingAddBudget = true }) {
+                            Label("添加预算", systemImage: "plus")
+                        }
+                        Button(action: copyFromPrevious) {
+                            Label("复制上月预算", systemImage: "doc.on.doc")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
-                    Button(action: copyFromPrevious) {
-                        Label("复制上月预算", systemImage: "doc.on.doc")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
                 }
             }
-        }
-        .sheet(isPresented: $showingAddBudget) {
-            AddBudgetSheet(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showingEditBudget) {
-            if let budget = selectedBudget {
-                EditBudgetSheet(viewModel: viewModel, budget: budget)
+            .sheet(isPresented: $showingAddBudget) {
+                AddBudgetSheet(viewModel: viewModel)
             }
-        }
-        .onAppear {
-            viewModel.fetchCurrentProgress()
+            .sheet(isPresented: $showingEditBudget) {
+                if let budget = selectedBudget {
+                    EditBudgetSheet(viewModel: viewModel, budget: budget)
+                }
+            }
+            .onAppear {
+                viewModel.fetchCurrentProgress()
         }
     }
     
@@ -117,8 +117,8 @@ struct BudgetView: View {
             
             // 高级进度条
             VStack(spacing: 10) {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
                         Capsule()
                             .fill(Theme.separator)
                             .frame(height: 12)
@@ -130,27 +130,27 @@ struct BudgetView: View {
                         )
                         .frame(width: min(CGFloat(summary.overallUsagePercent / 100) * geometry.size.width, geometry.size.width), height: 12)
                         .clipShape(Capsule())
-                    }
                 }
+            }
                 .frame(height: 12)
-                
-                HStack {
+            
+            HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("已消耗")
                             .font(.system(size: 10))
                             .foregroundColor(Theme.textSecondary)
-                        Text("¥\(String(format: "%.0f", summary.totalSpent))")
+                    Text("¥\(String(format: "%.0f", summary.totalSpent))")
                             .font(AppFont.monoNumber(size: 16, weight: .semibold))
                             .foregroundColor(progressColor(percent: summary.overallUsagePercent))
-                    }
-                    
-                    Spacer()
-                    
+                }
+                
+                Spacer()
+                
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("剩余额度")
                             .font(.system(size: 10))
                             .foregroundColor(Theme.textSecondary)
-                        Text("¥\(String(format: "%.0f", summary.totalRemaining))")
+                    Text("¥\(String(format: "%.0f", summary.totalRemaining))")
                             .font(AppFont.monoNumber(size: 16, weight: .semibold))
                             .foregroundColor(summary.totalRemaining >= 0 ? Theme.bambooGreen : .red)
                     }
@@ -289,7 +289,7 @@ struct BudgetProgressRow: View {
         VStack(spacing: 12) {
             HStack {
                 HStack(spacing: 6) {
-                    Text(budget.displayCategory)
+                Text(budget.displayCategory)
                         .font(AppFont.body(size: 15, weight: .semibold))
                         .foregroundColor(Theme.text)
                     
@@ -316,7 +316,7 @@ struct BudgetProgressRow: View {
                         .foregroundColor(Theme.text)
                     Text("/ ¥\(String(format: "%.0f", budget.budgetAmount))")
                         .foregroundColor(Theme.textSecondary)
-                }
+            }
                 .font(AppFont.monoNumber(size: 13))
             }
             

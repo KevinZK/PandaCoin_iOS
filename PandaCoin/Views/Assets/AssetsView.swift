@@ -51,9 +51,9 @@ struct AssetsView: View {
     
     var body: some View {
         List {
-            // 净值概览卡片
+                        // 净值概览卡片
             Section {
-                netWorthCard
+                        netWorthCard
             } header: {
                 // 留出空间给 large title
                 Color.clear.frame(height: 0)
@@ -61,9 +61,9 @@ struct AssetsView: View {
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            
-            // 净资产区块
-            if !netAssets.isEmpty {
+                        
+                        // 净资产区块
+                        if !netAssets.isEmpty {
                 Section {
                     ForEach(netAssets) { account in
                         AccountCard(account: account, accountService: accountService)
@@ -92,8 +92,8 @@ struct AssetsView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .listRowSeparator(.hidden)
-            }
-            
+                        }
+                        
             // 负债区块 - 贷款类
             if !loanLiabilities.isEmpty {
                 Section {
@@ -108,35 +108,35 @@ struct AssetsView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .listRowSeparator(.hidden)
-            }
-            
-            // 空状态
-            if accountService.accounts.isEmpty {
+                        }
+                        
+                        // 空状态
+                        if accountService.accounts.isEmpty {
                 Section {
-                    emptyState
-                }
+                            emptyState
+                        }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-            }
-        }
+                    }
+                }
         .listStyle(.plain)
         .modifier(ListBackgroundModifier())
-        .navigationTitle("资产管理")
-        .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("资产管理")
+            .navigationBarTitleDisplayMode(.large)
         .background(Theme.background)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showAddAccount = true }) {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundColor(Theme.bambooGreen)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showAddAccount = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(Theme.bambooGreen)
+                    }
                 }
             }
-        }
-        .sheet(isPresented: $showAddAccount) {
-            AddAccountView(accountService: accountService)
-        }
-        .onAppear {
-            accountService.fetchAccounts()
+            .sheet(isPresented: $showAddAccount) {
+                AddAccountView(accountService: accountService)
+            }
+            .onAppear {
+                accountService.fetchAccounts()
         }
     }
     
@@ -333,7 +333,7 @@ struct AccountCard: View {
                     Circle()
                         .fill(accountColor.opacity(0.12))
                         .frame(width: 48, height: 48)
-                    Image(systemName: account.type.icon)
+                Image(systemName: account.type.icon)
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(accountColor)
                 }
@@ -341,9 +341,9 @@ struct AccountCard: View {
                 // 信息
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(account.name)
+                    Text(account.name)
                             .font(AppFont.body(size: 16, weight: .semibold))
-                            .foregroundColor(Theme.text)
+                        .foregroundColor(Theme.text)
                         
                         // 默认支出标签
                         if isDefaultAccount {
@@ -366,9 +366,9 @@ struct AccountCard: View {
                 
                 // 余额
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("¥\(account.balance as NSDecimalNumber, formatter: currencyFormatter)")
+                Text("¥\(account.balance as NSDecimalNumber, formatter: currencyFormatter)")
                         .font(AppFont.monoNumber(size: 17, weight: .bold))
-                        .foregroundColor(Theme.text)
+                    .foregroundColor(Theme.text)
                     
                     if account.type.isLiability {
                         Text("待还金额")
@@ -1197,8 +1197,8 @@ struct EditAccountView: View {
     ]
     
     return NavigationView {
-        AssetsView()
-    }
+    AssetsView()
+}
 }
 
 // MARK: - Mock 扩展 (仅用于预览)

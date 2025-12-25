@@ -154,7 +154,7 @@ struct CreditCardRow: View {
                     .padding(.vertical, 5)
                     .background(Color.white.opacity(0.15))
                     .cornerRadius(8)
-            }
+                    }
             
             Spacer(minLength: 10)
             
@@ -192,22 +192,22 @@ struct CreditCardRow: View {
             VStack(spacing: 8) {
                 // 自定义进度条
                 GeometryReader { geo in
-                    ZStack(alignment: .leading) {
+                ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.white.opacity(0.2))
                         
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.white)
                             .frame(width: geo.size.width * min(card.usageRate, 1.0))
-                    }
                 }
-                .frame(height: 6)
-                
-                HStack {
+            }
+            .frame(height: 6)
+            
+            HStack {
                     Text("可用额度: \(formatCurrency(card.availableCredit, currency: card.currency))")
-                    Spacer()
+                Spacer()
                     Text("已用 \(Int(card.usageRate * 100))%")
-                }
+        }
                 .font(AppFont.body(size: 10, weight: .medium))
                 .opacity(0.8)
             }

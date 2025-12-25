@@ -295,8 +295,8 @@ class RecordService: ObservableObject {
         var phase1Publishers: [AnyPublisher<Void, APIError>] = []
         
         for event in assetEvents {
-            if let data = event.assetUpdateData {
-                let pub = saveAssetUpdate(data)
+                if let data = event.assetUpdateData {
+                    let pub = saveAssetUpdate(data)
                     .map { _ in () }
                     .eraseToAnyPublisher()
                 phase1Publishers.append(pub)
@@ -307,15 +307,15 @@ class RecordService: ObservableObject {
             if let data = event.creditCardData {
                 let pub = saveCreditCardUpdate(data)
                     .map { _ in () }
-                    .eraseToAnyPublisher()
+                        .eraseToAnyPublisher()
                 phase1Publishers.append(pub)
             }
-        }
+                }
         
         // 同时保存预算（不依赖账户）
         for event in budgetEvents {
-            if let data = event.budgetData {
-                let pub = saveBudget(data)
+                if let data = event.budgetData {
+                    let pub = saveBudget(data)
                     .map { _ in () }
                     .eraseToAnyPublisher()
                 phase1Publishers.append(pub)
@@ -326,7 +326,7 @@ class RecordService: ObservableObject {
         if phase1Publishers.isEmpty {
             return saveTransactionEvents(transactionEvents, accountMap: accountMap)
                 .map { events.count }
-                .eraseToAnyPublisher()
+                        .eraseToAnyPublisher()
         }
         
         // 第一阶段完成后，刷新账户列表，再保存交易

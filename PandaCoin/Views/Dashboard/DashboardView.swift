@@ -35,7 +35,6 @@ struct DashboardView: View {
     ]
     @State private var breathingPhase = false
     @State private var breathingAnimationStarted = false
-    @State private var wavePhases: [CGFloat] = [1.0, 1.0, 1.0]
     
     private var indexedChartData: [(index: Int, label: String, value: Double)] {
         chartData.enumerated().map { (index, element) in
@@ -85,76 +84,22 @@ struct DashboardView: View {
     @State private var showCreditCards = false
     @State private var showSettings = false
     
+    // 记账模式：经典(语音按钮) vs 对话(聊天)
+    @State private var isChatMode = false
+    
     var body: some View {
         ZStack {
             // 动画渐变背景
             AnimatedGradientBackground()
                 .ignoresSafeArea()
-            ScrollView {
-                
-                VStack(spacing: 0) {
-                    // 自定义导航栏
-                    HStack {
-                        Spacer()
-                        
-                        Menu {
-                            Button(action: { showAccounts = true }) {
-                                Label(L10n.TabBar.accounts, systemImage: "creditcard")
-                            }
-                            
-                            Button(action: { showCreditCards = true }) {
-                                Label("信用卡", systemImage: "creditcard.fill")
-                            }
-                            
-                            Button(action: { showRecords = true }) {
-                                Label(L10n.TabBar.records, systemImage: "list.bullet")
-                            }
-                            
-                            Button(action: { showStatistics = true }) {
-                                Label(L10n.TabBar.statistics, systemImage: "chart.pie")
-                            }
-                            
-                            Button(action: { showBudget = true }) {
-                                Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
-                            }
-                            
-                            Divider()
-                            
-                            Button(action: { showSettings = true }) {
-                                Label(L10n.TabBar.settings, systemImage: "gearshape")
-                            }
-                            
-                            Button(role: .destructive, action: {
-                                authService.logout()
-                            }) {
-                                Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
-                            }
-                        } label: {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 22))
-                                .foregroundColor(Theme.textSecondary)
-                                .frame(width: 44, height: 44)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    
-                    // 总资产显示
-                    totalAssetsSection
-                        .padding(.top, 20)
-                    
-                    Spacer()
-                    
-                    // 图表区域
-                    chartSection
-                        .padding(.vertical, 20)
-                    
-                    // 语音输入按钮
-                    voiceButton
-                        .padding(.bottom, 100)
-                }
-            }
             
+            if isChatMode {
+                // 对话模式：全屏聊天布局
+                chatModeFullScreen
+            } else {
+                // 经典模式：保持原有布局
+                classicModeLayout
+            }
         }
         .sheet(item: $unifiedEventsWrapper) { wrapper in
             UnifiedConfirmationView(
@@ -222,7 +167,7 @@ struct DashboardView: View {
         VStack(spacing: Spacing.small) {
             Text(formatCurrency(netWorthValue))
                 .font(.system(size: 48, weight: .thin, design: .serif))
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(Theme.text)
             
             Text(L10n.Dashboard.netAssets)
                 .font(.system(size: 14, weight: .regular))
@@ -326,123 +271,370 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
+        }
+    }
+    
+    // MARK: - 经典模式布局
+    private var classicModeLayout: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // 顶部栏：Segment + 菜单
+                topNavigationBar
+                
+                // 总资产显示
+                totalAssetsSection
+                    .padding(.top, 20)
+                
+                Spacer()
+                
+                // 图表区域
+                chartSection
+                    .padding(.vertical, 20)
+                
+                // 语音按钮
+                voiceButton
+                    .padding(.bottom, 100)
+            }
+        }
+    }
+    
+    // MARK: - 对话模式全屏布局
+    private var chatModeFullScreen: some View {
+        VStack(spacing: 0) {
+            // 顶部栏：Segment + 菜单
+            topNavigationBar
             
-            // 分页指示器
-            HStack(spacing: 8) {
-                ForEach(0..<3) { index in
+            // 净资产（放大版）
+            VStack(spacing: 4) {
+                Text(formatCurrency(netWorthValue))
+                    .font(.system(size: 36, weight: .light, design: .serif))
+                    .foregroundColor(Theme.text)
+                
+                Text(L10n.Dashboard.netAssets)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Theme.textSecondary)
+                    .tracking(1)
+            }
+            .padding(.vertical, 16)
+            
+            // 聊天区域（占满剩余空间）
+            ChatRecordView()
+        }
+    }
+    
+    // MARK: - 顶部导航栏（统一）
+    private var topNavigationBar: some View {
+        ZStack {
+            // 居中的 Segment Control
+            modeSegmentControl
+            
+            // 右侧菜单按钮
+            HStack {
+                Spacer()
+                
+                Menu {
+                    Button(action: { showAccounts = true }) {
+                        Label(L10n.TabBar.accounts, systemImage: "creditcard")
+                    }
+                    Button(action: { showCreditCards = true }) {
+                        Label("信用卡", systemImage: "creditcard.fill")
+                    }
+                    Button(action: { showRecords = true }) {
+                        Label(L10n.TabBar.records, systemImage: "list.bullet")
+                    }
+                    Button(action: { showStatistics = true }) {
+                        Label(L10n.TabBar.statistics, systemImage: "chart.pie")
+                    }
+                    Button(action: { showBudget = true }) {
+                        Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
+                    }
+                    Divider()
+                    Button(action: { showSettings = true }) {
+                        Label(L10n.TabBar.settings, systemImage: "gearshape")
+                    }
+                    Button(role: .destructive, action: { authService.logout() }) {
+                        Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 20))
+                        .foregroundColor(Theme.textSecondary)
+                        .frame(width: 40, height: 40)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+    
+    // MARK: - 导航栏
+    private var navigationBar: some View {
+        HStack {
+            Spacer()
+            
+            Menu {
+                Button(action: { showAccounts = true }) {
+                    Label(L10n.TabBar.accounts, systemImage: "creditcard")
+                }
+                Button(action: { showCreditCards = true }) {
+                    Label("信用卡", systemImage: "creditcard.fill")
+                }
+                Button(action: { showRecords = true }) {
+                    Label(L10n.TabBar.records, systemImage: "list.bullet")
+                }
+                Button(action: { showStatistics = true }) {
+                    Label(L10n.TabBar.statistics, systemImage: "chart.pie")
+                }
+                Button(action: { showBudget = true }) {
+                    Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
+                }
+                Divider()
+                Button(action: { showSettings = true }) {
+                    Label(L10n.TabBar.settings, systemImage: "gearshape")
+                }
+                Button(role: .destructive, action: { authService.logout() }) {
+                    Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 22))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 44, height: 44)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+    
+    // MARK: - 模式切换 Segment Control
+    private var modeSegmentControl: some View {
+        HStack(spacing: 0) {
+            // 语音模式
+            Button(action: { withAnimation(.spring(response: 0.3)) { isChatMode = false } }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 12))
+                    Text("语音")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(isChatMode ? Theme.textSecondary : .white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(isChatMode ? Color.clear : Theme.bambooGreen)
+                .cornerRadius(16)
+            }
+            
+            // 对话模式
+            Button(action: { withAnimation(.spring(response: 0.3)) { isChatMode = true } }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 12))
+                    Text("对话")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(isChatMode ? .white : Theme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(isChatMode ? Theme.bambooGreen : Color.clear)
+                .cornerRadius(16)
+            }
+        }
+        .padding(3)
+        .background(Theme.cardBackground)
+        .cornerRadius(20)
+        .shadow(color: Theme.cfoShadow, radius: 3, x: 0, y: 1)
+    }
+    
+    // MARK: - 语音按钮状态
+    @State private var isButtonPressed = false
+    @State private var waveScales: [CGFloat] = [1.0, 1.0, 1.0]
+    @State private var waveAnimating = false
+    
+    // MARK: - 语音按钮（重新设计）
+    private var voiceButton: some View {
+        VStack(spacing: Spacing.medium) {
+            // 主按钮区域
+            ZStack {
+                // 多层波浪向外扩散效果（录音时显示）
+                if speechService.isRecording {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .stroke(
+                                Theme.bambooGreen.opacity(0.5 - Double(index) * 0.1),
+                                lineWidth: 3 - CGFloat(index) * 0.5
+                            )
+                            .frame(width: 88, height: 88)
+                            .scaleEffect(waveScales[index])
+                            .opacity(Double(2.2 - waveScales[index]))
+                    }
+                }
+                
+                // 按下时的光晕效果
+                if isButtonPressed && !speechService.isRecording {
                     Circle()
-                        .fill(index == 0 ? Color.green.opacity(0.8) : Color.gray.opacity(0.3))
-                        .frame(width: 6, height: 6)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Theme.bambooGreen.opacity(0.3),
+                                    Theme.bambooGreen.opacity(0.1),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 40,
+                                endRadius: 80
+                            )
+                        )
+                        .frame(width: 160, height: 160)
+                        .transition(.opacity)
+                }
+                
+                // 主按钮 - 毛玻璃效果
+                ZStack {
+                    // 玻璃背景
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 88, height: 88)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Theme.bambooGreen.opacity(speechService.isRecording ? 0.8 : 0.4),
+                                            Theme.bambooGreen.opacity(speechService.isRecording ? 0.6 : 0.2)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: speechService.isRecording ? 3 : 2
+                                )
+                        )
+                        .shadow(
+                            color: Theme.bambooGreen.opacity(speechService.isRecording ? 0.5 : 0.2),
+                            radius: speechService.isRecording ? 20 : 8,
+                            x: 0,
+                            y: 4
+                        )
+                    
+                    // 内部填充（录音时高亮）
+                    Circle()
+                        .fill(
+                            speechService.isRecording
+                                ? Theme.bambooGreen.opacity(0.15)
+                                : Color.clear
+                        )
+                        .frame(width: 84, height: 84)
+                    
+                    // 图标
+                    Image(systemName: speechService.isRecording ? "waveform" : "mic.fill")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundColor(
+                            speechService.isRecording
+                                ? Theme.bambooGreen
+                                : Theme.text.opacity(0.7)
+                        )
+                        .scaleEffect(speechService.isRecording ? 1.15 : 1.0)
+                }
+                .scaleEffect(isButtonPressed ? 0.92 : (speechService.isRecording ? 1.05 : 1.0))
+            }
+            .frame(width: 180, height: 180)
+            .contentShape(Circle().scale(0.5))  // 缩小触摸区域，防止误触
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !isButtonPressed else { return }
+                        
+                        // 触觉反馈
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            isButtonPressed = true
+                        }
+                        
+                        // 延迟启动录音，防止误触
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            guard isButtonPressed, !speechService.isRecording else { return }
+                            do {
+                                try speechService.startRecording()
+                                startWaveAnimation()
+                                
+                                // 开始录音的触觉反馈
+                                let notificationFeedback = UINotificationFeedbackGenerator()
+                                notificationFeedback.notificationOccurred(.success)
+                            } catch {
+                                logError("语音识别启动失败", error: error)
+                                if let speechError = error as? SpeechRecognitionError {
+                                    if speechError == .needsSettingsAuthorization {
+                                        showSettingsAlert()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            isButtonPressed = false
+                        }
+                        
+                        guard speechService.isRecording else { return }
+                        
+                        let recognizedText = speechService.recognizedText
+                        speechService.stopRecording()
+                        stopWaveAnimation()
+                        
+                        // 结束录音的触觉反馈
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        
+                        handleVoiceInput(recognizedText)
+                    }
+            )
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: speechService.isRecording)
+            .animation(.easeInOut(duration: 0.2), value: isButtonPressed)
+            
+            // 提示文字
+            VStack(spacing: 4) {
+                Text(speechService.isRecording ? "松开结束" : "长按说话")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(speechService.isRecording ? Theme.bambooGreen : Theme.text)
+                
+                if !speechService.isRecording {
+                    Text("告诉我今天的收支")
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: speechService.isRecording)
+        }
+    }
+    
+    // 波浪扩散动画
+    private func startWaveAnimation() {
+        guard !waveAnimating else { return }
+        waveAnimating = true
+        
+        // 重置波浪
+        waveScales = [1.0, 1.0, 1.0]
+        
+        // 启动三层波浪，每层延迟启动形成层层扩散效果
+        for i in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.3) {
+                guard self.waveAnimating else { return }
+                withAnimation(
+                    .easeOut(duration: 1.2)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    self.waveScales[i] = 2.2
                 }
             }
         }
     }
     
-    // MARK: - 语音按钮
-    private var voiceButton: some View {
-        VStack(spacing: Spacing.small) {
-            // 熊猫语音按钮
-            ZStack {
-                // 波浪动画（录音时显示）
-                if speechService.isRecording {
-                    ForEach(0..<3, id: \.self) { index in
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color.green.opacity(0.6),
-                                        Color.green.opacity(0.2)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 3
-                            )
-                            .frame(width: 120, height: 120)
-                            .scaleEffect(wavePhases[index])
-                            .opacity(2.5 - wavePhases[index])
-                            .animation(
-                                Animation.easeOut(duration: 1.2)
-                                    .repeatForever(autoreverses: false)
-                                    .delay(Double(index) * 0.2),
-                                value: wavePhases[index]
-                            )
-                    }
-                }
-                
-                // 外圈阴影
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color.gray.opacity(0.3),
-                                Color.gray.opacity(0.1),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 50,
-                            endRadius: 90
-                        )
-                    )
-                    .frame(width: 180, height: 180)
-                
-                // 主按钮
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: speechService.isRecording ? [
-                                Color.green.opacity(0.8),
-                                Color.green.opacity(0.6)
-                            ] : [
-                                Color(red: 0.4, green: 0.4, blue: 0.4),
-                                Color(red: 0.5, green: 0.5, blue: 0.5)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 120, height: 120)
-                    .shadow(color: .black.opacity(0.3), radius: 15, x: 0, y: 8)
-                    .scaleEffect(speechService.isRecording ? 1.05 : 1.0)
-                
-                // 熊猫图标
-                Text("🐼")
-                    .font(.system(size: 50))
-                    .scaleEffect(speechService.isRecording ? 1.1 : 1.0)
-            }
-            .id("voice_button")  // 添加稳定ID
-            .onLongPressGesture(minimumDuration: 0.5, maximumDistance: 5.0, perform: {
-                print("✅ 长按完成！")
-            }, onPressingChanged: { isPressing in
-                if isPressing {
-                    guard !speechService.isRecording else { return }
-                    do {
-                        try speechService.startRecording()
-                        startWaveAnimation()
-                    } catch {
-                        logError("语音识别启动失败", error: error)
-                        if let speechError = error as? SpeechRecognitionError {
-                            if speechError == .needsSettingsAuthorization {
-                                showSettingsAlert()
-                            }
-                        }
-                    }
-                } else {
-                    print("长按结束")
-                    guard speechService.isRecording else { return }
-                    
-                    let recognizedText = speechService.recognizedText
-                    speechService.stopRecording()
-                    stopWaveAnimation()
-                    handleVoiceInput(recognizedText)
-                }
-            })
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: speechService.isRecording)
-            
-            Text(speechService.isRecording ? "Recording..." : "Voice Input")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundColor(Theme.textSecondary)
-                .tracking(1)
+    private func stopWaveAnimation() {
+        waveAnimating = false
+        withAnimation(.easeOut(duration: 0.2)) {
+            waveScales = [1.0, 1.0, 1.0]
         }
     }
     
@@ -455,23 +647,6 @@ struct DashboardView: View {
         }
     }
     
-    private func startWaveAnimation() {
-        // 重置所有波浪
-        wavePhases = [1.0, 1.0, 1.0]
-        
-        // 延迟启动动画，确保视图已渲染
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            for i in 0..<3 {
-                self.wavePhases[i] = 2.0
-            }
-        }
-    }
-    
-    private func stopWaveAnimation() {
-        for i in 0..<3 {
-            wavePhases[i] = 1.0
-        }
-    }
     
     private func showSettingsAlert() {
         // TODO: 显示设置提醒
