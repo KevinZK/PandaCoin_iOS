@@ -24,26 +24,17 @@ struct PandaCoinApp: App {
     }
     
     private func setupAppearance() {
-        // 配置导航栏样式
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(Theme.background)
-        appearance.shadowColor = .clear
-        
-        // 设置大标题颜色（Large Title）
-        appearance.largeTitleTextAttributes = [
-            .foregroundColor: UIColor(Theme.text)
-        ]
-        // 设置普通标题颜色
-        appearance.titleTextAttributes = [
-            .foregroundColor: UIColor(Theme.text)
-        ]
-        
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-        UINavigationBar.appearance().compactAppearance = appearance
-        
-        // 导航栏按钮颜色
+        // 完全不使用 UINavigationBarAppearance
+        // 让 SwiftUI 使用系统默认的导航栏行为
+        // 只设置 tint 颜色
         UINavigationBar.appearance().tintColor = UIColor(Theme.bambooGreen)
+        
+        // 设置导航栏标题颜色（旧API，但更可靠）
+        UINavigationBar.appearance().largeTitleTextAttributes = [
+            .foregroundColor: UIColor(Theme.text)
+        ]
+        UINavigationBar.appearance().titleTextAttributes = [
+            .foregroundColor: UIColor(Theme.text)
+        ]
     }
 }

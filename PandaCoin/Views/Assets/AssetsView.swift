@@ -119,7 +119,7 @@ struct AssetsView: View {
                 .listRowSeparator(.hidden)
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .modifier(ListBackgroundModifier())
         .navigationTitle("资产管理")
         .navigationBarTitleDisplayMode(.large)
