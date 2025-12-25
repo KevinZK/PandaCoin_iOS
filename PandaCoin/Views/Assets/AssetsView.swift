@@ -449,10 +449,14 @@ struct AccountCard: View {
 struct AssetDetailView: View {
     let asset: Asset
     @StateObject private var recordService = RecordService.shared
+    @StateObject private var autoPaymentService = AutoPaymentService.shared
     @State private var records: [Record] = []
     @State private var isLoading = true
     @State private var selectedMonth: Date = Date()
     @State private var showingAutoPaymentSetup = false
+    @State private var showingAutoPaymentDetail = false
+    @State private var linkedAutoPayment: AutoPayment?
+    @State private var cancellables = Set<AnyCancellable>()
     
     var body: some View {
         ZStack {
@@ -487,10 +491,28 @@ struct AssetDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             fetchRecords()
+            checkLinkedAutoPayment()
         }
         .onChange(of: selectedMonth) { _ in
             fetchRecords()
         }
+    }
+    
+    // MARK: - 检查关联的自动还款
+    private func checkLinkedAutoPayment() {
+        // 只对贷款类资产检查
+        guard asset.type == .loan || asset.type == .mortgage else { return }
+        
+        autoPaymentService.fetchAutoPayments()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [self] payments in
+                    // 查找关联到当前资产的自动还款
+                    linkedAutoPayment = payments.first { $0.liabilityAccountId == asset.id }
+                }
+            )
+            .store(in: &cancellables)
     }
     
     // MARK: - 资产概览卡片
@@ -546,23 +568,52 @@ struct AssetDetailView: View {
                 monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.warning)
             }
             
-            // 贷款类资产显示自动还款设置按钮
+            // 贷款类资产显示自动还款按钮
             if asset.type == .loan || asset.type == .mortgage {
                 Divider()
                     .padding(.vertical, 4)
                 
-                Button(action: { showingAutoPaymentSetup = true }) {
-                    HStack {
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.system(size: 16))
-                        Text("设置自动还款")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
+                if let autoPayment = linkedAutoPayment {
+                    // 已设置自动还款 - 显示查看按钮
+                    Button(action: { showingAutoPaymentDetail = true }) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.green)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("自动还款已启用")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Theme.text)
+                                
+                                Text("每月\(autoPayment.dayOfMonth)号 · \(autoPayment.formattedAmount ?? "按账单金额")")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.textSecondary)
+                        }
                     }
-                    .foregroundColor(Theme.bambooGreen)
+                } else {
+                    // 未设置自动还款 - 显示设置按钮
+                    Button(action: { showingAutoPaymentSetup = true }) {
+                        HStack {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 16))
+                            Text("设置自动还款")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                        }
+                        .foregroundColor(Theme.bambooGreen)
+                    }
                 }
             }
         }
@@ -573,6 +624,19 @@ struct AssetDetailView: View {
         .sheet(isPresented: $showingAutoPaymentSetup) {
             NavigationView {
                 AddAutoPaymentForAssetView(asset: asset)
+            }
+            .onDisappear {
+                checkLinkedAutoPayment()
+            }
+        }
+        .sheet(isPresented: $showingAutoPaymentDetail) {
+            if let autoPayment = linkedAutoPayment {
+                NavigationView {
+                    AutoPaymentDetailView(payment: autoPayment)
+                }
+                .onDisappear {
+                    checkLinkedAutoPayment()
+                }
             }
         }
     }
