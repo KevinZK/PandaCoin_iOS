@@ -195,7 +195,13 @@ class RecordService: ObservableObject {
                         location: data.location,
                         repaymentAmount: data.repayment_amount,
                         repaymentSchedule: data.repayment_schedule,
-                        cardIdentifier: data.card_identifier
+                        cardIdentifier: data.card_identifier,
+                        loanTermMonths: data.loan_term_months,
+                        interestRate: data.interest_rate,
+                        monthlyPayment: data.monthly_payment,
+                        repaymentDay: data.repayment_day,
+                        autoRepayment: data.auto_repayment,
+                        sourceAccount: data.source_account
                     )
                     return ParsedFinancialEvent(
                         eventType: .assetUpdate,
@@ -217,7 +223,10 @@ class RecordService: ObservableObject {
                         institutionName: data.institution_name,
                         creditLimit: creditLimit,
                         repaymentDueDate: data.repayment_due_date,
-                        cardIdentifier: data.card_identifier
+                        cardIdentifier: data.card_identifier,
+                        autoRepayment: data.auto_repayment,
+                        repaymentType: data.repayment_type,
+                        sourceAccount: data.source_account
                     )
                     return ParsedFinancialEvent(
                         eventType: .creditCardUpdate,
@@ -791,6 +800,16 @@ struct FinancialEventData: Codable {
     let priority: String?
     
     // is_recurring 用于 BUDGET 和 TRANSACTION（复用同一个字段）
+    
+    // 贷款专用字段 (LOAN / MORTGAGE)
+    let loan_term_months: Int?      // 贷款期限(月)
+    let interest_rate: Double?      // 年利率 (%)
+    let monthly_payment: Double?    // 月供金额
+    let repayment_day: Int?         // 还款日 (1-28)
+    
+    // 自动还款配置
+    let auto_repayment: Bool?       // 是否启用自动还款
+    let repayment_type: String?     // 还款类型: "FULL" 或 "MIN"（信用卡用）
 }
 
 // MARK: - 统一解析结果类型
@@ -844,6 +863,16 @@ struct AssetUpdateParsed {
     
     // 信用卡标识（仅当 asset_type = CREDIT_CARD 时使用）
     var cardIdentifier: String?
+    
+    // 贷款专用字段 (LOAN / MORTGAGE)
+    var loanTermMonths: Int?        // 贷款期限(月)
+    var interestRate: Double?       // 年利率 (%)
+    var monthlyPayment: Double?     // 月供金额
+    var repaymentDay: Int?          // 还款日 (1-28)
+    
+    // 自动还款配置
+    var autoRepayment: Bool?        // 是否启用自动还款
+    var sourceAccount: String?      // 扣款来源账户名称
 }
 
 // 预算解析结果
@@ -867,4 +896,9 @@ struct CreditCardParsed {
     let creditLimit: Double?        // 授信额度
     let repaymentDueDate: String?   // 还款日（如 "04"）
     var cardIdentifier: String?     // 卡片唯一标识（如尾号"1234"）
+    
+    // 自动还款配置
+    var autoRepayment: Bool?        // 是否启用自动还款
+    var repaymentType: String?      // 还款类型: "FULL" 或 "MIN"
+    var sourceAccount: String?      // 扣款来源账户名称
 }

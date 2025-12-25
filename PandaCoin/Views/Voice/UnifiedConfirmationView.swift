@@ -199,6 +199,8 @@ struct TransactionCardContent: View {
     @State private var selectedAccountType: SelectedAccountInfo?
     @State private var isSmartRecommended = false  // 是否是智能推荐的（用户可以修改）
     @State private var originalCardIdentifier: String? = nil  // 保存 AI 原始返回的 cardIdentifier
+    @State private var originalAccountName: String = ""  // 保存 AI 原始返回的账户名（用于判断是否需要显示选择器）
+    @State private var usedDefaultAccount = false  // 是否使用了默认账户预填
     
     @ObservedObject private var authService = AuthService.shared
     @ObservedObject private var accountService = AssetService.shared
@@ -209,20 +211,21 @@ struct TransactionCardContent: View {
         data.accountName.contains("信用卡") || data.cardIdentifier != nil
     }
     
-    // 是否需要显示账户选择器（支出类型且 AI 未识别出账户）
+    // 是否需要显示账户选择器（支出类型且 AI 未识别出账户，或者使用了默认账户预填）
     private var shouldShowAccountPicker: Bool {
-        data.type == .expense && data.accountName.isEmpty
+        data.type == .expense && (originalAccountName.isEmpty || usedDefaultAccount)
     }
     
     // 是否需要显示信用卡选择器（AI 识别出信用卡但没有明确尾号）
     // 使用 originalCardIdentifier 来判断，避免被 onChange 修改后的值影响
     private var shouldShowCreditCardPicker: Bool {
         involvesCreditCard &&
-        !shouldShowAccountPicker &&
+        !originalAccountName.isEmpty &&  // AI 识别出了账户名
+        !usedDefaultAccount &&  // 不是默认账户预填的情况
         (originalCardIdentifier == nil || originalCardIdentifier?.isEmpty == true)
     }
     
-    // 是否已经选择了账户（通过选择器或智能推荐）
+    // 是否已经选择了账户（通过选择器或智能推荐或默认账户）
     private var hasSelectedAccount: Bool {
         selectedAccountType != nil
     }
@@ -273,7 +276,7 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.textSecondary)
             }
             
-            // 支出账户选择（当 AI 未识别出账户时显示）
+            // 支出账户选择（当 AI 未识别出账户时显示，或使用了默认账户时显示供用户修改）
             if shouldShowAccountPicker {
                 Divider()
                     .padding(.vertical, 4)
@@ -287,6 +290,16 @@ struct TransactionCardContent: View {
                             Text("请选择支出账户")
                                 .font(AppFont.body(size: 12, weight: .medium))
                                 .foregroundColor(.orange)
+                        }
+                    } else if usedDefaultAccount {
+                        // 使用了默认账户，提示用户可以修改
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(Theme.bambooGreen)
+                                .font(.system(size: 14))
+                            Text("已使用默认账户（可点击修改）")
+                                .font(AppFont.body(size: 12, weight: .medium))
+                                .foregroundColor(Theme.bambooGreen)
                         }
                     } else {
                         HStack {
@@ -309,6 +322,16 @@ struct TransactionCardContent: View {
                                 .foregroundColor(selectedAccountType == nil ? Theme.textSecondary : Theme.text)
                             
                             Spacer()
+                            
+                            if usedDefaultAccount {
+                                Text("默认")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Theme.bambooGreen)
+                                    .cornerRadius(4)
+                            }
                             
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 12))
@@ -389,7 +412,8 @@ struct TransactionCardContent: View {
             }
         }
         .onAppear {
-            // 保存 AI 原始返回的 cardIdentifier，用于判断是否需要显示选择器
+            // 保存 AI 原始返回的值，用于判断是否需要显示选择器
+            originalAccountName = data.accountName
             originalCardIdentifier = data.cardIdentifier
             cardIdentifier = data.cardIdentifier ?? ""
             loadDefaultAccountIfNeeded()
@@ -407,9 +431,10 @@ struct TransactionCardContent: View {
             }
         }
         .sheet(isPresented: $showAccountPicker, onDismiss: {
-            // 用户从选择器中选择后，清除智能推荐标记
+            // 用户从选择器中选择后，清除智能推荐和默认账户标记
             if selectedAccountType != nil {
                 isSmartRecommended = false
+                usedDefaultAccount = false  // 用户手动选择了，不再是默认账户
             }
         }) {
             ExpenseAccountPickerSheet(
@@ -421,7 +446,10 @@ struct TransactionCardContent: View {
     }
     
     private func loadDefaultAccountIfNeeded() {
-        guard shouldShowAccountPicker, selectedAccountType == nil else { return }
+        // 只有当 AI 没有识别出账户时才加载默认账户
+        guard data.type == .expense,
+              originalAccountName.isEmpty,
+              selectedAccountType == nil else { return }
         
         // 尝试加载默认账户
         if let user = authService.currentUser,
@@ -436,6 +464,7 @@ struct TransactionCardContent: View {
                         icon: account.type.icon,
                         cardIdentifier: nil
                     )
+                    usedDefaultAccount = true  // 标记使用了默认账户
                 }
             } else if accountType == "CREDIT_CARD" {
                 if let card = creditCardService.creditCards.first(where: { $0.id == accountId }) {
@@ -446,6 +475,7 @@ struct TransactionCardContent: View {
                         icon: "creditcard.circle.fill",
                         cardIdentifier: card.cardIdentifier
                     )
+                    usedDefaultAccount = true  // 标记使用了默认账户
                 }
             }
         }
@@ -724,6 +754,91 @@ struct AssetUpdateCardContent: View {
                 }
             }
             
+            // 贷款专用信息（LOAN / MORTGAGE）
+            if isLoanType {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    // 贷款期限和利率
+                    HStack(spacing: Spacing.medium) {
+                        if let months = data.loanTermMonths {
+                            Label("\(months / 12)年\(months % 12 > 0 ? "\(months % 12)个月" : "")", systemImage: "calendar")
+                                .font(AppFont.body(size: 13))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        
+                        if let rate = data.interestRate {
+                            Label(String(format: "%.2f%%", rate), systemImage: "percent")
+                                .font(AppFont.body(size: 13))
+                                .foregroundColor(rate == 0 ? Theme.income : Theme.warning)
+                        }
+                    }
+                    
+                    // 月供和还款日
+                    HStack(spacing: Spacing.medium) {
+                        if let payment = data.monthlyPayment {
+                            Label("月供: ¥\(formatNumber(payment))", systemImage: "creditcard")
+                                .font(AppFont.body(size: 13, weight: .medium))
+                                .foregroundColor(Theme.expense)
+                        }
+                        
+                        if let day = data.repaymentDay {
+                            Label("每月\(day)日还款", systemImage: "calendar.badge.clock")
+                                .font(AppFont.body(size: 13))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                    
+                    // 自动还款设置
+                    if data.repaymentDay != nil {
+                        Divider()
+                        
+                        Toggle(isOn: Binding(
+                            get: { data.autoRepayment ?? false },
+                            set: { data.autoRepayment = $0 }
+                        )) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .foregroundColor(Theme.bambooGreen)
+                                Text("启用自动还款")
+                                    .font(AppFont.body(size: 14, weight: .medium))
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: Theme.bambooGreen))
+                        
+                        if data.autoRepayment == true {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("扣款来源账户")
+                                    .font(AppFont.body(size: 12))
+                                    .foregroundColor(Theme.textSecondary)
+                                
+                                if let source = data.sourceAccount, !source.isEmpty {
+                                    HStack {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(Theme.income)
+                                        Text(source)
+                                            .font(AppFont.body(size: 14))
+                                            .foregroundColor(Theme.text)
+                                    }
+                                } else {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(Theme.warning)
+                                        Text("未设置，请在确认后手动设置")
+                                            .font(AppFont.body(size: 13))
+                                            .foregroundColor(Theme.warning)
+                                    }
+                                }
+                            }
+                            .padding(8)
+                            .background(Theme.separator.opacity(0.3))
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+            }
+            
             // 信用卡标识选择器（仅当 asset_type = CREDIT_CARD 时显示）
             if isCreditCard {
                 Divider()
@@ -881,6 +996,18 @@ struct AssetUpdateCardContent: View {
     
     private var isLiability: Bool {
         ["CREDIT_CARD", "LOAN", "MORTGAGE", "OTHER_LIABILITY"].contains(data.assetType.uppercased())
+    }
+    
+    private var isLoanType: Bool {
+        ["LOAN", "MORTGAGE"].contains(data.assetType.uppercased())
+    }
+    
+    private func formatNumber(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "0"
     }
     
     private func formatValue() -> String {
@@ -1086,6 +1213,69 @@ struct CreditCardUpdateCardContent: View {
                     placeholder: "请输入卡片标识（如尾号）"
                 )
             }
+            
+            // 自动还款设置（信用卡）
+            if data.repaymentDueDate != nil && !data.repaymentDueDate!.isEmpty {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(isOn: Binding(
+                        get: { data.autoRepayment ?? false },
+                        set: { data.autoRepayment = $0 }
+                    )) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(Theme.bambooGreen)
+                            Text("启用自动还款")
+                                .font(AppFont.body(size: 14, weight: .medium))
+                        }
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: Theme.bambooGreen))
+                    
+                    if data.autoRepayment == true {
+                        // 还款类型选择
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("还款类型")
+                                .font(AppFont.body(size: 12))
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            HStack(spacing: 12) {
+                                repaymentTypeButton(title: "全额还款", type: "FULL", icon: "checkmark.circle.fill")
+                                repaymentTypeButton(title: "最低还款", type: "MIN", icon: "minus.circle.fill")
+                            }
+                        }
+                        
+                        // 扣款来源
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("扣款来源账户")
+                                .font(AppFont.body(size: 12))
+                                .foregroundColor(Theme.textSecondary)
+                            
+                            if let source = data.sourceAccount, !source.isEmpty {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(Theme.income)
+                                    Text(source)
+                                        .font(AppFont.body(size: 14))
+                                        .foregroundColor(Theme.text)
+                                }
+                            } else {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(Theme.warning)
+                                    Text("未设置，请在确认后手动设置")
+                                        .font(AppFont.body(size: 13))
+                                        .foregroundColor(Theme.warning)
+                                }
+                            }
+                        }
+                        .padding(8)
+                        .background(Theme.separator.opacity(0.3))
+                        .cornerRadius(8)
+                    }
+                }
+            }
         }
         .onAppear {
             cardIdentifier = data.cardIdentifier ?? ""
@@ -1093,6 +1283,31 @@ struct CreditCardUpdateCardContent: View {
         .onChange(of: cardIdentifier) { newValue in
             data.cardIdentifier = newValue.isEmpty ? nil : newValue
         }
+    }
+    
+    @ViewBuilder
+    private func repaymentTypeButton(title: String, type: String, icon: String) -> some View {
+        let isSelected = (data.repaymentType ?? "FULL") == type
+        Button(action: {
+            data.repaymentType = type
+        }) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                Text(title)
+                    .font(AppFont.body(size: 13, weight: .medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? Theme.bambooGreen.opacity(0.15) : Theme.separator.opacity(0.3))
+            .foregroundColor(isSelected ? Theme.bambooGreen : Theme.textSecondary)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Theme.bambooGreen : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private func formatBalance() -> String {

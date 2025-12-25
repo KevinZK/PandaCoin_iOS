@@ -163,6 +163,7 @@ struct EditCreditCardView: View {
     @State private var isSubmitting = false
     @State private var showDeleteConfirm = false
     @State private var errorMessage: String?
+    @State private var shouldBeDefault: Bool  // 本地状态，保存时才提交
     
     init(card: CreditCard) {
         self.card = card
@@ -173,13 +174,15 @@ struct EditCreditCardView: View {
         _currentBalance = State(initialValue: String(format: "%.2f", card.currentBalance))
         _repaymentDueDate = State(initialValue: card.repaymentDueDate ?? "")
         _currency = State(initialValue: card.currency)
+        // 初始化时从当前默认状态设置
+        _shouldBeDefault = State(initialValue: AuthService.shared.isDefaultExpenseAccount(accountId: card.id, type: .creditCard))
     }
     
     private var isFormValid: Bool {
         !name.isEmpty && !institutionName.isEmpty && !cardIdentifier.isEmpty && !creditLimit.isEmpty
     }
     
-    private var isDefaultCard: Bool {
+    private var isCurrentlyDefault: Bool {
         authService.isDefaultExpenseAccount(accountId: card.id, type: .creditCard)
     }
     
@@ -222,16 +225,16 @@ struct EditCreditCardView: View {
             
             // 默认支出账户设置
             Section {
-                Button(action: toggleDefaultCard) {
+                Button(action: { shouldBeDefault.toggle() }) {
                     HStack {
-                        Image(systemName: isDefaultCard ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(isDefaultCard ? Theme.bambooGreen : Theme.textSecondary)
+                        Image(systemName: shouldBeDefault ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(shouldBeDefault ? Theme.bambooGreen : Theme.textSecondary)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("设为默认支出账户")
                                 .foregroundColor(Theme.text)
                             
-                            if isDefaultCard {
+                            if shouldBeDefault {
                                 Text("消费时将自动使用此信用卡")
                                     .font(.caption)
                                     .foregroundColor(Theme.bambooGreen)
@@ -244,14 +247,14 @@ struct EditCreditCardView: View {
                         
                         Spacer()
                         
-                        if isDefaultCard {
-                            Text("默认")
+                        if shouldBeDefault {
+                            Text(isCurrentlyDefault ? "默认" : "待保存")
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Theme.bambooGreen)
+                                .background(isCurrentlyDefault ? Theme.bambooGreen : Theme.warning)
                                 .cornerRadius(8)
                         }
                     }
@@ -313,18 +316,6 @@ struct EditCreditCardView: View {
         }
     }
     
-    private func toggleDefaultCard() {
-        if isDefaultCard {
-            authService.clearDefaultExpenseAccount()
-                .sink(receiveCompletion: { _ in }, receiveValue: { })
-                .store(in: &creditCardService.cancellables)
-        } else {
-            authService.setDefaultExpenseAccount(accountId: card.id, accountType: .creditCard)
-                .sink(receiveCompletion: { _ in }, receiveValue: { })
-                .store(in: &creditCardService.cancellables)
-        }
-    }
-    
     private var currencySymbol: String {
         switch currency {
         case "USD": return "$"
@@ -345,6 +336,7 @@ struct EditCreditCardView: View {
         isSubmitting = true
         errorMessage = nil
         
+        // 同时处理信用卡更新和默认账户设置
         creditCardService.updateCreditCard(
             id: card.id,
             name: name,
@@ -355,6 +347,24 @@ struct EditCreditCardView: View {
             repaymentDueDate: repaymentDueDate.isEmpty ? nil : repaymentDueDate,
             currency: currency
         )
+        .receive(on: DispatchQueue.main)
+        .flatMap { [self] _ -> AnyPublisher<Void, APIError> in
+            // 处理默认账户的更改
+            if shouldBeDefault && !isCurrentlyDefault {
+                // 需要设为默认
+                return authService.setDefaultExpenseAccount(accountId: card.id, accountType: .creditCard)
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+            } else if !shouldBeDefault && isCurrentlyDefault {
+                // 需要取消默认
+                return authService.clearDefaultExpenseAccount()
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+            } else {
+                // 无需更改
+                return Just(()).setFailureType(to: APIError.self).eraseToAnyPublisher()
+            }
+        }
         .receive(on: DispatchQueue.main)
         .sink { completion in
             isSubmitting = false

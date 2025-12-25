@@ -309,8 +309,14 @@ struct AssetsView: View {
 struct AccountCard: View {
     let account: Asset
     @ObservedObject var accountService: AssetService
+    @ObservedObject var authService = AuthService.shared
     @State private var showEditSheet = false
     @State private var navigateToDetail = false
+    
+    /// 是否为默认支出账户
+    private var isDefaultAccount: Bool {
+        authService.isDefaultExpenseAccount(accountId: account.id, type: .account)
+    }
     
     var body: some View {
         ZStack {
@@ -334,9 +340,22 @@ struct AccountCard: View {
                 
                 // 信息
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(account.name)
-                        .font(AppFont.body(size: 16, weight: .semibold))
-                        .foregroundColor(Theme.text)
+                    HStack(spacing: 6) {
+                        Text(account.name)
+                            .font(AppFont.body(size: 16, weight: .semibold))
+                            .foregroundColor(Theme.text)
+                        
+                        // 默认支出标签
+                        if isDefaultAccount {
+                            Text("默认支出")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Theme.bambooGreen)
+                                .cornerRadius(4)
+                        }
+                    }
                     
                     Text(account.type.displayName)
                         .font(.caption)
@@ -433,6 +452,7 @@ struct AssetDetailView: View {
     @State private var records: [Record] = []
     @State private var isLoading = true
     @State private var selectedMonth: Date = Date()
+    @State private var showingAutoPaymentSetup = false
     
     var body: some View {
         ZStack {
@@ -525,11 +545,36 @@ struct AssetDetailView: View {
                 
                 monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.warning)
             }
+            
+            // 贷款类资产显示自动还款设置按钮
+            if asset.type == .loan || asset.type == .mortgage {
+                Divider()
+                    .padding(.vertical, 4)
+                
+                Button(action: { showingAutoPaymentSetup = true }) {
+                    HStack {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 16))
+                        Text("设置自动还款")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(Theme.bambooGreen)
+                }
+            }
         }
         .padding(20)
         .background(Theme.cardBackground)
         .cornerRadius(CornerRadius.large)
         .shadow(color: Theme.cfoShadow, radius: 10, x: 0, y: 5)
+        .sheet(isPresented: $showingAutoPaymentSetup) {
+            NavigationView {
+                AddAutoPaymentForAssetView(asset: asset)
+            }
+        }
     }
     
     private func monthStatItem(title: String, amount: Decimal, color: Color) -> some View {
@@ -898,6 +943,7 @@ struct EditAccountView: View {
     @State private var balance: String
     @State private var isLoading = false
     @State private var showDeleteAlert = false
+    @State private var shouldBeDefault: Bool  // 本地状态，保存时才提交
     private var cancellables = Set<AnyCancellable>()
     
     init(account: Asset, accountService: AssetService) {
@@ -905,9 +951,11 @@ struct EditAccountView: View {
         self.accountService = accountService
         _name = State(initialValue: account.name)
         _balance = State(initialValue: "\(account.balance)")
+        // 初始化时从当前默认状态设置
+        _shouldBeDefault = State(initialValue: AuthService.shared.isDefaultExpenseAccount(accountId: account.id, type: .account))
     }
     
-    private var isDefaultAccount: Bool {
+    private var isCurrentlyDefault: Bool {
         authService.isDefaultExpenseAccount(accountId: account.id, type: .account)
     }
     
@@ -948,16 +996,16 @@ struct EditAccountView: View {
                     // 默认支出账户设置（只有净资产类型才显示）
                     if canBeDefaultAccount {
                         Section {
-                            Button(action: toggleDefaultAccount) {
+                            Button(action: { shouldBeDefault.toggle() }) {
                                 HStack {
-                                    Image(systemName: isDefaultAccount ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(isDefaultAccount ? Theme.bambooGreen : Theme.textSecondary)
+                                    Image(systemName: shouldBeDefault ? "checkmark.circle.fill" : "circle")
+                                        .foregroundColor(shouldBeDefault ? Theme.bambooGreen : Theme.textSecondary)
                                     
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("设为默认支出账户")
                                             .foregroundColor(Theme.text)
                                         
-                                        if isDefaultAccount {
+                                        if shouldBeDefault {
                                             Text("消费时将自动从此账户扣款")
                                                 .font(.caption)
                                                 .foregroundColor(Theme.bambooGreen)
@@ -970,14 +1018,14 @@ struct EditAccountView: View {
                                     
                                     Spacer()
                                     
-                                    if isDefaultAccount {
-                                        Text("默认")
+                                    if shouldBeDefault {
+                                        Text(isCurrentlyDefault ? "默认" : "待保存")
                                             .font(.caption)
                                             .fontWeight(.medium)
                                             .foregroundColor(.white)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 4)
-                                            .background(Theme.bambooGreen)
+                                            .background(isCurrentlyDefault ? Theme.bambooGreen : Theme.warning)
                                             .cornerRadius(8)
                                     }
                                 }
@@ -1022,26 +1070,31 @@ struct EditAccountView: View {
         }
     }
     
-    private func toggleDefaultAccount() {
-        if isDefaultAccount {
-            // 取消默认
-            authService.clearDefaultExpenseAccount()
-                .sink(receiveCompletion: { _ in }, receiveValue: { })
-                .store(in: &accountService.cancellables)
-        } else {
-            // 设为默认
-            authService.setDefaultExpenseAccount(accountId: account.id, accountType: .account)
-                .sink(receiveCompletion: { _ in }, receiveValue: { })
-                .store(in: &accountService.cancellables)
-        }
-    }
-    
     private func updateAccount() {
         guard let balanceValue = Decimal(string: balance) else { return }
         
         isLoading = true
         
+        // 同时处理资产更新和默认账户设置
         accountService.updateAsset(id: account.id, name: name, balance: balanceValue)
+            .receive(on: DispatchQueue.main)
+            .flatMap { [self] _ -> AnyPublisher<Void, APIError> in
+                // 处理默认账户的更改
+                if shouldBeDefault && !isCurrentlyDefault {
+                    // 需要设为默认
+                    return authService.setDefaultExpenseAccount(accountId: account.id, accountType: .account)
+                        .map { _ in () }
+                        .eraseToAnyPublisher()
+                } else if !shouldBeDefault && isCurrentlyDefault {
+                    // 需要取消默认
+                    return authService.clearDefaultExpenseAccount()
+                        .map { _ in () }
+                        .eraseToAnyPublisher()
+                } else {
+                    // 无需更改
+                    return Just(()).setFailureType(to: APIError.self).eraseToAnyPublisher()
+                }
+            }
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in

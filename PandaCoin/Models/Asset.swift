@@ -102,6 +102,14 @@ struct Asset: Codable, Identifiable, Hashable {
     let createdAt: Date
     let updatedAt: Date
     
+    // 贷款专用字段
+    let loanTermMonths: Int?       // 贷款期限(月)
+    let interestRate: Double?      // 年利率 (%)
+    let monthlyPayment: Double?    // 月供金额
+    let repaymentDay: Int?         // 还款日 (每月几号)
+    let loanStartDate: Date?       // 贷款开始日期
+    let institutionName: String?   // 贷款机构
+    
     enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -111,6 +119,12 @@ struct Asset: Codable, Identifiable, Hashable {
         case userId
         case createdAt
         case updatedAt
+        case loanTermMonths
+        case interestRate
+        case monthlyPayment
+        case repaymentDay
+        case loanStartDate
+        case institutionName
     }
     
     init(from decoder: Decoder) throws {
@@ -122,7 +136,14 @@ struct Asset: Codable, Identifiable, Hashable {
         currency = try container.decode(String.self, forKey: .currency)
         userId = try container.decode(String.self, forKey: .userId)
         
-        // 支持多种日期格式
+        // 贷款字段（可选）
+        loanTermMonths = try container.decodeIfPresent(Int.self, forKey: .loanTermMonths)
+        interestRate = try container.decodeIfPresent(Double.self, forKey: .interestRate)
+        monthlyPayment = try container.decodeIfPresent(Double.self, forKey: .monthlyPayment)
+        repaymentDay = try container.decodeIfPresent(Int.self, forKey: .repaymentDay)
+        institutionName = try container.decodeIfPresent(String.self, forKey: .institutionName)
+        
+        // 日期解析
         if let dateString = try? container.decode(String.self, forKey: .createdAt) {
             createdAt = ISO8601DateFormatter().date(from: dateString) ?? Date()
         } else {
@@ -133,6 +154,12 @@ struct Asset: Codable, Identifiable, Hashable {
             updatedAt = ISO8601DateFormatter().date(from: dateString) ?? Date()
         } else {
             updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        }
+        
+        if let dateString = try? container.decodeIfPresent(String.self, forKey: .loanStartDate) {
+            loanStartDate = ISO8601DateFormatter().date(from: dateString)
+        } else {
+            loanStartDate = try container.decodeIfPresent(Date.self, forKey: .loanStartDate)
         }
     }
     
@@ -146,6 +173,22 @@ struct Asset: Codable, Identifiable, Hashable {
         let number = NSDecimalNumber(decimal: balance)
         return formatter.string(from: number) ?? "0.00"
     }
+    
+    // 格式化月供显示
+    var formattedMonthlyPayment: String? {
+        guard let payment = monthlyPayment else { return nil }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: payment))
+    }
+    
+    // 贷款期限显示（年）
+    var loanTermYears: Int? {
+        guard let months = loanTermMonths else { return nil }
+        return months / 12
+    }
 }
 
 // MARK: - 创建/更新资产请求
@@ -154,9 +197,75 @@ struct AssetRequest: Codable {
     let type: AssetType
     let balance: Decimal
     let currency: String?
+    
+    // 贷款专用字段
+    let loanTermMonths: Int?
+    let interestRate: Double?
+    let monthlyPayment: Double?
+    let repaymentDay: Int?
+    let loanStartDate: String?
+    let institutionName: String?
+    
+    // 自动还款配置
+    let autoRepayment: Bool?
+    let sourceAccountId: String?
+    let sourceAccountName: String?
+    
+    init(
+        name: String,
+        type: AssetType,
+        balance: Decimal,
+        currency: String? = "CNY",
+        loanTermMonths: Int? = nil,
+        interestRate: Double? = nil,
+        monthlyPayment: Double? = nil,
+        repaymentDay: Int? = nil,
+        loanStartDate: String? = nil,
+        institutionName: String? = nil,
+        autoRepayment: Bool? = nil,
+        sourceAccountId: String? = nil,
+        sourceAccountName: String? = nil
+    ) {
+        self.name = name
+        self.type = type
+        self.balance = balance
+        self.currency = currency
+        self.loanTermMonths = loanTermMonths
+        self.interestRate = interestRate
+        self.monthlyPayment = monthlyPayment
+        self.repaymentDay = repaymentDay
+        self.loanStartDate = loanStartDate
+        self.institutionName = institutionName
+        self.autoRepayment = autoRepayment
+        self.sourceAccountId = sourceAccountId
+        self.sourceAccountName = sourceAccountName
+    }
 }
 
 struct UpdateAccountRequest: Codable {
     let name: String?
     let balance: Decimal?
+    let loanTermMonths: Int?
+    let interestRate: Double?
+    let monthlyPayment: Double?
+    let repaymentDay: Int?
+    let institutionName: String?
+    
+    init(
+        name: String? = nil,
+        balance: Decimal? = nil,
+        loanTermMonths: Int? = nil,
+        interestRate: Double? = nil,
+        monthlyPayment: Double? = nil,
+        repaymentDay: Int? = nil,
+        institutionName: String? = nil
+    ) {
+        self.name = name
+        self.balance = balance
+        self.loanTermMonths = loanTermMonths
+        self.interestRate = interestRate
+        self.monthlyPayment = monthlyPayment
+        self.repaymentDay = repaymentDay
+        self.institutionName = institutionName
+    }
 }

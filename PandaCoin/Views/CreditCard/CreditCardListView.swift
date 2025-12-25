@@ -113,14 +113,33 @@ struct CreditCardListView: View {
 // MARK: - 信用卡行视图 (拟物化 CFO 升级)
 struct CreditCardRow: View {
     let card: CreditCard
+    @ObservedObject var authService = AuthService.shared
+    
+    /// 是否为默认支出账户
+    private var isDefaultCard: Bool {
+        authService.isDefaultExpenseAccount(accountId: card.id, type: .creditCard)
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // 顶部：卡名和银行
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(card.institutionName)
-                        .font(AppFont.body(size: 18, weight: .bold))
+                    HStack(spacing: 6) {
+                        Text(card.institutionName)
+                            .font(AppFont.body(size: 18, weight: .bold))
+                        
+                        // 默认支出标签
+                        if isDefaultCard {
+                            Text("默认")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Theme.bambooGreen)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.white.opacity(0.9))
+                                .cornerRadius(4)
+                        }
+                    }
                     Text(card.name)
                         .font(AppFont.body(size: 12))
                         .opacity(0.8)

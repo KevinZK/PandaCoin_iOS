@@ -36,6 +36,23 @@ struct SettingsView: View {
                 .padding(.vertical, 8)
             }
             
+            // MARK: - 财务管理
+            Section("财务管理") {
+                NavigationLink(destination: AutoPaymentListView()) {
+                    HStack {
+                        ZStack {
+                            Circle().fill(Color.green.opacity(0.1)).frame(width: 30, height: 30)
+                            Image(systemName: "calendar.badge.clock").foregroundColor(.green).font(.system(size: 14))
+                        }
+                        
+                        Text("自动还款")
+                            .foregroundColor(Theme.text)
+                        
+                        Spacer()
+                    }
+                }
+            }
+            
             // MARK: - 偏好设置
             Section("偏好设置") {
                 Button(action: { showLanguagePicker = true }) {
