@@ -296,14 +296,6 @@ struct ChatRecordView: View {
                 }
             }
             .padding(.top, 8)
-            
-            // 拍照提示
-            VStack(spacing: 4) {
-                Text("或者点击 📷 拍摄票据")
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
-            }
-            .padding(.top, 4)
         }
         .padding(.vertical, 40)
     }

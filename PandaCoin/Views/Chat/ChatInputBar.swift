@@ -25,8 +25,6 @@ struct ChatInputBar: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            Divider()
-                .background(Theme.separator)
             
             HStack(spacing: 8) {
                 // 拍照按钮
@@ -89,7 +87,6 @@ struct ChatInputBar: View {
             .padding(.vertical, 10)
             .background(
                 Color.clear
-                    .background(.ultraThinMaterial)
             )
         }
         .animation(.easeInOut(duration: 0.2), value: text.isEmpty)
@@ -168,21 +165,20 @@ struct ChatVoiceButton: View {
                             Theme.bambooGreen.opacity(0.4 - Double(index) * 0.1),
                             lineWidth: 2
                         )
-                        .frame(width: 44, height: 44)
+                        .frame(width: 36, height: 36)
                         .scaleEffect(waveScales[index])
                         .opacity(Double(2.0 - waveScales[index]))
                 }
             }
-            
             // 主按钮
             Circle()
-                .fill(isRecording ? Theme.expense : Theme.bambooGreen)
-                .frame(width: 44, height: 44)
+                .fill(isRecording ? Theme.expense : Theme.bambooGreen.opacity(0.1))
+                .frame(width: 36, height: 36)
                 .shadow(color: (isRecording ? Theme.expense : Theme.bambooGreen).opacity(0.3), radius: 5, x: 0, y: 2)
                 .overlay(
                     Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.white)
+                        .foregroundColor(isRecording ? .white : Theme.bambooGreen)
                 )
                 .scaleEffect(isRecording ? 1.05 : 1.0)
         }

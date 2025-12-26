@@ -86,6 +86,19 @@ struct DashboardView: View {
     
     // 记账模式：经典(语音按钮) vs 对话(聊天)
     @State private var isChatMode = false
+    @State private var pageIndex: Int = 0  // 用于 TabView 的页面索引
+    
+    // 拍照相关状态
+    @State private var showingCamera = false
+    @State private var showingPhotoLibrary = false
+    @State private var selectedImage: UIImage?
+    @State private var isProcessingImage = false
+    private let ocrService = LocalOCRService.shared
+    @State private var ocrCancellables = Set<AnyCancellable>()
+    
+    // AI 解析状态
+    @State private var isAIParsing = false
+    @State private var isParsingFromImage = false  // 标记 AI 解析是否来自图片
     
     var body: some View {
         ZStack {
@@ -93,12 +106,42 @@ struct DashboardView: View {
             AnimatedGradientBackground()
                 .ignoresSafeArea()
             
-            if isChatMode {
-                // 对话模式：全屏聊天布局
-                chatModeFullScreen
-            } else {
-                // 经典模式：保持原有布局
-                classicModeLayout
+            VStack(spacing: 0) {
+                // 顶部导航栏（只有菜单按钮，不再有 SegmentControl）
+                topNavigationBarSimple
+                
+                // 左右滑动切换的两种模式
+                TabView(selection: $pageIndex) {
+                    // 经典模式（语音按钮）
+                    classicModeContent
+                        .tag(0)
+                    
+                    // 对话模式（聊天）
+                    chatModeContent
+                        .tag(1)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))  // 隐藏系统的 page indicator
+                .onChange(of: pageIndex) { newValue in
+                    isChatMode = newValue == 1
+                }
+                
+                // 底部 PageControl
+                pageControlView
+            }
+        }
+        // 相机
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraImagePicker(selectedImage: $selectedImage)
+                .ignoresSafeArea()
+        }
+        // 相册
+        .sheet(isPresented: $showingPhotoLibrary) {
+            PhotoLibraryPicker(selectedImage: $selectedImage)
+        }
+        // 监听图片选择 - 直接进行 OCR 识别并发送给 AI 解析
+        .onChange(of: selectedImage) { newImage in
+            if let image = newImage {
+                processImageDirectly(image)
             }
         }
         .sheet(item: $unifiedEventsWrapper) { wrapper in
@@ -160,6 +203,139 @@ struct DashboardView: View {
                 netWorthValue = Decimal(nw.net_worth)
             }
         }
+    }
+    
+    // MARK: - 简化的顶部导航栏（只有菜单按钮）
+    private var topNavigationBarSimple: some View {
+        HStack {
+            Spacer()
+            
+            Menu {
+                Button(action: { showAccounts = true }) {
+                    Label(L10n.TabBar.accounts, systemImage: "creditcard")
+                }
+                Button(action: { showCreditCards = true }) {
+                    Label("信用卡", systemImage: "creditcard.fill")
+                }
+                Button(action: { showRecords = true }) {
+                    Label(L10n.TabBar.records, systemImage: "list.bullet")
+                }
+                Button(action: { showStatistics = true }) {
+                    Label(L10n.TabBar.statistics, systemImage: "chart.pie")
+                }
+                Button(action: { showBudget = true }) {
+                    Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
+                }
+                Divider()
+                Button(action: { showSettings = true }) {
+                    Label(L10n.TabBar.settings, systemImage: "gearshape")
+                }
+                Button(role: .destructive, action: { authService.logout() }) {
+                    Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(Theme.text)
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+    
+    // MARK: - 经典模式内容（用于 TabView）
+    private var classicModeContent: some View {
+        VStack(spacing: 0) {
+            // 总资产显示
+            totalAssetsSection
+                .padding(.top, 20)
+            
+            Spacer()
+            
+            // 图表区域
+            chartSection
+                .padding(.vertical, 20)
+            
+            // 语音按钮区域（含拍照和相册按钮）
+            voiceButtonWithMedia
+                .padding(.bottom, 60)
+        }
+    }
+    
+    // MARK: - AI 解析 Loading 提示（居中简洁样式）
+    private var aiParsingLoadingView: some View {
+        VStack(spacing: 8) {
+            // 熊猫表情
+            Text("🐼")
+                .font(.system(size: 15))
+            
+            // Loading 指示器 + 文字
+            HStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.9)
+                    .tint(Theme.bambooGreen)
+                
+                Text(parsingStatusText)
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.text)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .transition(.opacity)
+    }
+    
+    // 解析状态文案
+    private var parsingStatusText: String {
+        if isProcessingImage {
+            return "正在识别票据..."
+        } else if isParsingFromImage {
+            return "正在识别票据..."
+        } else {
+            return "正在理解你说的话..."
+        }
+    }
+    
+    // MARK: - 对话模式内容（用于 TabView）
+    private var chatModeContent: some View {
+        VStack(spacing: 0) {
+            // 净资产（放大版）
+            VStack(spacing: 4) {
+                Text(formatCurrency(netWorthValue))
+                    .font(.system(size: 36, weight: .light, design: .serif))
+                    .foregroundColor(Theme.text)
+                
+                Text(L10n.Dashboard.netAssets)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(Theme.textSecondary)
+                    .tracking(1)
+            }
+            .padding(.vertical, 16)
+            
+            // 聊天区域（占满剩余空间）
+            ChatRecordView()
+        }
+    }
+    
+    // MARK: - 底部 PageControl
+    private var pageControlView: some View {
+        HStack(spacing: 12) {
+            // 语音模式指示点
+            Circle()
+                .fill(pageIndex == 0 ? Theme.bambooGreen : Theme.textSecondary.opacity(0.3))
+                .frame(width: pageIndex == 0 ? 20 : 8, height: 8)
+                .animation(.spring(response: 0.3), value: pageIndex)
+            
+            // 对话模式指示点
+            Circle()
+                .fill(pageIndex == 1 ? Theme.bambooGreen : Theme.textSecondary.opacity(0.3))
+                .frame(width: pageIndex == 1 ? 20 : 8, height: 8)
+                .animation(.spring(response: 0.3), value: pageIndex)
+        }
+        .padding(.vertical, 12)
+        .padding(.bottom, 20)  // 底部安全区域
     }
     
     // MARK: - 净资产区域
@@ -243,17 +419,6 @@ struct DashboardView: View {
                                         )
                                 }
                             }
-                            .annotation(position: .bottom, alignment: .center, spacing: 10) {
-                                Text(formatChartAmount(item.value))
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Theme.income)
-                                    .foregroundColor(.white)
-                                    .clipShape(Capsule())
-                                    .shadow(color: Theme.income.opacity(0.3), radius: 4, x: 0, y: 2)
-                            }
                         }
                     }
                     .chartXAxis(.hidden)
@@ -274,184 +439,76 @@ struct DashboardView: View {
         }
     }
     
-    // MARK: - 经典模式布局
-    private var classicModeLayout: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // 顶部栏：Segment + 菜单
-                topNavigationBar
-                
-                // 总资产显示
-                totalAssetsSection
-                    .padding(.top, 20)
-                
-                Spacer()
-                
-                // 图表区域
-                chartSection
-                    .padding(.vertical, 20)
-                
-                // 语音按钮
-                voiceButton
-                    .padding(.bottom, 100)
-            }
-        }
-    }
-    
-    // MARK: - 对话模式全屏布局
-    private var chatModeFullScreen: some View {
-        VStack(spacing: 0) {
-            // 顶部栏：Segment + 菜单
-            topNavigationBar
-            
-            // 净资产（放大版）
-            VStack(spacing: 4) {
-                Text(formatCurrency(netWorthValue))
-                    .font(.system(size: 36, weight: .light, design: .serif))
-                    .foregroundColor(Theme.text)
-                
-                Text(L10n.Dashboard.netAssets)
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(Theme.textSecondary)
-                    .tracking(1)
-            }
-            .padding(.vertical, 16)
-            
-            // 聊天区域（占满剩余空间）
-            ChatRecordView()
-        }
-    }
-    
-    // MARK: - 顶部导航栏（统一）
-    private var topNavigationBar: some View {
-        ZStack {
-            // 居中的 Segment Control
-            modeSegmentControl
-            
-            // 右侧菜单按钮
-            HStack {
-                Spacer()
-                
-                Menu {
-                    Button(action: { showAccounts = true }) {
-                        Label(L10n.TabBar.accounts, systemImage: "creditcard")
-                    }
-                    Button(action: { showCreditCards = true }) {
-                        Label("信用卡", systemImage: "creditcard.fill")
-                    }
-                    Button(action: { showRecords = true }) {
-                        Label(L10n.TabBar.records, systemImage: "list.bullet")
-                    }
-                    Button(action: { showStatistics = true }) {
-                        Label(L10n.TabBar.statistics, systemImage: "chart.pie")
-                    }
-                    Button(action: { showBudget = true }) {
-                        Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
-                    }
-                    Divider()
-                    Button(action: { showSettings = true }) {
-                        Label(L10n.TabBar.settings, systemImage: "gearshape")
-                    }
-                    Button(role: .destructive, action: { authService.logout() }) {
-                        Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                } label: {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 20))
-                        .foregroundColor(Theme.textSecondary)
-                        .frame(width: 40, height: 40)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-    }
-    
-    // MARK: - 导航栏
-    private var navigationBar: some View {
-        HStack {
-            Spacer()
-            
-            Menu {
-                Button(action: { showAccounts = true }) {
-                    Label(L10n.TabBar.accounts, systemImage: "creditcard")
-                }
-                Button(action: { showCreditCards = true }) {
-                    Label("信用卡", systemImage: "creditcard.fill")
-                }
-                Button(action: { showRecords = true }) {
-                    Label(L10n.TabBar.records, systemImage: "list.bullet")
-                }
-                Button(action: { showStatistics = true }) {
-                    Label(L10n.TabBar.statistics, systemImage: "chart.pie")
-                }
-                Button(action: { showBudget = true }) {
-                    Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
-                }
-                Divider()
-                Button(action: { showSettings = true }) {
-                    Label(L10n.TabBar.settings, systemImage: "gearshape")
-                }
-                Button(role: .destructive, action: { authService.logout() }) {
-                    Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
-                }
-            } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 22))
-                    .foregroundColor(Theme.textSecondary)
-                    .frame(width: 44, height: 44)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.top, 8)
-    }
-    
-    // MARK: - 模式切换 Segment Control
-    private var modeSegmentControl: some View {
-        HStack(spacing: 0) {
-            // 语音模式
-            Button(action: { withAnimation(.spring(response: 0.3)) { isChatMode = false } }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 12))
-                    Text("语音")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(isChatMode ? Theme.textSecondary : .white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(isChatMode ? Color.clear : Theme.bambooGreen)
-                .cornerRadius(16)
-            }
-            
-            // 对话模式
-            Button(action: { withAnimation(.spring(response: 0.3)) { isChatMode = true } }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "bubble.left.fill")
-                        .font(.system(size: 12))
-                    Text("对话")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(isChatMode ? .white : Theme.textSecondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(isChatMode ? Theme.bambooGreen : Color.clear)
-                .cornerRadius(16)
-            }
-        }
-        .padding(3)
-        .background(Theme.cardBackground)
-        .cornerRadius(20)
-        .shadow(color: Theme.cfoShadow, radius: 3, x: 0, y: 1)
-    }
-    
     // MARK: - 语音按钮状态
     @State private var isButtonPressed = false
     @State private var waveScales: [CGFloat] = [1.0, 1.0, 1.0]
     @State private var waveAnimating = false
     
     // MARK: - 语音按钮（重新设计）
+    // MARK: - 语音按钮区域（含拍照和相册按钮）
+    private var voiceButtonWithMedia: some View {
+        HStack(spacing: 24) {
+            // 左侧：拍照按钮
+            mediaButton(
+                icon: "camera.fill",
+                label: "拍照",
+                action: { showingCamera = true }
+            )
+            .offset(x: 60, y: 40)
+            
+            // 中间：语音按钮
+            voiceButton
+            
+            // 右侧：相册按钮
+            mediaButton(
+                icon: "photo.on.rectangle",
+                label: "相册",
+                action: { showingPhotoLibrary = true }
+            )
+            .offset(x: -60, y: 40)
+        }
+    }
+    
+    // MARK: - 媒体按钮（拍照/相册）
+    private func mediaButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        VStack(spacing: 6) {
+            Button(action: action) {
+                ZStack {
+                    // 玻璃背景
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 56, height: 56)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    Theme.bambooGreen.opacity(0.3),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(
+                            color: Theme.bambooGreen.opacity(0.15),
+                            radius: 6,
+                            x: 0,
+                            y: 3
+                        )
+                    
+                    // 图标
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(Theme.text.opacity(0.7))
+                }
+            }
+            .disabled(isProcessingImage)
+            .opacity(isProcessingImage ? 0.5 : 1.0)
+            
+            // 标签
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundColor(Theme.textSecondary)
+        }
+    }
+    
+    // MARK: - 语音按钮
     private var voiceButton: some View {
         VStack(spacing: Spacing.medium) {
             // 主按钮区域
@@ -579,7 +636,7 @@ struct DashboardView: View {
                         
                         guard speechService.isRecording else { return }
                         
-                        let recognizedText = speechService.recognizedText
+                        let recognizedText = speechService.recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
                         speechService.stopRecording()
                         stopWaveAnimation()
                         
@@ -587,25 +644,35 @@ struct DashboardView: View {
                         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                         impactFeedback.impactOccurred()
                         
+                        // 如果没有识别到文字，不发送请求
+                        guard !recognizedText.isEmpty else {
+                            logInfo("语音识别未检测到文字，跳过 AI 解析")
+                            return
+                        }
+                        
                         handleVoiceInput(recognizedText)
                     }
             )
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: speechService.isRecording)
             .animation(.easeInOut(duration: 0.2), value: isButtonPressed)
             
-            // 提示文字
-            VStack(spacing: 4) {
-                Text(speechService.isRecording ? "松开结束" : "长按说话")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(speechService.isRecording ? Theme.bambooGreen : Theme.text)
-                
-                if !speechService.isRecording {
-                    Text("告诉我今天的收支")
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.textSecondary)
+            if isAIParsing || isProcessingImage {
+                aiParsingLoadingView
+            } else {
+                // 提示文字
+                VStack(spacing: 4) {
+                    Text(speechService.isRecording ? "松开结束" : "长按说话")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(speechService.isRecording ? Theme.bambooGreen : Theme.text)
+                    
+                    if !speechService.isRecording {
+                        Text("告诉我今天的收支")
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
+                .animation(.easeInOut(duration: 0.2), value: speechService.isRecording)
             }
-            .animation(.easeInOut(duration: 0.2), value: speechService.isRecording)
         }
     }
     
@@ -683,17 +750,81 @@ struct DashboardView: View {
         transactionService.fetchNetWorth()
     }
     
+    // MARK: - 直接处理图片（OCR + AI 解析）
+    private func processImageDirectly(_ image: UIImage) {
+        guard !isProcessingImage else { return }
+        isProcessingImage = true
+        
+        // 进行本地 OCR 识别
+        ocrService.recognizeText(from: image)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [self] completion in
+                    isProcessingImage = false
+                    selectedImage = nil
+                    
+                    if case .failure(let error) = completion {
+                        logError("图片识别失败", error: error)
+                    }
+                },
+                receiveValue: { [self] result in
+                    // OCR 成功，构建文本发送给 AI
+                    if !result.isValidReceipt {
+                        // 不是有效票据，提示用户
+                        logInfo("不是有效票据")
+                        isProcessingImage = false
+                        selectedImage = nil
+                        return
+                    }
+                    
+                    // 构建 AI 解析文本
+                    var parseText = "【票据识别】"
+                    
+                    if let amount = result.extractedInfo.amount {
+                        parseText += " 金额¥\(amount)"
+                    }
+                    if let merchant = result.extractedInfo.merchant {
+                        parseText += " 商家:\(merchant)"
+                    }
+                    if let paymentMethod = result.extractedInfo.paymentMethod {
+                        parseText += " 支付方式:\(paymentMethod)"
+                    }
+                    
+                    // 附加原始文字（帮助 AI 理解）
+                    parseText += "\n原文: \(result.rawText.prefix(500))"
+                    
+                    logInfo("📷 票据OCR结果: \(parseText)")
+                    
+                    // 标记来自图片，然后发送给 AI 解析
+                    isParsingFromImage = true
+                    handleVoiceInput(parseText)
+                    
+                    // 清理图片状态（AI 解析状态由 handleVoiceInput 管理）
+                    isProcessingImage = false
+                    selectedImage = nil
+                }
+            )
+            .store(in: &ocrCancellables)
+    }
+    
     private func handleVoiceInput(_ text: String) {
         logInfo("语音输入: \(text)")
+        
+        // 显示 loading
+        isAIParsing = true
         
         // 调用后端 AI 统一解析接口（支持多种事件类型）
         recordService.parseVoiceInputUnified(text: text)
             .receive(on: DispatchQueue.main)
-            .sink { completion in
+            .sink { [self] completion in
+                // 隐藏 loading
+                isAIParsing = false
+                isParsingFromImage = false  // 重置图片来源标记
+                
                 if case .failure(let error) = completion {
                     logError("AI 解析失败", error: error)
                 }
-            } receiveValue: { events in
+            } receiveValue: { [self] events in
                 logInfo("设置 unifiedEventsWrapper: \(events.count)条事件")
                 if !events.isEmpty {
                     self.unifiedEventsWrapper = ParsedEventsWrapper(events: events)
