@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import AVFoundation
+import Photos
 
 struct ChatInputBar: View {
     @Binding var text: String
@@ -14,26 +16,38 @@ struct ChatInputBar: View {
     let onSend: () -> Void
     let onStartRecording: () -> Void
     let onStopRecording: () -> Void
+    let onCameraPressed: () -> Void
+    let onPhotoLibraryPressed: () -> Void  // 新增：相册回调
     
     @FocusState private var isTextFieldFocused: Bool
+    @State private var showingPermissionAlert = false
+    @State private var permissionAlertMessage = ""
     
     var body: some View {
         VStack(spacing: 0) {
             Divider()
                 .background(Theme.separator)
             
-            HStack(spacing: 12) {
-                // 拍照按钮（预留）
-                Button(action: {
-                    // TODO: 拍照功能（第二阶段实现）
-                }) {
+            HStack(spacing: 8) {
+                // 拍照按钮
+                Button(action: checkCameraPermission) {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(Theme.textSecondary)
+                        .font(.system(size: 18))
+                        .foregroundColor(Theme.bambooGreen)
                         .frame(width: 36, height: 36)
+                        .background(Theme.bambooGreen.opacity(0.1))
+                        .clipShape(Circle())
                 }
-                .disabled(true) // 暂时禁用
-                .opacity(0.5)
+                
+                // 相册按钮
+                Button(action: checkPhotoLibraryPermission) {
+                    Image(systemName: "photo.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(Theme.income)
+                        .frame(width: 36, height: 36)
+                        .background(Theme.income.opacity(0.1))
+                        .clipShape(Circle())
+                }
                 
                 // 文本输入框
                 HStack(spacing: 8) {
@@ -71,15 +85,67 @@ struct ChatInputBar: View {
                     onStop: onStopRecording
                 )
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                // 输入栏使用毛玻璃效果，Light Mode 下更透明
                 Color.clear
                     .background(.ultraThinMaterial)
             )
         }
         .animation(.easeInOut(duration: 0.2), value: text.isEmpty)
+        .alert("需要权限", isPresented: $showingPermissionAlert) {
+            Button("去设置") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(permissionAlertMessage)
+        }
+    }
+    
+    // MARK: - 检查相机权限
+    private func checkCameraPermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            onCameraPressed()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        onCameraPressed()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            permissionAlertMessage = "请在设置中允许访问相机，以便拍摄票据进行识别。"
+            showingPermissionAlert = true
+        @unknown default:
+            break
+        }
+    }
+    
+    // MARK: - 检查相册权限
+    private func checkPhotoLibraryPermission() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        switch status {
+        case .authorized, .limited:
+            onPhotoLibraryPressed()
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { newStatus in
+                DispatchQueue.main.async {
+                    if newStatus == .authorized || newStatus == .limited {
+                        onPhotoLibraryPressed()
+                    }
+                }
+            }
+        case .denied, .restricted:
+            permissionAlertMessage = "请在设置中允许访问相册，以便选择票据图片进行识别。"
+            showingPermissionAlert = true
+        @unknown default:
+            break
+        }
     }
 }
 
@@ -89,25 +155,23 @@ struct ChatVoiceButton: View {
     let onStart: () -> Void
     let onStop: () -> Void
     
-    @State private var waveScale: CGFloat = 1.0
+    @State private var waveScales: [CGFloat] = [1.0, 1.0, 1.0]
+    @State private var isAnimating = false
     
     var body: some View {
         ZStack {
-            // 波浪效果（录音时）
+            // 多层波浪效果（录音时）
             if isRecording {
-                Circle()
-                    .stroke(Theme.bambooGreen.opacity(0.3), lineWidth: 2)
-                    .frame(width: 50, height: 50)
-                    .scaleEffect(waveScale)
-                    .opacity(2.0 - waveScale)
-                    .onAppear {
-                        withAnimation(.easeOut(duration: 1.0).repeatForever(autoreverses: false)) {
-                            waveScale = 1.8
-                        }
-                    }
-                    .onDisappear {
-                        waveScale = 1.0
-                    }
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .stroke(
+                            Theme.bambooGreen.opacity(0.4 - Double(index) * 0.1),
+                            lineWidth: 2
+                        )
+                        .frame(width: 44, height: 44)
+                        .scaleEffect(waveScales[index])
+                        .opacity(Double(2.0 - waveScales[index]))
+                }
             }
             
             // 主按钮
@@ -120,16 +184,60 @@ struct ChatVoiceButton: View {
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.white)
                 )
-                .scaleEffect(isRecording ? 1.1 : 1.0)
+                .scaleEffect(isRecording ? 1.05 : 1.0)
         }
         .onTapGesture {
             if isRecording {
-                onStop()
+                stopRecording()
             } else {
-                onStart()
+                startRecording()
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isRecording)
+        .onChange(of: isRecording) { newValue in
+            if newValue {
+                startWaveAnimation()
+            } else {
+                stopWaveAnimation()
+            }
+        }
+    }
+    
+    private func startRecording() {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        onStart()
+    }
+    
+    private func stopRecording() {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        onStop()
+    }
+    
+    private func startWaveAnimation() {
+        guard !isAnimating else { return }
+        isAnimating = true
+        waveScales = [1.0, 1.0, 1.0]
+        
+        for i in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.25) {
+                guard self.isAnimating else { return }
+                withAnimation(
+                    .easeOut(duration: 1.0)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    self.waveScales[i] = 1.8
+                }
+            }
+        }
+    }
+    
+    private func stopWaveAnimation() {
+        isAnimating = false
+        withAnimation(.easeOut(duration: 0.2)) {
+            waveScales = [1.0, 1.0, 1.0]
+        }
     }
 }
 
@@ -141,9 +249,10 @@ struct ChatVoiceButton: View {
             isRecording: .constant(false),
             onSend: {},
             onStartRecording: {},
-            onStopRecording: {}
+            onStopRecording: {},
+            onCameraPressed: {},
+            onPhotoLibraryPressed: {}
         )
     }
     .background(Theme.background)
 }
-

@@ -211,18 +211,17 @@ struct TransactionCardContent: View {
         data.accountName.contains("信用卡") || data.cardIdentifier != nil
     }
     
-    // 是否需要显示账户选择器（支出类型且 AI 未识别出账户，或者使用了默认账户预填）
+    // 是否需要显示账户选择器
+    // 所有支出类型都应该允许用户选择/修改支出账户，确保资金流向可追踪
     private var shouldShowAccountPicker: Bool {
-        data.type == .expense && (originalAccountName.isEmpty || usedDefaultAccount)
+        // 支出类型：始终显示账户选择器（除非是信用卡消费，那种情况由信用卡选择器处理）
+        data.type == .expense && !involvesCreditCard
     }
     
-    // 是否需要显示信用卡选择器（AI 识别出信用卡但没有明确尾号）
-    // 使用 originalCardIdentifier 来判断，避免被 onChange 修改后的值影响
+    // 是否需要显示信用卡选择器
+    // 当交易涉及信用卡时，始终显示选择器让用户确认或修改
     private var shouldShowCreditCardPicker: Bool {
-        involvesCreditCard &&
-        !originalAccountName.isEmpty &&  // AI 识别出了账户名
-        !usedDefaultAccount &&  // 不是默认账户预填的情况
-        (originalCardIdentifier == nil || originalCardIdentifier?.isEmpty == true)
+        involvesCreditCard
     }
     
     // 是否已经选择了账户（通过选择器或智能推荐或默认账户）
@@ -276,41 +275,14 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.textSecondary)
             }
             
-            // 支出账户选择（当 AI 未识别出账户时显示，或使用了默认账户时显示供用户修改）
+            // 支出账户选择 - 始终显示以便用户确认或修改资金来源
             if shouldShowAccountPicker {
                 Divider()
                     .padding(.vertical, 4)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    if !hasSelectedAccount {
-                        HStack {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundColor(.orange)
-                                .font(.system(size: 14))
-                            Text("请选择支出账户")
-                                .font(AppFont.body(size: 12, weight: .medium))
-                                .foregroundColor(.orange)
-                        }
-                    } else if usedDefaultAccount {
-                        // 使用了默认账户，提示用户可以修改
-                        HStack {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(Theme.bambooGreen)
-                                .font(.system(size: 14))
-                            Text("已使用默认账户（可点击修改）")
-                                .font(AppFont.body(size: 12, weight: .medium))
-                                .foregroundColor(Theme.bambooGreen)
-                        }
-                    } else {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(Theme.bambooGreen)
-                                .font(.system(size: 14))
-                            Text("已选择支出账户")
-                                .font(AppFont.body(size: 12, weight: .medium))
-                                .foregroundColor(Theme.bambooGreen)
-                        }
-                    }
+                    // 状态提示
+                    accountPickerStatusView
                     
                     Button(action: { showAccountPicker = true }) {
                         HStack {
@@ -350,32 +322,14 @@ struct TransactionCardContent: View {
                 }
             }
             
-            // 信用卡选择器（当 AI 识别出信用卡但没有具体尾号时显示）
-            // 智能推荐会预填充，但用户可以修改
+            // 信用卡选择器 - 始终显示以便用户确认或修改
             if shouldShowCreditCardPicker {
                 Divider()
                     .padding(.vertical, 4)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    if hasSelectedAccount {
-                        HStack {
-                            Image(systemName: isSmartRecommended ? "sparkles" : "checkmark.circle.fill")
-                                .foregroundColor(Theme.bambooGreen)
-                                .font(.system(size: 14))
-                            Text(isSmartRecommended ? "智能推荐（可修改）" : "已选择信用卡")
-                                .font(AppFont.body(size: 12, weight: .medium))
-                                .foregroundColor(Theme.bambooGreen)
-                        }
-                    } else {
-                        HStack {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundColor(.orange)
-                                .font(.system(size: 14))
-                            Text("请选择信用卡")
-                                .font(AppFont.body(size: 12, weight: .medium))
-                                .foregroundColor(.orange)
-                        }
-                    }
+                    // 状态提示
+                    creditCardPickerStatusView
                     
                     Button(action: { showAccountPicker = true }) {
                         HStack {
@@ -445,13 +399,121 @@ struct TransactionCardContent: View {
         }
     }
     
+    // MARK: - 信用卡选择器状态视图
+    @ViewBuilder
+    private var creditCardPickerStatusView: some View {
+        if !hasSelectedAccount {
+            // 未选择信用卡
+            HStack {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundColor(.orange)
+                    .font(.system(size: 14))
+                Text("请选择信用卡")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(.orange)
+            }
+        } else if isSmartRecommended {
+            // 智能推荐的
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundColor(Theme.bambooGreen)
+                    .font(.system(size: 14))
+                Text("智能推荐（可修改）")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.bambooGreen)
+            }
+        } else if originalCardIdentifier != nil && !(originalCardIdentifier?.isEmpty ?? true) {
+            // AI 直接识别出卡号
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(Theme.bambooGreen)
+                    .font(.system(size: 14))
+                Text("已识别信用卡（可修改）")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.bambooGreen)
+            }
+        } else {
+            // 用户手动选择的
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(Theme.bambooGreen)
+                    .font(.system(size: 14))
+                Text("已选择信用卡")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.bambooGreen)
+            }
+        }
+    }
+    
+    // MARK: - 账户选择器状态视图
+    @ViewBuilder
+    private var accountPickerStatusView: some View {
+        if !hasSelectedAccount {
+            // 未选择账户
+            HStack {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundColor(.orange)
+                    .font(.system(size: 14))
+                Text("请选择支出账户")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(.orange)
+            }
+        } else if usedDefaultAccount {
+            // 使用了默认账户
+            HStack {
+                Image(systemName: "star.fill")
+                    .foregroundColor(Theme.bambooGreen)
+                    .font(.system(size: 14))
+                Text("已使用默认账户（可修改）")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.bambooGreen)
+            }
+        } else if !originalAccountName.isEmpty {
+            // AI 识别并匹配成功
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundColor(Theme.bambooGreen)
+                    .font(.system(size: 14))
+                Text("已自动匹配（可修改）")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.bambooGreen)
+            }
+        } else {
+            // 用户手动选择的
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(Theme.bambooGreen)
+                    .font(.system(size: 14))
+                Text("已选择支出账户")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(Theme.bambooGreen)
+            }
+        }
+    }
+    
     private func loadDefaultAccountIfNeeded() {
-        // 只有当 AI 没有识别出账户时才加载默认账户
+        // 支出类型且没有涉及信用卡（信用卡由智能推荐处理）
         guard data.type == .expense,
-              originalAccountName.isEmpty,
+              !involvesCreditCard,
               selectedAccountType == nil else { return }
         
-        // 尝试加载默认账户
+        // 如果 AI 识别出了账户名，先尝试匹配现有账户
+        if !originalAccountName.isEmpty {
+            // 尝试匹配现有账户
+            if let matchedAccount = accountService.accounts.first(where: { $0.name == originalAccountName }) {
+                selectedAccountType = SelectedAccountInfo(
+                    id: matchedAccount.id,
+                    displayName: matchedAccount.name,
+                    type: .account,
+                    icon: matchedAccount.type.icon,
+                    cardIdentifier: nil
+                )
+                usedDefaultAccount = false
+                return
+            }
+        }
+        
+        // AI 没有识别出账户或匹配失败，尝试加载默认账户
         if let user = authService.currentUser,
            let accountId = user.defaultExpenseAccountId,
            let accountType = user.defaultExpenseAccountType {
@@ -481,9 +543,24 @@ struct TransactionCardContent: View {
         }
     }
     
-    /// 尝试智能推荐信用卡（当账户名称包含机构名称但没有卡片标识时）
+    /// 尝试智能推荐或匹配信用卡
     private func trySmartRecommendation() {
-        // 如果账户名称不为空且包含"信用卡"，尝试智能推荐
+        // 情况1: AI 识别出具体卡号，直接匹配
+        if let identifier = data.cardIdentifier, !identifier.isEmpty {
+            if let matchedCard = creditCardService.creditCards.first(where: { $0.cardIdentifier == identifier }) {
+                selectedAccountType = SelectedAccountInfo(
+                    id: matchedCard.id,
+                    displayName: matchedCard.displayName,
+                    type: .creditCard,
+                    icon: "creditcard.circle.fill",
+                    cardIdentifier: matchedCard.cardIdentifier
+                )
+                isSmartRecommended = false  // 精确匹配，不是推荐
+                return
+            }
+        }
+        
+        // 情况2: AI 识别出机构名称但没有卡号，智能推荐
         guard !data.accountName.isEmpty,
               data.accountName.contains("信用卡"),
               data.cardIdentifier == nil else { return }

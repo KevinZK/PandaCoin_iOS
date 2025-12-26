@@ -282,7 +282,8 @@ class RecordService: ObservableObject {
     func saveFinancialEvents(
         _ events: [ParsedFinancialEvent],
         accountMap: [String: String],
-        assetService: AssetService? = nil
+        assetService: AssetService? = nil,
+        authService: AuthService? = nil  // 新增：用于获取默认支出账户
     ) -> AnyPublisher<Int, APIError> {
         
         // 分离事件类型
@@ -324,7 +325,7 @@ class RecordService: ObservableObject {
         
         // 如果没有资产/信用卡更新，直接保存交易
         if phase1Publishers.isEmpty {
-            return saveTransactionEvents(transactionEvents, accountMap: accountMap)
+            return saveTransactionEvents(transactionEvents, accountMap: accountMap, authService: authService)
                 .map { events.count }
                         .eraseToAnyPublisher()
         }
@@ -346,7 +347,7 @@ class RecordService: ObservableObject {
                 guard let assetService = assetService else {
                     // 没有 assetService，使用原来的 accountMap
                     logInfo("⚠️ 无法刷新账户列表，使用原始 accountMap")
-                    return self.saveTransactionEvents(transactionEvents, accountMap: accountMap)
+                    return self.saveTransactionEvents(transactionEvents, accountMap: accountMap, authService: authService)
                         .map { events.count }
                         .eraseToAnyPublisher()
                 }
@@ -360,7 +361,7 @@ class RecordService: ObservableObject {
                         }
                         logInfo("✅ 刷新账户映射，共 \(newAccountMap.count) 个账户")
                         
-                        return self.saveTransactionEvents(transactionEvents, accountMap: newAccountMap)
+                        return self.saveTransactionEvents(transactionEvents, accountMap: newAccountMap, authService: authService)
                             .map { events.count }
                             .eraseToAnyPublisher()
                     }
@@ -372,13 +373,14 @@ class RecordService: ObservableObject {
     // MARK: - 保存交易事件（辅助方法）
     private func saveTransactionEvents(
         _ events: [ParsedFinancialEvent],
-        accountMap: [String: String]
+        accountMap: [String: String],
+        authService: AuthService? = nil
     ) -> AnyPublisher<Void, APIError> {
         var publishers: [AnyPublisher<Void, APIError>] = []
         
         for event in events {
             if let data = event.transactionData {
-                let pub = saveTransaction(data, accountMap: accountMap)
+                let pub = saveTransaction(data, accountMap: accountMap, authService: authService)
                     .map { _ in () }
                     .eraseToAnyPublisher()
                 publishers.append(pub)
@@ -396,7 +398,7 @@ class RecordService: ObservableObject {
     }
     
     // MARK: - 保存交易记录
-    private func saveTransaction(_ data: AIRecordParsed, accountMap: [String: String]) -> AnyPublisher<Record, APIError> {
+    private func saveTransaction(_ data: AIRecordParsed, accountMap: [String: String], authService: AuthService? = nil) -> AnyPublisher<Record, APIError> {
         // 检查是否涉及信用卡（有 cardIdentifier）
         if let cardIdentifier = data.cardIdentifier, !cardIdentifier.isEmpty {
             logInfo("✅ 信用卡消费: 卡号=\(cardIdentifier), 金额=\(data.amount), 类型=\(data.type)")
@@ -430,14 +432,31 @@ class RecordService: ObservableObject {
                 .eraseToAnyPublisher()
         }
         
-        // 普通账户交易 - 账户为可选
-        let accountId = data.accountName.isEmpty ? nil : accountMap[data.accountName]
+        // 普通账户交易 - 优先使用识别的账户，找不到则使用默认支出账户
+        var accountId: String? = nil
+        var usedDefaultAccount = false
         
-        if !data.accountName.isEmpty && accountId == nil {
-            logInfo("⚠️ 未匹配到账户: \(data.accountName)，将不关联账户保存")
+        if !data.accountName.isEmpty {
+            // 先尝试匹配识别的账户名
+            accountId = accountMap[data.accountName]
         }
         
-        logInfo("✅ 保存交易: 账户=\(data.accountName.isEmpty ? "未指定" : data.accountName), 金额=\(data.amount), 类型=\(data.type)")
+        // 如果没有匹配到，使用默认支出账户
+        if accountId == nil {
+            let auth = authService ?? AuthService.shared
+            if let user = auth.currentUser,
+               let defaultAccountId = user.defaultExpenseAccountId,
+               user.defaultExpenseAccountType == "ACCOUNT" {
+                accountId = defaultAccountId
+                usedDefaultAccount = true
+                logInfo("✅ 使用默认支出账户: \(defaultAccountId)")
+            } else if !data.accountName.isEmpty {
+                logInfo("⚠️ 未匹配到账户: \(data.accountName)，且无默认账户，将不关联账户保存")
+            }
+        }
+        
+        let accountDisplayName = usedDefaultAccount ? "默认账户" : (data.accountName.isEmpty ? "未指定" : data.accountName)
+        logInfo("✅ 保存交易: 账户=\(accountDisplayName), 金额=\(data.amount), 类型=\(data.type)")
         
         let request = CreateRecordRequest(
             amount: data.amount,

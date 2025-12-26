@@ -12,6 +12,7 @@ import Combine
 enum ChatMessageType {
     case userText(String)                      // 用户文字输入
     case userVoice(String)                     // 用户语音输入
+    case userImage(UIImage)                    // 用户图片输入
     case assistantText(String)                 // 熊猫文字回复
     case assistantParsing                      // 正在解析中
     case assistantResult([ParsedFinancialEvent]) // AI解析结果卡片
@@ -28,7 +29,7 @@ struct ChatMessage: Identifiable {
     // 是否是用户消息
     var isUser: Bool {
         switch type {
-        case .userText, .userVoice:
+        case .userText, .userVoice, .userImage:
             return true
         default:
             return false
@@ -48,6 +49,13 @@ struct ChatRecordView: View {
     @State private var editableEvents: [ParsedFinancialEvent] = []  // 可编辑的事件列表
     @State private var showingEventCards = false  // 是否显示事件确认卡片
     @State private var cancellables = Set<AnyCancellable>()
+    
+    // 拍照相关状态
+    @State private var showingCamera = false
+    @State private var showingPhotoLibrary = false
+    @State private var selectedImage: UIImage?
+    @State private var isProcessingImage = false  // 正在处理图片
+    private let ocrService = LocalOCRService.shared
     
     // 用于自动滚动到底部
     @Namespace private var bottomID
@@ -95,12 +103,98 @@ struct ChatRecordView: View {
                 isRecording: $isRecording,
                 onSend: sendTextMessage,
                 onStartRecording: startRecording,
-                onStopRecording: stopRecording
+                onStopRecording: stopRecording,
+                onCameraPressed: {
+                    showingCamera = true
+                },
+                onPhotoLibraryPressed: {
+                    showingPhotoLibrary = true
+                }
             )
             .disabled(showingEventCards)
             .opacity(showingEventCards ? 0.5 : 1.0)
         }
         .background(Color.clear)  // 透明背景，与首页渐变融合
+        // 相机
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraImagePicker(selectedImage: $selectedImage)
+                .ignoresSafeArea()
+        }
+        // 相册
+        .sheet(isPresented: $showingPhotoLibrary) {
+            PhotoLibraryPicker(selectedImage: $selectedImage)
+        }
+        // 监听图片选择 - 直接进行 OCR 识别并发送给 AI
+        .onChange(of: selectedImage) { newImage in
+            if let image = newImage {
+                processImageDirectly(image)
+            }
+        }
+    }
+    
+    // MARK: - 直接处理图片（无预览，直接 OCR + AI 解析）
+    private func processImageDirectly(_ image: UIImage) {
+        guard !isProcessingImage else { return }
+        isProcessingImage = true
+        
+        // 添加用户图片消息
+        messages.append(ChatMessage(type: .userImage(image)))
+        
+        // 显示识别中状态
+        messages.append(ChatMessage(type: .assistantParsing))
+        
+        // 进行本地 OCR 识别
+        ocrService.recognizeText(from: image)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [self] completion in
+                    isProcessingImage = false
+                    selectedImage = nil
+                    
+                    if case .failure(let error) = completion {
+                        // OCR 失败
+                        self.messages.removeAll { msg in
+                            if case .assistantParsing = msg.type { return true }
+                            return false
+                        }
+                        self.messages.append(ChatMessage(type: .assistantError("图片识别失败：\(error.localizedDescription)")))
+                    }
+                },
+                receiveValue: { [self] result in
+                    // OCR 成功，构建文本发送给 AI
+                    if !result.isValidReceipt {
+                        // 不是有效票据
+                        self.messages.removeAll { msg in
+                            if case .assistantParsing = msg.type { return true }
+                            return false
+                        }
+                        self.messages.append(ChatMessage(type: .assistantText("这张图片不像是票据哦，请拍摄购物小票、支付截图或外卖订单~")))
+                        return
+                    }
+                    
+                    // 构建 AI 解析文本
+                    var parseText = "【票据识别】"
+                    
+                    if let amount = result.extractedInfo.amount {
+                        parseText += " 金额¥\(amount)"
+                    }
+                    if let merchant = result.extractedInfo.merchant {
+                        parseText += " 商家:\(merchant)"
+                    }
+                    if let paymentMethod = result.extractedInfo.paymentMethod {
+                        parseText += " 支付方式:\(paymentMethod)"
+                    }
+                    
+                    // 附加原始文字（帮助 AI 理解）
+                    parseText += "\n原文: \(result.rawText.prefix(500))"
+                    
+                    logInfo("📷 票据OCR结果: \(parseText)")
+                    
+                    // 发送给 AI 解析
+                    parseAndRespond(text: parseText, parsingMessageId: nil)
+                }
+            )
+            .store(in: &cancellables)
     }
     
     // MARK: - 事件确认区域（复用 EventConfirmCard）
@@ -202,6 +296,14 @@ struct ChatRecordView: View {
                 }
             }
             .padding(.top, 8)
+            
+            // 拍照提示
+            VStack(spacing: 4) {
+                Text("或者点击 📷 拍摄票据")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+            .padding(.top, 4)
         }
         .padding(.vertical, 40)
     }
@@ -297,8 +399,8 @@ struct ChatRecordView: View {
             accountMap[account.name] = account.id
         }
         
-        // 保存事件
-        recordService.saveFinancialEvents(events, accountMap: accountMap, assetService: accountService)
+        // 保存事件（传入 authService 以便使用默认账户）
+        recordService.saveFinancialEvents(events, accountMap: accountMap, assetService: accountService, authService: AuthService.shared)
             .receive(on: DispatchQueue.main)
             .sink { completion in
                 if case .failure(let error) = completion {
@@ -381,6 +483,9 @@ struct SimpleChatBubble: View {
         case .userText(let text), .userVoice(let text):
             userBubble(text: text, isVoice: message.type.isVoice)
             
+        case .userImage(let image):
+            imageBubble(image: image)
+            
         case .assistantText(let text):
             assistantTextBubble(text: text)
             
@@ -415,7 +520,30 @@ struct SimpleChatBubble: View {
         .padding(.vertical, 10)
         .background(Theme.bambooGreen)
         .cornerRadius(18)
-        .cornerRadius(18, corners: [.topLeft, .topRight, .bottomLeft])
+    }
+    
+    // 图片消息气泡
+    private func imageBubble(image: UIImage) -> some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 150, height: 150)
+                .cornerRadius(12)
+                .clipped()
+            
+            HStack(spacing: 4) {
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.system(size: 10))
+                Text("票据识别")
+                    .font(.system(size: 10))
+            }
+            .foregroundColor(.white.opacity(0.8))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Theme.bambooGreen.opacity(0.8))
+            .cornerRadius(8)
+        }
     }
     
     // 熊猫文字消息气泡
@@ -427,7 +555,6 @@ struct SimpleChatBubble: View {
             .padding(.vertical, 10)
             .background(Theme.cardBackground)
             .cornerRadius(18)
-            .cornerRadius(18, corners: [.topLeft, .topRight, .bottomRight])
             .shadow(color: Theme.cfoShadow, radius: 5, x: 0, y: 2)
     }
     
@@ -488,28 +615,6 @@ extension ChatMessageType {
     }
 }
 
-// MARK: - 圆角扩展
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
-    }
-}
-
-struct RoundedCorner: Shape {
-    var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
-
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-        return Path(path.cgPath)
-    }
-}
-
 #Preview {
     ChatRecordView()
 }
-
