@@ -6,47 +6,21 @@
 //
 
 import SwiftUI
-import AVFoundation
-import Photos
 
 struct ChatInputBar: View {
     @Binding var text: String
     @Binding var isRecording: Bool
-    
+
     let onSend: () -> Void
     let onStartRecording: () -> Void
     let onStopRecording: () -> Void
-    let onCameraPressed: () -> Void
-    let onPhotoLibraryPressed: () -> Void  // 新增：相册回调
-    
+
     @FocusState private var isTextFieldFocused: Bool
-    @State private var showingPermissionAlert = false
-    @State private var permissionAlertMessage = ""
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            
+
             HStack(spacing: 8) {
-                // 拍照按钮
-                Button(action: checkCameraPermission) {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(Theme.bambooGreen)
-                        .frame(width: 36, height: 36)
-                        .background(Theme.bambooGreen.opacity(0.1))
-                        .clipShape(Circle())
-                }
-                
-                // 相册按钮
-                Button(action: checkPhotoLibraryPermission) {
-                    Image(systemName: "photo.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(Theme.income)
-                        .frame(width: 36, height: 36)
-                        .background(Theme.income.opacity(0.1))
-                        .clipShape(Circle())
-                }
-                
                 // 文本输入框
                 HStack(spacing: 8) {
                     TextField("输入记账内容...", text: $text)
@@ -90,59 +64,6 @@ struct ChatInputBar: View {
             )
         }
         .animation(.easeInOut(duration: 0.2), value: text.isEmpty)
-        .alert("需要权限", isPresented: $showingPermissionAlert) {
-            Button("去设置") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text(permissionAlertMessage)
-        }
-    }
-    
-    // MARK: - 检查相机权限
-    private func checkCameraPermission() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized:
-            onCameraPressed()
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                DispatchQueue.main.async {
-                    if granted {
-                        onCameraPressed()
-                    }
-                }
-            }
-        case .denied, .restricted:
-            permissionAlertMessage = "请在设置中允许访问相机，以便拍摄票据进行识别。"
-            showingPermissionAlert = true
-        @unknown default:
-            break
-        }
-    }
-    
-    // MARK: - 检查相册权限
-    private func checkPhotoLibraryPermission() {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        switch status {
-        case .authorized, .limited:
-            onPhotoLibraryPressed()
-        case .notDetermined:
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { newStatus in
-                DispatchQueue.main.async {
-                    if newStatus == .authorized || newStatus == .limited {
-                        onPhotoLibraryPressed()
-                    }
-                }
-            }
-        case .denied, .restricted:
-            permissionAlertMessage = "请在设置中允许访问相册，以便选择票据图片进行识别。"
-            showingPermissionAlert = true
-        @unknown default:
-            break
-        }
     }
 }
 
@@ -245,9 +166,7 @@ struct ChatVoiceButton: View {
             isRecording: .constant(false),
             onSend: {},
             onStartRecording: {},
-            onStopRecording: {},
-            onCameraPressed: {},
-            onPhotoLibraryPressed: {}
+            onStopRecording: {}
         )
     }
     .background(Theme.background)

@@ -39,21 +39,21 @@ struct ChatMessage: Identifiable {
 
 // MARK: - 对话式记账视图
 struct ChatRecordView: View {
+    // 外部传入的图片（从 DashboardView 的拍照/相册按钮获取）
+    @Binding var externalImage: UIImage?
+
     @StateObject private var speechService = SpeechRecognitionService()
     @StateObject private var recordService = RecordService()
     @ObservedObject private var accountService = AssetService.shared
-    
+
     @State private var messages: [ChatMessage] = []
     @State private var inputText: String = ""
     @State private var isRecording = false
     @State private var editableEvents: [ParsedFinancialEvent] = []  // 可编辑的事件列表
     @State private var showingEventCards = false  // 是否显示事件确认卡片
     @State private var cancellables = Set<AnyCancellable>()
-    
-    // 拍照相关状态
-    @State private var showingCamera = false
-    @State private var showingPhotoLibrary = false
-    @State private var selectedImage: UIImage?
+
+    // 图片处理状态
     @State private var isProcessingImage = false  // 正在处理图片
     private let ocrService = LocalOCRService.shared
     
@@ -103,31 +103,18 @@ struct ChatRecordView: View {
                 isRecording: $isRecording,
                 onSend: sendTextMessage,
                 onStartRecording: startRecording,
-                onStopRecording: stopRecording,
-                onCameraPressed: {
-                    showingCamera = true
-                },
-                onPhotoLibraryPressed: {
-                    showingPhotoLibrary = true
-                }
+                onStopRecording: stopRecording
             )
             .disabled(showingEventCards)
             .opacity(showingEventCards ? 0.5 : 1.0)
         }
         .background(Color.clear)  // 透明背景，与首页渐变融合
-        // 相机
-        .fullScreenCover(isPresented: $showingCamera) {
-            CameraImagePicker(selectedImage: $selectedImage)
-                .ignoresSafeArea()
-        }
-        // 相册
-        .sheet(isPresented: $showingPhotoLibrary) {
-            PhotoLibraryPicker(selectedImage: $selectedImage)
-        }
-        // 监听图片选择 - 直接进行 OCR 识别并发送给 AI
-        .onChange(of: selectedImage) { newImage in
+        // 监听外部图片（从 DashboardView 传入）- 直接进行 OCR 识别并发送给 AI
+        .onChange(of: externalImage) { newImage in
             if let image = newImage {
                 processImageDirectly(image)
+                // 处理后清空外部图片
+                externalImage = nil
             }
         }
     }
@@ -149,8 +136,7 @@ struct ChatRecordView: View {
             .sink(
                 receiveCompletion: { [self] completion in
                     isProcessingImage = false
-                    selectedImage = nil
-                    
+
                     if case .failure(let error) = completion {
                         // OCR 失败
                         self.messages.removeAll { msg in
@@ -608,5 +594,5 @@ extension ChatMessageType {
 }
 
 #Preview {
-    ChatRecordView()
+    ChatRecordView(externalImage: .constant(nil))
 }

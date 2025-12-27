@@ -92,6 +92,7 @@ struct DashboardView: View {
     @State private var showingCamera = false
     @State private var showingPhotoLibrary = false
     @State private var selectedImage: UIImage?
+    @State private var chatModeImage: UIImage?  // 对话模式下传递给 ChatRecordView 的图片
     @State private var isProcessingImage = false
     private let ocrService = LocalOCRService.shared
     @State private var ocrCancellables = Set<AnyCancellable>()
@@ -125,8 +126,27 @@ struct DashboardView: View {
                     isChatMode = newValue == 1
                 }
                 
-                // 底部 PageControl
-                pageControlView
+                HStack {
+                    // 左侧：拍照按钮
+                    mediaButton(
+                        icon: "camera.fill",
+                        label: "",
+                        action: { showingCamera = true }
+                    )
+                    Spacer()
+                    // 底部 PageControl
+                    pageControlView
+                    Spacer()
+                    // 右侧：相册按钮
+                    mediaButton(
+                        icon: "photo.on.rectangle",
+                        label: "",
+                        action: { showingPhotoLibrary = true }
+                    )
+                    
+                }
+                .padding(.horizontal, 16)
+                
             }
         }
         // 相机
@@ -138,10 +158,17 @@ struct DashboardView: View {
         .sheet(isPresented: $showingPhotoLibrary) {
             PhotoLibraryPicker(selectedImage: $selectedImage)
         }
-        // 监听图片选择 - 直接进行 OCR 识别并发送给 AI 解析
+        // 监听图片选择 - 根据当前模式决定处理方式
         .onChange(of: selectedImage) { newImage in
             if let image = newImage {
-                processImageDirectly(image)
+                if pageIndex == 0 {
+                    // 经典模式：在当前页面处理（弹出确认卡片）
+                    processImageDirectly(image)
+                } else {
+                    // 对话模式：传递给 ChatRecordView 处理（在聊天中显示）
+                    chatModeImage = image
+                }
+                selectedImage = nil
             }
         }
         .sheet(item: $unifiedEventsWrapper) { wrapper in
@@ -315,7 +342,7 @@ struct DashboardView: View {
             .padding(.vertical, 16)
             
             // 聊天区域（占满剩余空间）
-            ChatRecordView()
+            ChatRecordView(externalImage: $chatModeImage)
         }
     }
     
@@ -448,24 +475,8 @@ struct DashboardView: View {
     // MARK: - 语音按钮区域（含拍照和相册按钮）
     private var voiceButtonWithMedia: some View {
         HStack(spacing: 24) {
-            // 左侧：拍照按钮
-            mediaButton(
-                icon: "camera.fill",
-                label: "拍照",
-                action: { showingCamera = true }
-            )
-            .offset(x: 60, y: 40)
-            
             // 中间：语音按钮
             voiceButton
-            
-            // 右侧：相册按钮
-            mediaButton(
-                icon: "photo.on.rectangle",
-                label: "相册",
-                action: { showingPhotoLibrary = true }
-            )
-            .offset(x: -60, y: 40)
         }
     }
     
@@ -761,8 +772,7 @@ struct DashboardView: View {
             .sink(
                 receiveCompletion: { [self] completion in
                     isProcessingImage = false
-                    selectedImage = nil
-                    
+
                     if case .failure(let error) = completion {
                         logError("图片识别失败", error: error)
                     }
@@ -773,13 +783,12 @@ struct DashboardView: View {
                         // 不是有效票据，提示用户
                         logInfo("不是有效票据")
                         isProcessingImage = false
-                        selectedImage = nil
                         return
                     }
-                    
+
                     // 构建 AI 解析文本
                     var parseText = "【票据识别】"
-                    
+
                     if let amount = result.extractedInfo.amount {
                         parseText += " 金额¥\(amount)"
                     }
@@ -789,19 +798,18 @@ struct DashboardView: View {
                     if let paymentMethod = result.extractedInfo.paymentMethod {
                         parseText += " 支付方式:\(paymentMethod)"
                     }
-                    
+
                     // 附加原始文字（帮助 AI 理解）
                     parseText += "\n原文: \(result.rawText.prefix(500))"
-                    
+
                     logInfo("📷 票据OCR结果: \(parseText)")
-                    
+
                     // 标记来自图片，然后发送给 AI 解析
                     isParsingFromImage = true
                     handleVoiceInput(parseText)
-                    
-                    // 清理图片状态（AI 解析状态由 handleVoiceInput 管理）
+
+                    // 清理图片处理状态（AI 解析状态由 handleVoiceInput 管理）
                     isProcessingImage = false
-                    selectedImage = nil
                 }
             )
             .store(in: &ocrCancellables)
