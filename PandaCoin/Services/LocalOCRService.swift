@@ -255,11 +255,20 @@ class LocalOCRService: ObservableObject {
     private func isValidReceipt(text: String) -> Bool {
         // 检查是否包含有效关键词
         let hasValidKeyword = Keywords.validIndicators.contains { text.contains($0.lowercased()) }
-        
-        // 检查是否包含金额模式
-        let amountPattern = #"[¥￥]\s*\d+\.?\d*|(\d+\.?\d*)\s*元"#
-        let hasAmount = text.range(of: amountPattern, options: .regularExpression) != nil
-        
+
+        // 检查是否包含金额模式（扩展匹配）
+        let amountPatterns = [
+            #"[¥￥]\s*\d+\.?\d*"#,                           // ¥7.90
+            #"\d+\.?\d*\s*元"#,                              // 7.90元
+            #"(?:合计|总计|实付|应付|应收|实收)[：:]*\s*\d+\.?\d*"#,  // 合计应收：7.90
+            #"(?:金额|总额|付款)[：:]*\s*\d+\.?\d*"#,              // 金额：7.90
+            #"\d+\.\d{2}"#                                   // 任意两位小数的金额格式（如 7.90）
+        ]
+
+        let hasAmount = amountPatterns.contains { pattern in
+            text.range(of: pattern, options: .regularExpression) != nil
+        }
+
         return hasValidKeyword && hasAmount
     }
     
