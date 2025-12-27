@@ -24,6 +24,7 @@ struct DashboardView: View {
     @StateObject private var recordService = RecordService()
     @StateObject private var transactionService = TransactionService()
     @StateObject private var authService = AuthService.shared
+    @ObservedObject private var appSettings = AppSettings.shared
     
     @State private var netWorthValue: Decimal = 0
     @State private var unifiedEventsWrapper: ParsedEventsWrapper? = nil
@@ -221,6 +222,9 @@ struct DashboardView: View {
             }
         }
         .onAppear {
+            // 使用用户设置的首选页面
+            pageIndex = appSettings.homeLayoutMode.pageIndex
+            isChatMode = appSettings.homeLayoutMode == .chat
             loadData()
             startBreathingAnimation()
         }
