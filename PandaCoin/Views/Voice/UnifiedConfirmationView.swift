@@ -212,10 +212,11 @@ struct TransactionCardContent: View {
     }
     
     // 是否需要显示账户选择器
-    // 所有支出类型都应该允许用户选择/修改支出账户，确保资金流向可追踪
+    // 支出和收入类型都应该允许用户选择/修改账户，确保资金流向可追踪
     private var shouldShowAccountPicker: Bool {
-        // 支出类型：始终显示账户选择器（除非是信用卡消费，那种情况由信用卡选择器处理）
-        data.type == .expense && !involvesCreditCard
+        // 支出类型：显示账户选择器（除非是信用卡消费，那种情况由信用卡选择器处理）
+        // 收入类型：显示账户选择器，用于选择收款账户
+        (data.type == .expense && !involvesCreditCard) || data.type == .income
     }
     
     // 是否需要显示信用卡选择器
@@ -289,7 +290,7 @@ struct TransactionCardContent: View {
                             Image(systemName: selectedAccountType == nil ? "wallet.pass" : selectedAccountType!.icon)
                                 .foregroundColor(selectedAccountType == nil ? Theme.textSecondary : Theme.bambooGreen)
                             
-                            Text(selectedAccountType?.displayName ?? "选择账户或信用卡")
+                            Text(selectedAccountType?.displayName ?? (data.type == .income ? "选择收款账户" : "选择账户或信用卡"))
                                 .font(AppFont.body(size: 14))
                                 .foregroundColor(selectedAccountType == nil ? Theme.textSecondary : Theme.text)
                             
@@ -394,7 +395,8 @@ struct TransactionCardContent: View {
             ExpenseAccountPickerSheet(
                 selectedAccount: $selectedAccountType,
                 accounts: accountService.accounts,
-                creditCards: creditCardService.creditCards
+                creditCards: creditCardService.creditCards,
+                isIncome: data.type == .income
             )
         }
     }
@@ -448,13 +450,15 @@ struct TransactionCardContent: View {
     // MARK: - 账户选择器状态视图
     @ViewBuilder
     private var accountPickerStatusView: some View {
+        let accountTypeText = data.type == .income ? "收入账户" : "支出账户"
+
         if !hasSelectedAccount {
             // 未选择账户
             HStack {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundColor(.orange)
                     .font(.system(size: 14))
-                Text("请选择支出账户")
+                Text("请选择\(accountTypeText)")
                     .font(AppFont.body(size: 12, weight: .medium))
                     .foregroundColor(.orange)
             }
@@ -484,7 +488,7 @@ struct TransactionCardContent: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(Theme.bambooGreen)
                     .font(.system(size: 14))
-                Text("已选择支出账户")
+                Text("已选择\(accountTypeText)")
                     .font(AppFont.body(size: 12, weight: .medium))
                     .foregroundColor(Theme.bambooGreen)
             }
@@ -492,11 +496,10 @@ struct TransactionCardContent: View {
     }
     
     private func loadDefaultAccountIfNeeded() {
-        // 支出类型且没有涉及信用卡（信用卡由智能推荐处理）
-        guard data.type == .expense,
-              !involvesCreditCard,
+        // 支出类型且没有涉及信用卡（信用卡由智能推荐处理），或者收入类型
+        guard (data.type == .expense && !involvesCreditCard) || data.type == .income,
               selectedAccountType == nil else { return }
-        
+
         // 如果 AI 识别出了账户名，先尝试匹配现有账户
         if !originalAccountName.isEmpty {
             // 尝试匹配现有账户
@@ -512,32 +515,45 @@ struct TransactionCardContent: View {
                 return
             }
         }
-        
+
         // AI 没有识别出账户或匹配失败，尝试加载默认账户
-        if let user = authService.currentUser,
-           let accountId = user.defaultExpenseAccountId,
-           let accountType = user.defaultExpenseAccountType {
-            if accountType == "ACCOUNT" {
-                if let account = accountService.accounts.first(where: { $0.id == accountId }) {
-                    selectedAccountType = SelectedAccountInfo(
-                        id: account.id,
-                        displayName: account.name,
-                        type: .account,
-                        icon: account.type.icon,
-                        cardIdentifier: nil
-                    )
-                    usedDefaultAccount = true  // 标记使用了默认账户
-                }
-            } else if accountType == "CREDIT_CARD" {
-                if let card = creditCardService.creditCards.first(where: { $0.id == accountId }) {
-                    selectedAccountType = SelectedAccountInfo(
-                        id: card.id,
-                        displayName: card.displayName,
-                        type: .creditCard,
-                        icon: "creditcard.circle.fill",
-                        cardIdentifier: card.cardIdentifier
-                    )
-                    usedDefaultAccount = true  // 标记使用了默认账户
+        // 收入类型：使用默认收入账户；支出类型：使用默认支出账户
+        if let user = authService.currentUser {
+            let defaultAccountId: String?
+            let defaultAccountType: String?
+
+            if data.type == .income {
+                defaultAccountId = user.defaultIncomeAccountId
+                defaultAccountType = user.defaultIncomeAccountType
+            } else {
+                defaultAccountId = user.defaultExpenseAccountId
+                defaultAccountType = user.defaultExpenseAccountType
+            }
+
+            if let accountId = defaultAccountId, let accountType = defaultAccountType {
+                if accountType == "ACCOUNT" {
+                    if let account = accountService.accounts.first(where: { $0.id == accountId }) {
+                        selectedAccountType = SelectedAccountInfo(
+                            id: account.id,
+                            displayName: account.name,
+                            type: .account,
+                            icon: account.type.icon,
+                            cardIdentifier: nil
+                        )
+                        usedDefaultAccount = true  // 标记使用了默认账户
+                    }
+                } else if accountType == "CREDIT_CARD" && data.type == .expense {
+                    // 信用卡只能用于支出
+                    if let card = creditCardService.creditCards.first(where: { $0.id == accountId }) {
+                        selectedAccountType = SelectedAccountInfo(
+                            id: card.id,
+                            displayName: card.displayName,
+                            type: .creditCard,
+                            icon: "creditcard.circle.fill",
+                            cardIdentifier: card.cardIdentifier
+                        )
+                        usedDefaultAccount = true  // 标记使用了默认账户
+                    }
                 }
             }
         }
@@ -617,16 +633,24 @@ struct SelectedAccountInfo: Equatable {
     let cardIdentifier: String?
 }
 
-// MARK: - 支出账户选择器 Sheet
+// MARK: - 账户选择器 Sheet（支持支出和收入类型）
 struct ExpenseAccountPickerSheet: View {
     @Environment(\.dismiss) var dismiss
     @Binding var selectedAccount: SelectedAccountInfo?
-    
+
     let accounts: [Asset]
     let creditCards: [CreditCard]
-    
-    // 过滤出可用于支出的账户（排除房产、车辆等）
-    private var expenseAccounts: [Asset] {
+    let isIncome: Bool  // 是否是收入类型
+
+    init(selectedAccount: Binding<SelectedAccountInfo?>, accounts: [Asset], creditCards: [CreditCard], isIncome: Bool = false) {
+        self._selectedAccount = selectedAccount
+        self.accounts = accounts
+        self.creditCards = creditCards
+        self.isIncome = isIncome
+    }
+
+    // 过滤出可用于支出/收入的账户（排除房产、车辆等）
+    private var availableAccounts: [Asset] {
         accounts.filter { account in
             switch account.type {
             case .bank, .cash, .digitalWallet, .savings:
@@ -640,9 +664,9 @@ struct ExpenseAccountPickerSheet: View {
     var body: some View {
         NavigationView {
             List {
-                if !expenseAccounts.isEmpty {
-                    Section("储蓄账户") {
-                        ForEach(expenseAccounts) { account in
+                if !availableAccounts.isEmpty {
+                    Section(isIncome ? "收款账户" : "储蓄账户") {
+                        ForEach(availableAccounts) { account in
                             Button(action: {
                                 selectedAccount = SelectedAccountInfo(
                                     id: account.id,
@@ -679,7 +703,8 @@ struct ExpenseAccountPickerSheet: View {
                     }
                 }
                 
-                if !creditCards.isEmpty {
+                // 信用卡选项 - 仅支出类型显示（收入不能进入信用卡）
+                if !isIncome && !creditCards.isEmpty {
                     Section("信用卡") {
                         ForEach(creditCards) { card in
                             Button(action: {
@@ -696,7 +721,7 @@ struct ExpenseAccountPickerSheet: View {
                                     Image(systemName: "creditcard.circle.fill")
                                         .foregroundColor(.purple)
                                         .frame(width: 30)
-                                    
+
                                     VStack(alignment: .leading) {
                                         Text(card.displayName)
                                             .foregroundColor(Theme.text)
@@ -704,9 +729,9 @@ struct ExpenseAccountPickerSheet: View {
                                             .font(.caption)
                                             .foregroundColor(Theme.textSecondary)
                                     }
-                                    
+
                                     Spacer()
-                                    
+
                                     if selectedAccount?.id == card.id {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundColor(Theme.bambooGreen)
@@ -717,8 +742,10 @@ struct ExpenseAccountPickerSheet: View {
                         }
                     }
                 }
-                
-                if expenseAccounts.isEmpty && creditCards.isEmpty {
+
+                // 空账户提示
+                let hasNoOptions = isIncome ? availableAccounts.isEmpty : (availableAccounts.isEmpty && creditCards.isEmpty)
+                if hasNoOptions {
                     Section {
                         VStack(spacing: 12) {
                             Image(systemName: "wallet.pass")
@@ -726,7 +753,7 @@ struct ExpenseAccountPickerSheet: View {
                                 .foregroundColor(Theme.textSecondary)
                             Text("暂无可用账户")
                                 .foregroundColor(Theme.textSecondary)
-                            Text("请先添加储蓄账户或信用卡")
+                            Text(isIncome ? "请先添加储蓄账户" : "请先添加储蓄账户或信用卡")
                                 .font(.caption)
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -735,7 +762,7 @@ struct ExpenseAccountPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("选择支出账户")
+            .navigationTitle(isIncome ? "选择收入账户" : "选择支出账户")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

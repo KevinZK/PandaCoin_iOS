@@ -17,7 +17,9 @@ struct User: Codable, Identifiable {
     let updatedAt: Date
     let defaultExpenseAccountId: String?
     let defaultExpenseAccountType: String?  // "ACCOUNT" 或 "CREDIT_CARD"
-    
+    let defaultIncomeAccountId: String?
+    let defaultIncomeAccountType: String?  // "ACCOUNT"（收入只能进入账户，不能进入信用卡）
+
     enum CodingKeys: String, CodingKey {
         case id
         case email
@@ -27,6 +29,8 @@ struct User: Codable, Identifiable {
         case updatedAt
         case defaultExpenseAccountId
         case defaultExpenseAccountType
+        case defaultIncomeAccountId
+        case defaultIncomeAccountType
     }
 }
 
