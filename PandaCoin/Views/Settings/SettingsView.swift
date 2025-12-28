@@ -46,10 +46,24 @@ struct SettingsView: View {
                             Circle().fill(Color.green.opacity(0.1)).frame(width: 30, height: 30)
                             Image(systemName: "calendar.badge.clock").foregroundColor(.green).font(.system(size: 14))
                         }
-                        
+
                         Text("自动还款")
                             .foregroundColor(Theme.text)
-                        
+
+                        Spacer()
+                    }
+                }
+
+                NavigationLink(destination: AutoIncomeListView()) {
+                    HStack {
+                        ZStack {
+                            Circle().fill(Theme.income.opacity(0.1)).frame(width: 30, height: 30)
+                            Image(systemName: "arrow.down.circle").foregroundColor(Theme.income).font(.system(size: 14))
+                        }
+
+                        Text("自动入账")
+                            .foregroundColor(Theme.text)
+
                         Spacer()
                     }
                 }

@@ -847,7 +847,8 @@ struct DashboardView: View {
     
     // MARK: - 统一保存事件（支持多类型）
     private func saveUnifiedEvents(_ events: [ParsedFinancialEvent]) {
-        unifiedEventsWrapper = nil
+        // 注意：不在这里设置 unifiedEventsWrapper = nil
+        // 让 UnifiedConfirmationView 自己通过 dismiss() 控制关闭，以便显示自动入账提示
         logInfo("用户确认保存\(events.count)条事件")
         
         // 构建账户名称到ID的映射

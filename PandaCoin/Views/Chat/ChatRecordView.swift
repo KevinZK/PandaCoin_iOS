@@ -8,6 +8,12 @@
 import SwiftUI
 import Combine
 
+// MARK: - 固定收入信息（用于自动入账提示）
+struct FixedIncomeInfo {
+    let record: AIRecordParsed
+    let accountId: String  // 记录收入时使用的账户 ID
+}
+
 // MARK: - 对话消息类型
 enum ChatMessageType {
     case userText(String)                      // 用户文字输入
@@ -18,6 +24,7 @@ enum ChatMessageType {
     case assistantResult([ParsedFinancialEvent]) // AI解析结果卡片
     case assistantError(String)                // 错误提示
     case savedConfirmation(Int)                // 保存成功确认（保存了几条）
+    case autoIncomePrompt(FixedIncomeInfo)     // 自动入账提示（带确认/取消按钮）
 }
 
 // MARK: - 对话消息模型
@@ -56,7 +63,11 @@ struct ChatRecordView: View {
     // 图片处理状态
     @State private var isProcessingImage = false  // 正在处理图片
     private let ocrService = LocalOCRService.shared
-    
+
+    // 自动入账服务
+    @StateObject private var autoIncomeService = AutoIncomeService.shared
+    @State private var autoIncomeCancellables = Set<AnyCancellable>()
+
     // 用于自动滚动到底部
     @Namespace private var bottomID
     
@@ -73,7 +84,11 @@ struct ChatRecordView: View {
                         
                         // 显示对话消息
                         ForEach(messages) { message in
-                            SimpleChatBubble(message: message)
+                            SimpleChatBubble(
+                                message: message,
+                                onConfirmAutoIncome: confirmAutoIncome,
+                                onCancelAutoIncome: cancelAutoIncome
+                            )
                         }
                         
                         // 显示可编辑的事件确认卡片（复用 UnifiedConfirmationView 的卡片）
@@ -370,13 +385,16 @@ struct ChatRecordView: View {
     private func confirmEvents(_ events: [ParsedFinancialEvent]) {
         // 隐藏事件卡片
         showingEventCards = false
-        
+
         // 构建账户映射
         var accountMap: [String: String] = [:]
         for account in accountService.accounts {
             accountMap[account.name] = account.id
         }
-        
+
+        // 检测是否有固定收入事件（保存成功后提示）- 传入 accountMap 以获取账户 ID
+        let fixedIncomeInfo = findFixedIncomeRecord(in: events, accountMap: accountMap)
+
         // 保存事件（传入 authService 以便使用默认账户）
         recordService.saveFinancialEvents(events, accountMap: accountMap, assetService: accountService, authService: AuthService.shared)
             .receive(on: DispatchQueue.main)
@@ -387,8 +405,193 @@ struct ChatRecordView: View {
             } receiveValue: { count in
                 self.messages.append(ChatMessage(type: .savedConfirmation(count)))
                 self.editableEvents = []
+
+                // 检测到固定收入，延迟显示提示
+                if let info = fixedIncomeInfo {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        self.promptAutoIncome(for: info)
+                    }
+                }
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - 提示设置自动入账
+    private func promptAutoIncome(for info: FixedIncomeInfo) {
+        // 发送带确认/取消按钮的消息
+        messages.append(ChatMessage(type: .autoIncomePrompt(info)))
+    }
+
+    // MARK: - 确认设置自动入账
+    func confirmAutoIncome(for info: FixedIncomeInfo, messageId: UUID) {
+        // 移除提示消息
+        messages.removeAll { $0.id == messageId }
+
+        // 显示设置中状态
+        messages.append(ChatMessage(type: .assistantText("好的，正在为你设置自动入账...")))
+
+        let record = info.record
+
+        // 使用记录时的账户 ID，如果为空则查找合适的账户
+        var targetAccountId = info.accountId
+        if targetAccountId.isEmpty {
+            targetAccountId = findSuitableAccountId(for: record)
+        }
+
+        guard !targetAccountId.isEmpty else {
+            // 移除"设置中"消息
+            messages.removeAll { msg in
+                if case .assistantText(let text) = msg.type, text.contains("正在为你设置") {
+                    return true
+                }
+                return false
+            }
+            messages.append(ChatMessage(type: .assistantError("未找到可用的储蓄账户，请先添加银行卡或储蓄账户")))
+            return
+        }
+
+        // 创建自动入账请求
+        let request = CreateAutoIncomeRequest(
+            name: record.description.isEmpty ? inferIncomeType(from: record).displayName : record.description,
+            incomeType: inferIncomeType(from: record).rawValue,
+            amount: Double(truncating: record.amount as NSNumber),
+            targetAccountId: targetAccountId,
+            category: inferIncomeType(from: record).defaultCategory,
+            dayOfMonth: record.suggestedDay ?? Calendar.current.component(.day, from: Date()),
+            executeTime: "09:00",
+            reminderDaysBefore: 1,
+            isEnabled: true
+        )
+
+        autoIncomeService.createAutoIncome(request)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    // 移除"设置中"消息
+                    self.messages.removeAll { msg in
+                        if case .assistantText(let text) = msg.type, text.contains("正在为你设置") {
+                            return true
+                        }
+                        return false
+                    }
+
+                    if case .failure(let error) = completion {
+                        self.messages.append(ChatMessage(type: .assistantError("设置失败：\(error.localizedDescription)")))
+                    }
+                },
+                receiveValue: { _ in
+                    // 移除"设置中"消息
+                    self.messages.removeAll { msg in
+                        if case .assistantText(let text) = msg.type, text.contains("正在为你设置") {
+                            return true
+                        }
+                        return false
+                    }
+
+                    self.messages.append(ChatMessage(type: .assistantText("已设置成功！以后每月都会自动记录这笔收入，你可以在「设置 → 自动入账」中管理 🎉")))
+                }
+            )
+            .store(in: &autoIncomeCancellables)
+    }
+
+    // MARK: - 取消设置自动入账
+    func cancelAutoIncome(messageId: UUID) {
+        // 移除提示消息
+        messages.removeAll { $0.id == messageId }
+        messages.append(ChatMessage(type: .assistantText("好的，已跳过。有需要时可以在「设置」中手动添加自动入账~")))
+    }
+
+    // MARK: - 查找合适的入账账户
+    private func findSuitableAccountId(for record: AIRecordParsed) -> String {
+        // 储蓄类账户类型
+        let savingsTypes: [AssetType] = [.bank, .cash, .digitalWallet, .savings]
+
+        // 1. 优先使用记录时选择的账户（如果是储蓄类）
+        if !record.accountName.isEmpty {
+            if let account = accountService.accounts.first(where: { $0.name == record.accountName }) {
+                if savingsTypes.contains(account.type) {
+                    return account.id
+                }
+            }
+        }
+
+        // 2. 使用第一个储蓄类账户
+        if let account = accountService.accounts.first(where: { savingsTypes.contains($0.type) }) {
+            return account.id
+        }
+
+        return ""
+    }
+
+    // MARK: - 查找固定收入记录
+    private func findFixedIncomeRecord(in events: [ParsedFinancialEvent], accountMap: [String: String]) -> FixedIncomeInfo? {
+        let fixedIncomeCategories = [
+            // 英文枚举值
+            "INCOME_SALARY", "SALARY",
+            "HOUSING_FUND",
+            "PENSION",
+            "RENTAL", "INCOME_RENTAL",
+            "INCOME_INVESTMENT",
+            // 中文分类名称
+            "工资", "薪资", "月薪",
+            "公积金", "住房公积金",
+            "养老金", "养老保险", "退休金",
+            "租金", "租金收入", "房租收入"
+        ]
+
+        for event in events {
+            if let record = event.transactionData {
+                // 收入类型且被标记为固定收入
+                if record.type == .income && record.isFixedIncome == true {
+                    let accountId = accountMap[record.accountName] ?? ""
+                    return FixedIncomeInfo(record: record, accountId: accountId)
+                }
+                // 收入类型且分类是工资、公积金等
+                if record.type == .income {
+                    let categoryUpper = record.category.uppercased()
+                    if fixedIncomeCategories.contains(where: { $0.uppercased() == categoryUpper || record.category.contains($0) }) {
+                        let accountId = accountMap[record.accountName] ?? ""
+                        return FixedIncomeInfo(record: record, accountId: accountId)
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    // MARK: - 推断收入类型
+    private func inferIncomeType(from record: AIRecordParsed) -> IncomeType {
+        // 先尝试使用 incomeType 字段
+        if let typeString = record.incomeType {
+            switch typeString.uppercased() {
+            case "SALARY": return .salary
+            case "HOUSING_FUND": return .housingFund
+            case "PENSION": return .pension
+            case "RENTAL": return .rental
+            case "INVESTMENT_RETURN": return .investmentReturn
+            default: break
+            }
+        }
+
+        // 从 category 推断
+        let category = record.category.uppercased()
+        if category.contains("SALARY") || category.contains("工资") || category.contains("薪") {
+            return .salary
+        }
+        if category.contains("HOUSING") || category.contains("公积金") {
+            return .housingFund
+        }
+        if category.contains("PENSION") || category.contains("养老") || category.contains("退休") {
+            return .pension
+        }
+        if category.contains("RENTAL") || category.contains("租金") || category.contains("房租") {
+            return .rental
+        }
+        if category.contains("INVESTMENT") || category.contains("投资") || category.contains("理财") {
+            return .investmentReturn
+        }
+
+        return .other
     }
     
     // MARK: - 取消事件
@@ -421,7 +624,9 @@ struct QuickTipChip: View {
 // MARK: - 简化对话气泡视图（不包含事件卡片）
 struct SimpleChatBubble: View {
     let message: ChatMessage
-    
+    var onConfirmAutoIncome: ((FixedIncomeInfo, UUID) -> Void)?
+    var onCancelAutoIncome: ((UUID) -> Void)?
+
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             if !message.isUser {
@@ -430,17 +635,17 @@ struct SimpleChatBubble: View {
                     .font(.system(size: 28))
                     .frame(width: 36, height: 36)
             }
-            
+
             if message.isUser {
                 Spacer(minLength: 60)
             }
-            
+
             bubbleContent
-            
+
             if !message.isUser {
                 Spacer(minLength: 60)
             }
-            
+
             if message.isUser {
                 // 用户头像
                 Circle()
@@ -454,31 +659,34 @@ struct SimpleChatBubble: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var bubbleContent: some View {
         switch message.type {
         case .userText(let text), .userVoice(let text):
             userBubble(text: text, isVoice: message.type.isVoice)
-            
+
         case .userImage(let image):
             imageBubble(image: image)
-            
+
         case .assistantText(let text):
             assistantTextBubble(text: text)
-            
+
         case .assistantParsing:
             parsingBubble
-            
+
         case .assistantResult:
             // 事件卡片现在在 ChatRecordView 中单独处理
             EmptyView()
-            
+
         case .assistantError(let error):
             errorBubble(error: error)
-            
+
         case .savedConfirmation(let count):
             confirmationBubble(count: count)
+
+        case .autoIncomePrompt(let info):
+            autoIncomePromptBubble(info: info)
         }
     }
     
@@ -582,6 +790,63 @@ struct SimpleChatBubble: View {
         .padding(.vertical, 10)
         .background(Theme.income.opacity(0.1))
         .cornerRadius(18)
+    }
+
+    // 自动入账提示气泡（带确认/取消按钮）
+    private func autoIncomePromptBubble(info: FixedIncomeInfo) -> some View {
+        let record = info.record
+        let incomeName = record.description.isEmpty ? record.category : record.description
+
+        return VStack(alignment: .leading, spacing: 12) {
+            // 提示文字
+            HStack(spacing: 8) {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                    .font(.system(size: 16))
+                Text("检测到「\(incomeName)」是固定收入")
+                    .font(AppFont.body(size: 15))
+                    .foregroundColor(Theme.text)
+            }
+
+            Text("要设置为每月自动入账吗？这样以后就不用手动记录啦~")
+                .font(AppFont.body(size: 14))
+                .foregroundColor(Theme.textSecondary)
+
+            // 确认/取消按钮
+            HStack(spacing: 12) {
+                Button(action: {
+                    onCancelAutoIncome?(message.id)
+                }) {
+                    Text("不用了")
+                        .font(AppFont.body(size: 14, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Theme.separator)
+                        .cornerRadius(16)
+                }
+
+                Button(action: {
+                    onConfirmAutoIncome?(info, message.id)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("设置自动入账")
+                            .font(AppFont.body(size: 14, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Theme.bambooGreen)
+                    .cornerRadius(16)
+                }
+            }
+        }
+        .padding(14)
+        .background(Theme.cardBackground)
+        .cornerRadius(18)
+        .shadow(color: Theme.cfoShadow, radius: 5, x: 0, y: 2)
     }
 }
 

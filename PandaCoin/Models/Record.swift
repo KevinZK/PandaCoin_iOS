@@ -212,6 +212,11 @@ struct AIRecordParsed: Codable {
     let date: Date
     let confidence: Double?
     var cardIdentifier: String?  // 信用卡标识（仅当交易涉及信用卡时使用）
+
+    // 固定收入识别（用于自动入账提示）
+    var isFixedIncome: Bool?  // AI 识别是否为固定收入（工资、公积金等）
+    var suggestedDay: Int?    // AI 从原文推断的入账日期（如"每月15号"）
+    var incomeType: String?   // 收入类型（SALARY, HOUSING_FUND, PENSION 等）
 }
 
 // MARK: - AI语音记账请求
