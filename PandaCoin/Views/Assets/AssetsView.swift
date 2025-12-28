@@ -553,19 +553,22 @@ struct AssetDetailView: View {
                 }
             }
             
-            // 本月统计
+            // 本月统计（根据资产类型显示不同内容）
             HStack(spacing: 20) {
                 monthStatItem(title: "本月收入", amount: monthlyIncome, color: Theme.income)
-                
+
                 Divider()
                     .frame(height: 30)
-                
+
                 monthStatItem(title: "本月支出", amount: monthlyExpense, color: Theme.expense)
-                
-                Divider()
-                    .frame(height: 30)
-                
-                monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.warning)
+
+                // 只有负债类资产才显示本月还款
+                if asset.type.isLiability {
+                    Divider()
+                        .frame(height: 30)
+
+                    monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.warning)
+                }
             }
             
             // 贷款类资产显示自动还款按钮
