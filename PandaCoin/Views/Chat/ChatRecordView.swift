@@ -48,6 +48,10 @@ struct ChatMessage: Identifiable {
 struct ChatRecordView: View {
     // 外部传入的图片（从 DashboardView 的拍照/相册按钮获取）
     @Binding var externalImage: UIImage?
+    // 控制输入栏显示/隐藏
+    @Binding var showInputBar: Bool
+    // 外部控制录音状态
+    @Binding var isRecording: Bool
 
     @StateObject private var speechService = SpeechRecognitionService()
     @StateObject private var recordService = RecordService()
@@ -55,7 +59,6 @@ struct ChatRecordView: View {
 
     @State private var messages: [ChatMessage] = []
     @State private var inputText: String = ""
-    @State private var isRecording = false
     @State private var editableEvents: [ParsedFinancialEvent] = []  // 可编辑的事件列表
     @State private var showingEventCards = false  // 是否显示事件确认卡片
     @State private var cancellables = Set<AnyCancellable>()
@@ -112,16 +115,16 @@ struct ChatRecordView: View {
                 }
             }
             
-            // 输入栏（确认卡片显示时禁用输入）
-            ChatInputBar(
-                text: $inputText,
-                isRecording: $isRecording,
-                onSend: sendTextMessage,
-                onStartRecording: startRecording,
-                onStopRecording: stopRecording
-            )
-            .disabled(showingEventCards)
-            .opacity(showingEventCards ? 0.5 : 1.0)
+            // 输入栏（根据 showInputBar 控制显示，确认卡片显示时禁用输入）
+            if showInputBar {
+                ChatInputBar(
+                    text: $inputText,
+                    onSend: sendTextMessage
+                )
+                .disabled(showingEventCards)
+                .opacity(showingEventCards ? 0.5 : 1.0)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .background(Color.clear)  // 透明背景，与首页渐变融合
         // 监听外部图片（从 DashboardView 传入）- 直接进行 OCR 识别并发送给 AI
@@ -130,6 +133,17 @@ struct ChatRecordView: View {
                 processImageDirectly(image)
                 // 处理后清空外部图片
                 externalImage = nil
+            }
+        }
+        // 监听外部录音状态变化
+        .onChange(of: isRecording) { newValue in
+            if newValue {
+                startRecording()
+            } else {
+                // 只有在 speechService 正在录音时才停止
+                if speechService.isRecording {
+                    stopRecording()
+                }
             }
         }
     }
@@ -322,8 +336,8 @@ struct ChatRecordView: View {
     private func startRecording() {
         do {
             try speechService.startRecording()
-            isRecording = true
         } catch {
+            isRecording = false
             messages.append(ChatMessage(type: .assistantError("语音识别启动失败，请检查麦克风权限")))
         }
     }
@@ -825,5 +839,5 @@ extension ChatMessageType {
 }
 
 #Preview {
-    ChatRecordView(externalImage: .constant(nil))
+    ChatRecordView(externalImage: .constant(nil), showInputBar: .constant(true), isRecording: .constant(false))
 }

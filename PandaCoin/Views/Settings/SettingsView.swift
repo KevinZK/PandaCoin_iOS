@@ -10,9 +10,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var languageManager = LanguageManager.shared
-    @StateObject private var appSettings = AppSettings.shared
     @State private var showLanguagePicker = false
-    @State private var showHomeLayoutPicker = false
     
     var body: some View {
         List {
@@ -71,29 +69,6 @@ struct SettingsView: View {
             
             // MARK: - 偏好设置
             Section("偏好设置") {
-                // 首页布局
-                Button(action: { showHomeLayoutPicker = true }) {
-                    HStack {
-                        ZStack {
-                            Circle().fill(Theme.bambooGreen.opacity(0.1)).frame(width: 30, height: 30)
-                            Image(systemName: "rectangle.on.rectangle").foregroundColor(Theme.bambooGreen).font(.system(size: 14))
-                        }
-
-                        Text("首页布局")
-                            .foregroundColor(Theme.text)
-
-                        Spacer()
-
-                        Text(appSettings.homeLayoutMode.displayName)
-                            .font(.subheadline)
-                            .foregroundColor(Theme.textSecondary)
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(Theme.textSecondary.opacity(0.5))
-                    }
-                }
-
                 // 语言设置
                 Button(action: { showLanguagePicker = true }) {
                     HStack {
@@ -171,70 +146,6 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showLanguagePicker) {
             LanguagePickerView(selectedLanguage: $languageManager.currentLanguage)
-        }
-        .sheet(isPresented: $showHomeLayoutPicker) {
-            HomeLayoutPickerView(selectedMode: $appSettings.homeLayoutMode)
-        }
-    }
-}
-
-// MARK: - 首页布局选择器视图
-struct HomeLayoutPickerView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var selectedMode: HomeLayoutMode
-
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(HomeLayoutMode.allCases) { mode in
-                    Button(action: {
-                        selectedMode = mode
-                        dismiss()
-                    }) {
-                        HStack(spacing: 12) {
-                            // 图标
-                            ZStack {
-                                Circle()
-                                    .fill(selectedMode == mode ? Theme.bambooGreen.opacity(0.15) : Theme.separator)
-                                    .frame(width: 44, height: 44)
-                                Image(systemName: mode.icon)
-                                    .font(.system(size: 18))
-                                    .foregroundColor(selectedMode == mode ? Theme.bambooGreen : Theme.textSecondary)
-                            }
-
-                            // 文字
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(mode.displayName)
-                                    .font(AppFont.body(size: 16, weight: .medium))
-                                    .foregroundColor(Theme.text)
-
-                                Text(mode.description)
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-
-                            Spacer()
-
-                            // 选中标记
-                            if selectedMode == mode {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(Theme.bambooGreen)
-                                    .font(.system(size: 22))
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .navigationTitle("首页布局")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(L10n.Common.cancel) {
-                        dismiss()
-                    }
-                }
-            }
         }
     }
 }
