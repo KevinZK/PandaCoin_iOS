@@ -13,6 +13,7 @@
 "common_done" = "Done";
 "common_search" = "Search";
 "common_all" = "All";
+"common_not_set" = "Not set";
 
 /* Auth */
 "auth_login" = "Login";
@@ -120,6 +121,46 @@
 "category_investment" = "Investment";
 "category_parttime" = "Part-time";
 "category_initial_balance" = "Initial Balance";
+"category_red_packet" = "Gift/Red Packet";
+"category_asset_sale" = "Asset Sale";
+"category_other_income" = "Other Income";
+"category_pets" = "Pets";
+"category_subscription" = "Subscription";
+"category_fees_taxes" = "Fees & Taxes";
+"category_loan_repayment" = "Loan Repayment";
+
+/* Income Types (Auto Income) */
+"income_type_salary" = "Salary";
+"income_type_housing_fund" = "Housing Fund";
+"income_type_pension" = "Pension";
+"income_type_rental" = "Rental Income";
+"income_type_investment_return" = "Investment Return";
+"income_type_other" = "Other Income";
+
+/* Auto Income */
+"auto_income_title" = "Auto Income";
+"auto_income_add" = "Add Auto Income";
+"auto_income_edit" = "Edit Auto Income";
+"auto_income_empty" = "No auto income yet";
+"auto_income_empty_hint" = "Add recurring income, system will record automatically";
+"auto_income_detected" = "Fixed income detected";
+"auto_income_prompt" = "Would you like to set up auto income? You won't need to record it manually anymore.";
+"auto_income_confirm" = "Set Auto Income";
+"auto_income_skip" = "Not Now";
+"auto_income_success" = "Auto income set up successfully! It will be recorded automatically every month. You can manage it in Settings → Auto Income";
+"auto_income_skipped" = "OK, skipped. You can add it manually in Settings if needed.";
+"auto_income_setting_up" = "Setting up auto income...";
+"auto_income_day_format" = "Day %d of each month";
+
+/* OCR Receipt Types */
+"receipt_type_shopping" = "Shopping Receipt";
+"receipt_type_takeout" = "Takeout Order";
+"receipt_type_payment" = "Payment Screenshot";
+"receipt_type_invoice" = "Invoice";
+"receipt_type_bank_bill" = "Bank Statement";
+"receipt_type_taxi" = "Ride Order";
+"receipt_type_utility" = "Utility Bill";
+"receipt_type_unknown" = "Other Receipt";
 
 /* Statistics */
 "statistics_title" = "Statistics";

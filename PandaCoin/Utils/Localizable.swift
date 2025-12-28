@@ -22,6 +22,7 @@ enum L10n {
         static let done = "common_done".localized
         static let search = "common_search".localized
         static let all = "common_all".localized
+        static let notSet = "common_not_set".localized
     }
     
     // MARK: - Auth
@@ -143,6 +144,58 @@ enum L10n {
         static let categoryBonus = "category_bonus".localized
         static let categoryInvestment = "category_investment".localized
         static let categoryParttime = "category_parttime".localized
+        static let categoryRedPacket = "category_red_packet".localized
+        static let categoryAssetSale = "category_asset_sale".localized
+        static let categoryOtherIncome = "category_other_income".localized
+        static let categoryInitialBalance = "category_initial_balance".localized
+
+        // Categories - Additional Expense
+        static let categoryPets = "category_pets".localized
+        static let categorySubscription = "category_subscription".localized
+        static let categoryFeesTaxes = "category_fees_taxes".localized
+        static let categoryLoanRepayment = "category_loan_repayment".localized
+    }
+
+    // MARK: - Income Types
+    enum IncomeTypes {
+        static let salary = "income_type_salary".localized
+        static let housingFund = "income_type_housing_fund".localized
+        static let pension = "income_type_pension".localized
+        static let rental = "income_type_rental".localized
+        static let investmentReturn = "income_type_investment_return".localized
+        static let other = "income_type_other".localized
+    }
+
+    // MARK: - Auto Income
+    enum AutoIncome {
+        static let title = "auto_income_title".localized
+        static let add = "auto_income_add".localized
+        static let edit = "auto_income_edit".localized
+        static let empty = "auto_income_empty".localized
+        static let emptyHint = "auto_income_empty_hint".localized
+        static let detected = "auto_income_detected".localized
+        static let prompt = "auto_income_prompt".localized
+        static let confirm = "auto_income_confirm".localized
+        static let skip = "auto_income_skip".localized
+        static let success = "auto_income_success".localized
+        static let skipped = "auto_income_skipped".localized
+        static let settingUp = "auto_income_setting_up".localized
+
+        static func dayFormat(_ day: Int) -> String {
+            return String(format: "auto_income_day_format".localized, day)
+        }
+    }
+
+    // MARK: - OCR Receipt Types
+    enum ReceiptType {
+        static let shopping = "receipt_type_shopping".localized
+        static let takeout = "receipt_type_takeout".localized
+        static let payment = "receipt_type_payment".localized
+        static let invoice = "receipt_type_invoice".localized
+        static let bankBill = "receipt_type_bank_bill".localized
+        static let taxi = "receipt_type_taxi".localized
+        static let utility = "receipt_type_utility".localized
+        static let unknown = "receipt_type_unknown".localized
     }
     
     // MARK: - Statistics

@@ -16,14 +16,15 @@ enum IncomeType: String, Codable, CaseIterable {
     case investmentReturn = "INVESTMENT_RETURN"
     case other = "OTHER"
 
+    /// 本地化显示名称
     var displayName: String {
         switch self {
-        case .salary: return "工资"
-        case .housingFund: return "公积金"
-        case .pension: return "养老金"
-        case .rental: return "租金收入"
-        case .investmentReturn: return "投资收益"
-        case .other: return "其他收入"
+        case .salary: return NSLocalizedString("income_type_salary", comment: "Salary")
+        case .housingFund: return NSLocalizedString("income_type_housing_fund", comment: "Housing Fund")
+        case .pension: return NSLocalizedString("income_type_pension", comment: "Pension")
+        case .rental: return NSLocalizedString("income_type_rental", comment: "Rental Income")
+        case .investmentReturn: return NSLocalizedString("income_type_investment_return", comment: "Investment Return")
+        case .other: return NSLocalizedString("income_type_other", comment: "Other Income")
         }
     }
 
@@ -38,14 +39,15 @@ enum IncomeType: String, Codable, CaseIterable {
         }
     }
 
+    /// 默认分类（使用枚举值，与后端保持一致）
     var defaultCategory: String {
         switch self {
-        case .salary: return "工资"
-        case .housingFund: return "公积金"
-        case .pension: return "养老金"
-        case .rental: return "租金"
-        case .investmentReturn: return "投资收益"
-        case .other: return "其他收入"
+        case .salary: return "INCOME_SALARY"
+        case .housingFund: return "INCOME_HOUSING_FUND"
+        case .pension: return "INCOME_PENSION"
+        case .rental: return "INCOME_RENTAL"
+        case .investmentReturn: return "INCOME_INVESTMENT"
+        case .other: return "INCOME_OTHER"
         }
     }
 }
@@ -97,9 +99,9 @@ struct AutoIncome: Codable, Identifiable {
         return formatter.string(from: date)
     }
 
-    /// 入账日描述
+    /// 入账日描述（本地化）
     var dayDescription: String {
-        return "每月\(dayOfMonth)号"
+        return String(format: NSLocalizedString("auto_income_day_format", comment: "Day %d of each month"), dayOfMonth)
     }
 
     /// 目标账户描述
@@ -107,7 +109,7 @@ struct AutoIncome: Codable, Identifiable {
         if let account = targetAccount {
             return account.name
         }
-        return "未设置"
+        return NSLocalizedString("common_not_set", comment: "Not set")
     }
 }
 

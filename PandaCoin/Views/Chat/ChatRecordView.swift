@@ -525,20 +525,6 @@ struct ChatRecordView: View {
 
     // MARK: - 查找固定收入记录
     private func findFixedIncomeRecord(in events: [ParsedFinancialEvent], accountMap: [String: String]) -> FixedIncomeInfo? {
-        let fixedIncomeCategories = [
-            // 英文枚举值
-            "INCOME_SALARY", "SALARY",
-            "HOUSING_FUND",
-            "PENSION",
-            "RENTAL", "INCOME_RENTAL",
-            "INCOME_INVESTMENT",
-            // 中文分类名称
-            "工资", "薪资", "月薪",
-            "公积金", "住房公积金",
-            "养老金", "养老保险", "退休金",
-            "租金", "租金收入", "房租收入"
-        ]
-
         for event in events {
             if let record = event.transactionData {
                 // 收入类型且被标记为固定收入
@@ -546,13 +532,10 @@ struct ChatRecordView: View {
                     let accountId = accountMap[record.accountName] ?? ""
                     return FixedIncomeInfo(record: record, accountId: accountId)
                 }
-                // 收入类型且分类是工资、公积金等
-                if record.type == .income {
-                    let categoryUpper = record.category.uppercased()
-                    if fixedIncomeCategories.contains(where: { $0.uppercased() == categoryUpper || record.category.contains($0) }) {
-                        let accountId = accountMap[record.accountName] ?? ""
-                        return FixedIncomeInfo(record: record, accountId: accountId)
-                    }
+                // 收入类型且分类是工资、公积金等（使用 CategoryMapper 的纯枚举匹配）
+                if record.type == .income && CategoryMapper.isFixedIncomeCategory(record.category) {
+                    let accountId = accountMap[record.accountName] ?? ""
+                    return FixedIncomeInfo(record: record, accountId: accountId)
                 }
             }
         }
@@ -573,25 +556,8 @@ struct ChatRecordView: View {
             }
         }
 
-        // 从 category 推断
-        let category = record.category.uppercased()
-        if category.contains("SALARY") || category.contains("工资") || category.contains("薪") {
-            return .salary
-        }
-        if category.contains("HOUSING") || category.contains("公积金") {
-            return .housingFund
-        }
-        if category.contains("PENSION") || category.contains("养老") || category.contains("退休") {
-            return .pension
-        }
-        if category.contains("RENTAL") || category.contains("租金") || category.contains("房租") {
-            return .rental
-        }
-        if category.contains("INVESTMENT") || category.contains("投资") || category.contains("理财") {
-            return .investmentReturn
-        }
-
-        return .other
+        // 使用 CategoryMapper 从 category 推断
+        return CategoryMapper.inferIncomeType(from: record.category)
     }
     
     // MARK: - 取消事件

@@ -13,6 +13,7 @@
 "common_done" = "Hecho";
 "common_search" = "Buscar";
 "common_all" = "Todo";
+"common_not_set" = "No establecido";
 
 /* Auth */
 "auth_login" = "Iniciar sesión";
@@ -120,6 +121,46 @@
 "category_investment" = "Inversión";
 "category_parttime" = "Tiempo parcial";
 "category_initial_balance" = "Saldo inicial";
+"category_red_packet" = "Regalo/Sobre rojo";
+"category_asset_sale" = "Venta de activo";
+"category_other_income" = "Otros ingresos";
+"category_pets" = "Mascotas";
+"category_subscription" = "Suscripción";
+"category_fees_taxes" = "Comisiones/Impuestos";
+"category_loan_repayment" = "Pago de préstamo";
+
+/* Income Types (Auto Income) */
+"income_type_salary" = "Salario";
+"income_type_housing_fund" = "Fondo de vivienda";
+"income_type_pension" = "Pensión";
+"income_type_rental" = "Ingresos por alquiler";
+"income_type_investment_return" = "Rendimiento de inversión";
+"income_type_other" = "Otros ingresos";
+
+/* Auto Income */
+"auto_income_title" = "Ingreso automático";
+"auto_income_add" = "Añadir ingreso automático";
+"auto_income_edit" = "Editar ingreso automático";
+"auto_income_empty" = "Sin ingresos automáticos";
+"auto_income_empty_hint" = "Añade ingresos recurrentes, el sistema los registrará automáticamente";
+"auto_income_detected" = "Ingreso fijo detectado";
+"auto_income_prompt" = "¿Desea configurar un ingreso automático? Se registrará automáticamente cada mes.";
+"auto_income_confirm" = "Configurar ingreso automático";
+"auto_income_skip" = "Ahora no";
+"auto_income_success" = "¡Ingreso automático configurado! Se registrará automáticamente cada mes. Gestionar en Configuración → Ingreso automático";
+"auto_income_skipped" = "Omitido. Puede añadirlo más tarde en la configuración.";
+"auto_income_setting_up" = "Configurando ingreso automático...";
+"auto_income_day_format" = "El día %d de cada mes";
+
+/* OCR Receipt Types */
+"receipt_type_shopping" = "Recibo de compra";
+"receipt_type_takeout" = "Pedido a domicilio";
+"receipt_type_payment" = "Captura de pago";
+"receipt_type_invoice" = "Factura";
+"receipt_type_bank_bill" = "Extracto bancario";
+"receipt_type_taxi" = "Pedido de taxi";
+"receipt_type_utility" = "Factura de servicios";
+"receipt_type_unknown" = "Otro recibo";
 
 /* Statistics */
 "statistics_title" = "Estadísticas";

@@ -13,6 +13,7 @@
 "common_done" = "完了";
 "common_search" = "検索";
 "common_all" = "すべて";
+"common_not_set" = "未設定";
 
 /* Auth */
 "auth_login" = "ログイン";
@@ -120,6 +121,46 @@
 "category_investment" = "投資";
 "category_parttime" = "アルバイト";
 "category_initial_balance" = "期首残高";
+"category_red_packet" = "ご祝儀/お年玉";
+"category_asset_sale" = "資産売却";
+"category_other_income" = "その他収入";
+"category_pets" = "ペット";
+"category_subscription" = "サブスクリプション";
+"category_fees_taxes" = "手数料/税金";
+"category_loan_repayment" = "ローン返済";
+
+/* Income Types (Auto Income) */
+"income_type_salary" = "給料";
+"income_type_housing_fund" = "住宅積立金";
+"income_type_pension" = "年金";
+"income_type_rental" = "家賃収入";
+"income_type_investment_return" = "投資リターン";
+"income_type_other" = "その他収入";
+
+/* Auto Income */
+"auto_income_title" = "自動入金";
+"auto_income_add" = "自動入金を追加";
+"auto_income_edit" = "自動入金を編集";
+"auto_income_empty" = "自動入金がありません";
+"auto_income_empty_hint" = "定期収入を追加すると、システムが自動で記録します";
+"auto_income_detected" = "固定収入を検出しました";
+"auto_income_prompt" = "自動入金を設定しますか？毎月自動で記録されます。";
+"auto_income_confirm" = "自動入金を設定";
+"auto_income_skip" = "今はしない";
+"auto_income_success" = "自動入金を設定しました！毎月自動で記録されます。設定→自動入金で管理できます";
+"auto_income_skipped" = "スキップしました。必要に応じて設定で追加できます。";
+"auto_income_setting_up" = "自動入金を設定中...";
+"auto_income_day_format" = "毎月%d日";
+
+/* OCR Receipt Types */
+"receipt_type_shopping" = "買い物レシート";
+"receipt_type_takeout" = "デリバリー注文";
+"receipt_type_payment" = "支払いスクリーンショット";
+"receipt_type_invoice" = "請求書";
+"receipt_type_bank_bill" = "銀行明細";
+"receipt_type_taxi" = "タクシー注文";
+"receipt_type_utility" = "光熱費";
+"receipt_type_unknown" = "その他の領収書";
 
 /* Statistics */
 "statistics_title" = "統計";

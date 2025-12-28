@@ -13,6 +13,7 @@
 "common_done" = "完成";
 "common_search" = "搜索";
 "common_all" = "全部";
+"common_not_set" = "未设置";
 
 /* Auth */
 "auth_login" = "登录";
@@ -120,6 +121,46 @@
 "category_investment" = "投资";
 "category_parttime" = "兼职";
 "category_initial_balance" = "期初余额";
+"category_red_packet" = "红包/礼金";
+"category_asset_sale" = "资产变现";
+"category_other_income" = "其他收入";
+"category_pets" = "宠物";
+"category_subscription" = "订阅服务";
+"category_fees_taxes" = "手续费/税费";
+"category_loan_repayment" = "还贷";
+
+/* Income Types (Auto Income) */
+"income_type_salary" = "工资";
+"income_type_housing_fund" = "公积金";
+"income_type_pension" = "养老金";
+"income_type_rental" = "租金收入";
+"income_type_investment_return" = "投资回报";
+"income_type_other" = "其他收入";
+
+/* Auto Income */
+"auto_income_title" = "自动入账";
+"auto_income_add" = "添加自动入账";
+"auto_income_edit" = "编辑自动入账";
+"auto_income_empty" = "还没有自动入账";
+"auto_income_empty_hint" = "添加周期性收入，系统将自动记账";
+"auto_income_detected" = "检测到固定收入";
+"auto_income_prompt" = "是否设置为自动入账？以后每月将自动记录，无需手动操作。";
+"auto_income_confirm" = "设置自动入账";
+"auto_income_skip" = "暂不设置";
+"auto_income_success" = "自动入账已设置成功！每月将自动记录，可在设置→自动入账中管理";
+"auto_income_skipped" = "好的，已跳过。如需添加可在设置中手动添加。";
+"auto_income_setting_up" = "正在设置自动入账...";
+"auto_income_day_format" = "每月%d号";
+
+/* OCR Receipt Types */
+"receipt_type_shopping" = "购物小票";
+"receipt_type_takeout" = "外卖订单";
+"receipt_type_payment" = "支付截图";
+"receipt_type_invoice" = "发票";
+"receipt_type_bank_bill" = "银行账单";
+"receipt_type_taxi" = "打车订单";
+"receipt_type_utility" = "水电煤账单";
+"receipt_type_unknown" = "其他票据";
 
 /* Statistics */
 "statistics_title" = "统计报表";

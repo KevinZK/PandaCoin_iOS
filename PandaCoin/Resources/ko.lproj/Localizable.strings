@@ -13,6 +13,7 @@
 "common_done" = "완료";
 "common_search" = "검색";
 "common_all" = "전체";
+"common_not_set" = "미설정";
 
 /* Auth */
 "auth_login" = "로그인";
@@ -120,6 +121,46 @@
 "category_investment" = "투자";
 "category_parttime" = "아르바이트";
 "category_initial_balance" = "기초 잔액";
+"category_red_packet" = "축의금/선물";
+"category_asset_sale" = "자산 매각";
+"category_other_income" = "기타 수입";
+"category_pets" = "반려동물";
+"category_subscription" = "구독";
+"category_fees_taxes" = "수수료/세금";
+"category_loan_repayment" = "대출 상환";
+
+/* Income Types (Auto Income) */
+"income_type_salary" = "급여";
+"income_type_housing_fund" = "주택청약";
+"income_type_pension" = "연금";
+"income_type_rental" = "임대 수입";
+"income_type_investment_return" = "투자 수익";
+"income_type_other" = "기타 수입";
+
+/* Auto Income */
+"auto_income_title" = "자동 입금";
+"auto_income_add" = "자동 입금 추가";
+"auto_income_edit" = "자동 입금 편집";
+"auto_income_empty" = "자동 입금이 없습니다";
+"auto_income_empty_hint" = "정기 수입을 추가하면 시스템이 자동으로 기록합니다";
+"auto_income_detected" = "고정 수입이 감지되었습니다";
+"auto_income_prompt" = "자동 입금을 설정하시겠습니까? 매월 자동으로 기록됩니다.";
+"auto_income_confirm" = "자동 입금 설정";
+"auto_income_skip" = "나중에";
+"auto_income_success" = "자동 입금이 설정되었습니다! 매월 자동으로 기록됩니다. 설정→자동 입금에서 관리할 수 있습니다";
+"auto_income_skipped" = "건너뛰었습니다. 필요시 설정에서 추가할 수 있습니다.";
+"auto_income_setting_up" = "자동 입금 설정 중...";
+"auto_income_day_format" = "매월 %d일";
+
+/* OCR Receipt Types */
+"receipt_type_shopping" = "쇼핑 영수증";
+"receipt_type_takeout" = "배달 주문";
+"receipt_type_payment" = "결제 스크린샷";
+"receipt_type_invoice" = "청구서";
+"receipt_type_bank_bill" = "은행 명세서";
+"receipt_type_taxi" = "택시 주문";
+"receipt_type_utility" = "공과금";
+"receipt_type_unknown" = "기타 영수증";
 
 /* Statistics */
 "statistics_title" = "통계";

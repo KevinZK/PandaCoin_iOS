@@ -13,6 +13,7 @@
 "common_done" = "Fertig";
 "common_search" = "Suchen";
 "common_all" = "Alle";
+"common_not_set" = "Nicht festgelegt";
 
 /* Auth */
 "auth_login" = "Anmelden";
@@ -120,6 +121,46 @@
 "category_investment" = "Investition";
 "category_parttime" = "Teilzeit";
 "category_initial_balance" = "Anfangssaldo";
+"category_red_packet" = "Geschenk/Geldgeschenk";
+"category_asset_sale" = "Vermögensverkauf";
+"category_other_income" = "Sonstiges Einkommen";
+"category_pets" = "Haustiere";
+"category_subscription" = "Abonnement";
+"category_fees_taxes" = "Gebühren/Steuern";
+"category_loan_repayment" = "Kreditrückzahlung";
+
+/* Income Types (Auto Income) */
+"income_type_salary" = "Gehalt";
+"income_type_housing_fund" = "Wohnungsbaufonds";
+"income_type_pension" = "Rente";
+"income_type_rental" = "Mieteinnahmen";
+"income_type_investment_return" = "Anlagerendite";
+"income_type_other" = "Sonstiges Einkommen";
+
+/* Auto Income */
+"auto_income_title" = "Automatisches Einkommen";
+"auto_income_add" = "Automatisches Einkommen hinzufügen";
+"auto_income_edit" = "Automatisches Einkommen bearbeiten";
+"auto_income_empty" = "Noch kein automatisches Einkommen";
+"auto_income_empty_hint" = "Fügen Sie regelmäßige Einnahmen hinzu, das System wird sie automatisch aufzeichnen";
+"auto_income_detected" = "Festes Einkommen erkannt";
+"auto_income_prompt" = "Möchten Sie automatisches Einkommen einrichten? Es wird jeden Monat automatisch aufgezeichnet.";
+"auto_income_confirm" = "Automatisches Einkommen einrichten";
+"auto_income_skip" = "Nicht jetzt";
+"auto_income_success" = "Automatisches Einkommen eingerichtet! Es wird jeden Monat automatisch aufgezeichnet. Verwalten unter Einstellungen → Automatisches Einkommen";
+"auto_income_skipped" = "Übersprungen. Sie können es bei Bedarf in den Einstellungen hinzufügen.";
+"auto_income_setting_up" = "Automatisches Einkommen wird eingerichtet...";
+"auto_income_day_format" = "Am %d. jedes Monats";
+
+/* OCR Receipt Types */
+"receipt_type_shopping" = "Einkaufsbeleg";
+"receipt_type_takeout" = "Lieferbestellung";
+"receipt_type_payment" = "Zahlungsscreenshot";
+"receipt_type_invoice" = "Rechnung";
+"receipt_type_bank_bill" = "Kontoauszug";
+"receipt_type_taxi" = "Taxibestellung";
+"receipt_type_utility" = "Nebenkosten";
+"receipt_type_unknown" = "Sonstiger Beleg";
 
 /* Statistics */
 "statistics_title" = "Statistiken";
