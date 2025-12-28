@@ -192,12 +192,8 @@ struct DashboardView: View {
 
             Spacer()
 
-            // 语音按钮
-            actionButton(icon: isRecording ? "waveform.circle.fill" : "mic.fill", isActive: isRecording) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    isRecording.toggle()
-                }
-            }
+            // 语音按钮（带波浪动画）
+            VoiceActionButton(isRecording: $isRecording)
 
             Spacer()
 
@@ -268,6 +264,104 @@ struct DashboardView: View {
     private func loadData() {
         accountService.fetchAccounts()
         transactionService.fetchNetWorth()
+    }
+}
+
+// MARK: - 语音按钮（带波浪动画）
+struct VoiceActionButton: View {
+    @Binding var isRecording: Bool
+
+    @State private var waveScales: [CGFloat] = [1.0, 1.0, 1.0]
+    @State private var isAnimating = false
+
+    var body: some View {
+        ZStack {
+            // 多层波浪效果（录音时）
+            if isRecording {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .stroke(
+                            Theme.bambooGreen.opacity(0.4 - Double(index) * 0.1),
+                            lineWidth: 2
+                        )
+                        .frame(width: 50, height: 50)
+                        .scaleEffect(waveScales[index])
+                        .opacity(Double(2.0 - waveScales[index]))
+                }
+            }
+
+            // 主按钮
+            Button(action: toggleRecording) {
+                ZStack {
+                    if isRecording {
+                        Circle()
+                            .fill(Theme.expense)
+                            .frame(width: 50, height: 50)
+                            .overlay(
+                                Circle()
+                                    .stroke(Theme.expense, lineWidth: 2)
+                            )
+                            .shadow(color: Theme.expense.opacity(0.4), radius: 10, x: 0, y: 3)
+                    } else {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 50, height: 50)
+                            .overlay(
+                                Circle()
+                                    .stroke(Theme.bambooGreen.opacity(0.3), lineWidth: 1.5)
+                            )
+                            .shadow(color: Theme.bambooGreen.opacity(0.15), radius: 6, x: 0, y: 3)
+                    }
+
+                    Image(systemName: isRecording ? "stop.fill" : "mic.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(isRecording ? .white : Theme.text.opacity(0.7))
+                }
+            }
+            .scaleEffect(isRecording ? 1.05 : 1.0)
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isRecording)
+        .onChange(of: isRecording) { newValue in
+            if newValue {
+                startWaveAnimation()
+            } else {
+                stopWaveAnimation()
+            }
+        }
+    }
+
+    private func toggleRecording() {
+        let impactFeedback = UIImpactFeedbackGenerator(style: isRecording ? .light : .medium)
+        impactFeedback.impactOccurred()
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            isRecording.toggle()
+        }
+    }
+
+    private func startWaveAnimation() {
+        guard !isAnimating else { return }
+        isAnimating = true
+        waveScales = [1.0, 1.0, 1.0]
+
+        for i in 0..<3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.25) {
+                guard self.isAnimating else { return }
+                withAnimation(
+                    .easeOut(duration: 1.0)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    self.waveScales[i] = 1.8
+                }
+            }
+        }
+    }
+
+    private func stopWaveAnimation() {
+        isAnimating = false
+        withAnimation(.easeOut(duration: 0.2)) {
+            waveScales = [1.0, 1.0, 1.0]
+        }
     }
 }
 
