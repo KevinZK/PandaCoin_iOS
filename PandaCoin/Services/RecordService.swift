@@ -716,6 +716,64 @@ class RecordService: ObservableObject {
             )
             .store(in: &cancellables)
     }
+
+    // MARK: - 获取统计数据（返回 Publisher）
+    func fetchStatisticsPublisher(period: StatisticsPeriod = .month) -> AnyPublisher<RecordStatistics, APIError> {
+        networkManager.request(
+            endpoint: "/records/statistics?period=\(period.rawValue)",
+            method: "GET"
+        )
+    }
+
+    // MARK: - 获取趋势统计
+    func fetchTrendStatistics(
+        period: TrendPeriod = .daily,
+        startDate: String? = nil,
+        endDate: String? = nil
+    ) -> AnyPublisher<TrendStatistics, APIError> {
+        var params = ["period": period.rawValue]
+        if let start = startDate { params["startDate"] = start }
+        if let end = endDate { params["endDate"] = end }
+
+        let queryString = params.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
+        return networkManager.request(
+            endpoint: "/records/statistics/trend?\(queryString)",
+            method: "GET"
+        )
+    }
+
+    // MARK: - 获取环比对比统计
+    func fetchComparisonStatistics(month: String? = nil) -> AnyPublisher<ComparisonStatistics, APIError> {
+        var endpoint = "/records/statistics/comparison"
+        if let m = month {
+            endpoint += "?month=\(m)"
+        }
+        return networkManager.request(endpoint: endpoint, method: "GET")
+    }
+
+    // MARK: - 获取收入分析
+    func fetchIncomeAnalysis(period: StatisticsPeriod = .month) -> AnyPublisher<IncomeAnalysis, APIError> {
+        networkManager.request(
+            endpoint: "/records/statistics/income?period=\(period.rawValue)",
+            method: "GET"
+        )
+    }
+
+    // MARK: - 获取财务健康度
+    func fetchFinancialHealth() -> AnyPublisher<FinancialHealth, APIError> {
+        networkManager.request(
+            endpoint: "/records/statistics/health",
+            method: "GET"
+        )
+    }
+
+    // MARK: - 获取分类趋势
+    func fetchCategoryTrend(category: String, months: Int = 6) -> AnyPublisher<CategoryTrend, APIError> {
+        networkManager.request(
+            endpoint: "/records/statistics/category-trend?category=\(category)&months=\(months)",
+            method: "GET"
+        )
+    }
 }
 
 // MARK: - 辅助模型
@@ -741,23 +799,7 @@ struct UpdateRecordRequest: Codable {
     let description: String?
 }
 
-struct RecordStatistics: Codable {
-    let period: String
-    let totalIncome: Decimal
-    let totalExpense: Decimal
-    let balance: Decimal
-    let categoryStats: [String: Decimal]
-    let recordCount: Int
-    
-    enum CodingKeys: String, CodingKey {
-        case period
-        case totalIncome = "total_income"
-        case totalExpense = "total_expense"
-        case balance
-        case categoryStats = "category_stats"
-        case recordCount = "record_count"
-    }
-}
+// RecordStatistics 已移到 Statistics.swift
 
 struct EmptyResponse: Codable {}
 

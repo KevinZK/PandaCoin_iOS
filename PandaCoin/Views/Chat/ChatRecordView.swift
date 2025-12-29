@@ -299,16 +299,25 @@ struct ChatRecordView: View {
                 Text("你可以这样说：")
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
-                
                 HStack(spacing: 8) {
-                    QuickTipChip(text: "午餐花了35元")
+                    QuickTipChip(text: "我的汇丰银行储蓄卡有156300")
+                    QuickTipChip(text: "我这个月预算2600")
+                }
+                QuickTipChip(text: "我有一张尾号2345的花旗银行信用卡，额度25000，每个月15号还款")
+                HStack(spacing: 8) {
+                    QuickTipChip(text: "午餐花了35元，打车15块")
                     QuickTipChip(text: "发了8000工资")
                 }
                 
                 HStack(spacing: 8) {
                     QuickTipChip(text: "买衣服消费200")
-                    QuickTipChip(text: "打车15块")
+                    QuickTipChip(text: "我持有英伟达股票1万股")
                 }
+                HStack(spacing: 8) {
+                    QuickTipChip(text: "我的车贷目前还有12000")
+                    QuickTipChip(text: "今天车贷还款3065")
+                }
+                
             }
             .padding(.top, 8)
         }
