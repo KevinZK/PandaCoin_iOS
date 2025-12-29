@@ -432,8 +432,44 @@ struct ChatRecordView: View {
 
     // MARK: - 提示设置自动入账
     private func promptAutoIncome(for info: FixedIncomeInfo) {
-        // 发送带确认/取消按钮的消息
-        messages.append(ChatMessage(type: .autoIncomePrompt(info)))
+        let record = info.record
+        let incomeType = inferIncomeType(from: record)
+        let amount = Double(truncating: record.amount as NSNumber)
+        let suggestedDay = record.suggestedDay ?? Calendar.current.component(.day, from: Date())
+
+        // 先检查是否已存在相似的自动入账
+        autoIncomeService.fetchAutoIncomes()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { autoIncomes in
+                    // 检查是否存在相似的自动入账（收入类型 + 金额 + 日期）
+                    let exists = autoIncomes.contains { existing in
+                        // 1. 收入类型相同
+                        let sameType = existing.incomeType == incomeType
+
+                        // 2. 金额相近（差异在 10% 以内，或绝对差异在 100 元以内）
+                        let amountDiff = abs(existing.amount - amount)
+                        let percentDiff = amount > 0 ? amountDiff / amount : 0
+                        let similarAmount = percentDiff < 0.1 || amountDiff < 100
+
+                        // 3. 日期相近（差异在 3 天以内，考虑月末跨月的情况）
+                        let dayDiff = abs(existing.dayOfMonth - suggestedDay)
+                        let similarDay = dayDiff <= 3 || dayDiff >= 28  // 28+ 表示月末和月初的差异
+
+                        return sameType && similarAmount && similarDay
+                    }
+
+                    if exists {
+                        // 已存在相似的自动入账，不再提示
+                        logInfo("检测到已存在相似的自动入账配置（类型+金额+日期匹配），跳过提示")
+                    } else {
+                        // 不存在，发送带确认/取消按钮的消息
+                        self.messages.append(ChatMessage(type: .autoIncomePrompt(info)))
+                    }
+                }
+            )
+            .store(in: &autoIncomeCancellables)
     }
 
     // MARK: - 确认设置自动入账
