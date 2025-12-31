@@ -6,12 +6,25 @@
 //
 
 import SwiftUI
+import AuthenticationServices
+import Combine
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var languageManager = LanguageManager.shared
+    @StateObject private var authService = AuthService.shared
     @State private var showLanguagePicker = false
-    
+    @State private var showDeleteAccountAlert = false
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var cancellables = Set<AnyCancellable>()
+
+    // 需要登录的功能导航
+    @State private var showAutoPayment = false
+    @State private var showAutoIncome = false
+    @State private var showLoginRequired = false
+    @State private var loginRequiredFeature = ""
+
     var body: some View {
         List {
             // MARK: - 个人资料头部
@@ -24,21 +37,70 @@ struct SettingsView: View {
                         Text("🐼")
                             .font(.system(size: 32))
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("私人财务官用户")
-                            .font(AppFont.body(size: 18, weight: .bold))
-                        Text("PandaCoin 专业版")
-                            .font(.system(size: 13))
-                            .foregroundColor(Theme.bambooGreen)
+                        if authService.isAuthenticated {
+                            Text(authService.currentUser?.name ?? "私人财务官用户")
+                                .font(AppFont.body(size: 18, weight: .bold))
+                            Text(authService.currentUser?.email ?? "PandaCoin 专业版")
+                                .font(.system(size: 13))
+                                .foregroundColor(Theme.bambooGreen)
+                        } else {
+                            Text("未登录")
+                                .font(AppFont.body(size: 18, weight: .bold))
+                            Text("登录后解锁全部功能")
+                                .font(.system(size: 13))
+                                .foregroundColor(Theme.textSecondary)
+                        }
                     }
                 }
                 .padding(.vertical, 8)
             }
-            
+
+            // MARK: - 登录区域（未登录时显示）
+            if !authService.isAuthenticated {
+                Section("账号") {
+                    // Apple Sign In 按钮
+                    SignInWithAppleButton(
+                        onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                        },
+                        onCompletion: handleAppleSignIn
+                    )
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 50)
+                    .cornerRadius(10)
+
+                    // Debug 一键登录
+                    #if DEBUG
+                    Button(action: debugAutoLogin) {
+                        HStack {
+                            ZStack {
+                                Circle().fill(Color.orange.opacity(0.1)).frame(width: 30, height: 30)
+                                Image(systemName: "hammer.fill").foregroundColor(.orange).font(.system(size: 14))
+                            }
+                            Text("[DEBUG] 一键登录")
+                                .foregroundColor(Theme.text)
+                            Spacer()
+                            if isLoading {
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isLoading)
+                    #endif
+
+                    if let error = errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+
             // MARK: - 财务管理
             Section("财务管理") {
-                NavigationLink(destination: AutoPaymentListView()) {
+                Button(action: { requireAuth("自动还款") { showAutoPayment = true } }) {
                     HStack {
                         ZStack {
                             Circle().fill(Color.green.opacity(0.1)).frame(width: 30, height: 30)
@@ -49,10 +111,14 @@ struct SettingsView: View {
                             .foregroundColor(Theme.text)
 
                         Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textSecondary.opacity(0.5))
                     }
                 }
 
-                NavigationLink(destination: AutoIncomeListView()) {
+                Button(action: { requireAuth("自动入账") { showAutoIncome = true } }) {
                     HStack {
                         ZStack {
                             Circle().fill(Theme.income.opacity(0.1)).frame(width: 30, height: 30)
@@ -63,10 +129,14 @@ struct SettingsView: View {
                             .foregroundColor(Theme.text)
 
                         Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textSecondary.opacity(0.5))
                     }
                 }
             }
-            
+
             // MARK: - 偏好设置
             Section("偏好设置") {
                 // 语言设置
@@ -92,7 +162,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            
+
             // MARK: - 关于与支持
             Section("关于与支持") {
                 HStack {
@@ -106,7 +176,7 @@ struct SettingsView: View {
                         .font(.subheadline)
                         .foregroundColor(Theme.textSecondary)
                 }
-                
+
                 HStack {
                     ZStack {
                         Circle().fill(Color.purple.opacity(0.1)).frame(width: 30, height: 30)
@@ -119,17 +189,38 @@ struct SettingsView: View {
                         .foregroundColor(Theme.textSecondary.opacity(0.5))
                 }
             }
-            
-            // MARK: - 退出登录
-            Section {
-                Button(role: .destructive, action: {
-                    AuthService.shared.logout()
-                }) {
-                    HStack {
-                        Spacer()
-                        Text(L10n.Auth.logout)
-                            .fontWeight(.semibold)
-                        Spacer()
+
+            // MARK: - 账号操作（已登录时显示）
+            if authService.isAuthenticated {
+                Section("账号") {
+                    // 删除账号
+                    Button(action: { showDeleteAccountAlert = true }) {
+                        HStack {
+                            ZStack {
+                                Circle().fill(Color.red.opacity(0.1)).frame(width: 30, height: 30)
+                                Image(systemName: "trash").foregroundColor(.red).font(.system(size: 14))
+                            }
+                            Text("删除账号")
+                                .foregroundColor(Theme.text)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(Theme.textSecondary.opacity(0.5))
+                        }
+                    }
+                }
+
+                Section {
+                    // 退出登录
+                    Button(role: .destructive, action: {
+                        authService.logout()
+                    }) {
+                        HStack {
+                            Spacer()
+                            Text(L10n.Auth.logout)
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
                     }
                 }
             }
@@ -147,6 +238,134 @@ struct SettingsView: View {
         .sheet(isPresented: $showLanguagePicker) {
             LanguagePickerView(selectedLanguage: $languageManager.currentLanguage)
         }
+        .sheet(isPresented: $showAutoPayment) {
+            NavigationView {
+                AutoPaymentListView()
+            }
+        }
+        .sheet(isPresented: $showAutoIncome) {
+            NavigationView {
+                AutoIncomeListView()
+            }
+        }
+        .sheet(isPresented: $showLoginRequired) {
+            LoginRequiredView(featureName: loginRequiredFeature)
+        }
+        .alert("删除账号", isPresented: $showDeleteAccountAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                deleteAccount()
+            }
+        } message: {
+            Text("删除账号后，所有数据将被永久删除且无法恢复。确定要删除吗？")
+        }
+    }
+
+    // MARK: - 登录检查辅助函数
+    private func requireAuth(_ feature: String, action: @escaping () -> Void) {
+        if authService.isAuthenticated {
+            action()
+        } else {
+            loginRequiredFeature = feature
+            showLoginRequired = true
+        }
+    }
+
+    // MARK: - Apple Sign In Handler
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let identityTokenData = appleIDCredential.identityToken,
+                  let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+                errorMessage = "无法获取 Apple 登录凭证"
+                return
+            }
+
+            let appleUserId = appleIDCredential.user
+            let email = appleIDCredential.email
+            var fullName: String? = nil
+            if let nameComponents = appleIDCredential.fullName {
+                let parts = [nameComponents.familyName, nameComponents.givenName].compactMap { $0 }
+                if !parts.isEmpty {
+                    fullName = parts.joined(separator: "")
+                }
+            }
+
+            isLoading = true
+            errorMessage = nil
+
+            authService.appleLogin(
+                identityToken: identityToken,
+                appleUserId: appleUserId,
+                email: email,
+                fullName: fullName
+            )
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isLoading = false
+                    if case .failure(let error) = completion {
+                        errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { _ in
+                    // 登录成功，AuthService 会自动更新状态
+                }
+            )
+            .store(in: &cancellables)
+
+        case .failure(let error):
+            if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
+                errorMessage = "Apple 登录失败: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    // MARK: - Debug Auto Login
+    #if DEBUG
+    private func debugAutoLogin() {
+        isLoading = true
+        errorMessage = nil
+
+        authService.login(
+            email: DebugConfig.TestAccount.email,
+            password: DebugConfig.TestAccount.password
+        )
+        .receive(on: DispatchQueue.main)
+        .sink(
+            receiveCompletion: { completion in
+                isLoading = false
+                if case .failure(let error) = completion {
+                    errorMessage = error.localizedDescription
+                }
+            },
+            receiveValue: { _ in
+                // 登录成功
+            }
+        )
+        .store(in: &cancellables)
+    }
+    #endif
+
+    // MARK: - Delete Account
+    private func deleteAccount() {
+        isLoading = true
+
+        authService.deleteAccount()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isLoading = false
+                    if case .failure(let error) = completion {
+                        errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { _ in
+                    // 账号已删除，AuthService 会自动登出
+                }
+            )
+            .store(in: &cancellables)
     }
 }
 
@@ -154,7 +373,7 @@ struct SettingsView: View {
 struct LanguagePickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedLanguage: AppLanguage
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -167,16 +386,16 @@ struct LanguagePickerView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(language.displayName)
                                     .foregroundColor(Theme.text)
-                                
+
                                 if language != .system {
                                     Text(language.localizedName)
                                         .font(.caption)
                                         .foregroundColor(Theme.textSecondary)
                                 }
                             }
-                            
+
                             Spacer()
-                            
+
                             if selectedLanguage == language {
                                 Image(systemName: "checkmark")
                                     .foregroundColor(.accentColor)

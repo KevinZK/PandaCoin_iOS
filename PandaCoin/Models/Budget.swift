@@ -43,9 +43,69 @@ struct BudgetProgress: Codable, Identifiable {
         case isRecurring
     }
     
-    // 显示用的分类名
+    // 分类代码到中文名的映射（与AI解析输出保持一致）
+    private static let categoryMap: [String: String] = [
+        // 消费分类
+        "FOOD": "餐饮",
+        "TRANSPORT": "交通",
+        "SHOPPING": "购物",
+        "HOUSING": "住房",
+        "ENTERTAINMENT": "娱乐",
+        "HEALTH": "医疗",
+        "EDUCATION": "教育",
+        "COMMUNICATION": "通讯",
+        "SPORTS": "运动",
+        "BEAUTY": "美容",
+        "TRAVEL": "旅行",
+        "PETS": "宠物",
+        "SUBSCRIPTION": "订阅",
+        "FEES_AND_TAXES": "税费",
+        "LOAN_REPAYMENT": "还贷",
+        "OTHER": "其他"
+    ]
+
+    // 分类代码到图标的映射（与AI解析输出保持一致）
+    private static let categoryIconMap: [String: String] = [
+        "FOOD": "🍜",
+        "TRANSPORT": "🚗",
+        "SHOPPING": "🛍️",
+        "HOUSING": "🏠",
+        "ENTERTAINMENT": "🎬",
+        "HEALTH": "💊",
+        "EDUCATION": "📚",
+        "COMMUNICATION": "📱",
+        "SPORTS": "⚽",
+        "BEAUTY": "💄",
+        "TRAVEL": "✈️",
+        "PETS": "🐾",
+        "SUBSCRIPTION": "📺",
+        "FEES_AND_TAXES": "🏛️",
+        "LOAN_REPAYMENT": "💳",
+        "OTHER": "📦"
+    ]
+
+    // 显示用的分类名（将英文代码映射为中文）
     var displayCategory: String {
-        name ?? category ?? "总预算"
+        if let name = name, !name.isEmpty {
+            return name
+        }
+        guard let category = category else {
+            return "总预算"
+        }
+        return Self.categoryMap[category] ?? category
+    }
+
+    // 分类图标
+    var categoryIcon: String {
+        guard let category = category else {
+            return "📊"  // 总预算图标
+        }
+        return Self.categoryIconMap[category] ?? "📦"
+    }
+
+    // 是否为总预算
+    var isTotalBudget: Bool {
+        category == nil
     }
 }
 

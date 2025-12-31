@@ -76,7 +76,50 @@ class RecordService: ObservableObject {
         return networkManager.request(endpoint: endpoint, method: "GET")
             .eraseToAnyPublisher()
     }
-    
+
+    // MARK: - 按分类和日期范围获取记录（用于预算明细）
+    func fetchRecords(
+        type: RecordType?,
+        category: String?,
+        startDate: Date?,
+        endDate: Date?,
+        completion: @escaping (Result<[Record], APIError>) -> Void
+    ) {
+        var params: [String: String] = [:]
+
+        if let type = type {
+            params["type"] = type.rawValue
+        }
+        if let category = category {
+            params["category"] = category
+        }
+        if let startDate = startDate {
+            let formatter = ISO8601DateFormatter()
+            params["startDate"] = formatter.string(from: startDate)
+        }
+        if let endDate = endDate {
+            let formatter = ISO8601DateFormatter()
+            params["endDate"] = formatter.string(from: endDate)
+        }
+
+        let queryString = params.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
+        let endpoint = "/records" + (queryString.isEmpty ? "" : "?\(queryString)")
+
+        networkManager.request(endpoint: endpoint, method: "GET")
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { result in
+                    if case .failure(let error) = result {
+                        completion(.failure(error))
+                    }
+                },
+                receiveValue: { (records: [Record]) in
+                    completion(.success(records))
+                }
+            )
+            .store(in: &cancellables)
+    }
+
     // MARK: - AI语音记账（新流程：只解析不存储）
     func parseVoiceInput(text: String) -> AnyPublisher<[AIRecordParsed], APIError> {
         Logger.shared.logAIRequest(text: text)
@@ -237,10 +280,11 @@ class RecordService: ObservableObject {
                     )
                     
                 case .budget:
-                    // 使用通用字段 name, amount, date
+                    // 使用通用字段 name, amount, date, category
                     let budgetData = BudgetParsed(
                         action: data.budget_action ?? "CREATE_BUDGET",
                         name: data.name ?? "",
+                        category: data.category,
                         targetAmount: Decimal(data.amount ?? 0),
                         currency: data.currency,
                         targetDate: data.date,
@@ -940,6 +984,7 @@ struct AssetUpdateParsed {
 struct BudgetParsed {
     let action: String      // CREATE_BUDGET, UPDATE_BUDGET
     let name: String
+    var category: String?   // 预算分类（如 FOOD, TRANSPORT 等）
     let targetAmount: Decimal
     let currency: String?
     let targetDate: String?

@@ -7,6 +7,23 @@
 
 import Foundation
 import Combine
+import AuthenticationServices
+
+// MARK: - Apple Login Request
+struct AppleLoginRequest: Codable {
+    let identityToken: String
+    let appleUserId: String
+    let email: String?
+    let fullName: String?
+}
+
+// MARK: - Apple Auth Response
+struct AppleAuthResponse: Codable {
+    let user: User
+    let accessToken: String
+    let tokenType: String
+    let isNewUser: Bool
+}
 
 class AuthService: ObservableObject {
     static let shared = AuthService()
@@ -46,7 +63,7 @@ class AuthService: ObservableObject {
     // MARK: - 登录
     func login(email: String, password: String) -> AnyPublisher<AuthResponse, APIError> {
         let request = LoginRequest(email: email, password: password)
-        
+
         return networkManager.request(
             endpoint: "/auth/login",
             method: "POST",
@@ -58,7 +75,41 @@ class AuthService: ObservableObject {
         })
         .eraseToAnyPublisher()
     }
-    
+
+    // MARK: - Apple Sign In
+    func appleLogin(identityToken: String, appleUserId: String, email: String?, fullName: String?) -> AnyPublisher<AppleAuthResponse, APIError> {
+        let request = AppleLoginRequest(
+            identityToken: identityToken,
+            appleUserId: appleUserId,
+            email: email,
+            fullName: fullName
+        )
+
+        return networkManager.request(
+            endpoint: "/auth/apple",
+            method: "POST",
+            body: request,
+            requiresAuth: false
+        )
+        .handleEvents(receiveOutput: { [weak self] (response: AppleAuthResponse) in
+            self?.handleAppleAuthSuccess(response)
+        })
+        .eraseToAnyPublisher()
+    }
+
+    // MARK: - 删除账号
+    func deleteAccount() -> AnyPublisher<Void, APIError> {
+        return networkManager.request(
+            endpoint: "/auth/account",
+            method: "DELETE"
+        )
+        .handleEvents(receiveOutput: { [weak self] (_: EmptyResponse) in
+            self?.logout()
+        })
+        .map { _ in () }
+        .eraseToAnyPublisher()
+    }
+
     // MARK: - 获取当前用户
     func fetchCurrentUser() {
         networkManager.request(endpoint: "/auth/me", method: "GET")
@@ -147,6 +198,13 @@ class AuthService: ObservableObject {
     
     // MARK: - Private
     private func handleAuthSuccess(_ response: AuthResponse) {
+        networkManager.accessToken = response.accessToken
+        currentUser = response.user
+        isAuthenticated = true
+        fetchDefaultExpenseAccount()
+    }
+
+    private func handleAppleAuthSuccess(_ response: AppleAuthResponse) {
         networkManager.accessToken = response.accessToken
         currentUser = response.user
         isAuthenticated = true

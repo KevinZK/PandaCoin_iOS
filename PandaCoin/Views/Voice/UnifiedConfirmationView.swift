@@ -49,8 +49,19 @@ struct UnifiedConfirmationView: View {
 
                         // 事件列表
                         VStack(spacing: Spacing.medium) {
-                            ForEach(editableEvents.indices, id: \.self) { index in
-                                EventConfirmCard(event: $editableEvents[index])
+                            ForEach(editableEvents) { event in
+                                if let index = editableEvents.firstIndex(where: { $0.id == event.id }) {
+                                    EventConfirmCard(event: Binding(
+                                        get: {
+                                            guard index < editableEvents.count else { return event }
+                                            return editableEvents[index]
+                                        },
+                                        set: { newValue in
+                                            guard index < editableEvents.count else { return }
+                                            editableEvents[index] = newValue
+                                        }
+                                    ))
+                                }
                             }
                         }
                         .padding(.horizontal, Spacing.medium)
@@ -200,30 +211,30 @@ struct EventConfirmCard: View {
             // 根据事件类型显示不同内容
             switch event.eventType {
             case .transaction:
-                if event.transactionData != nil {
+                if let transactionData = event.transactionData {
                     TransactionCardContent(data: Binding(
-                        get: { event.transactionData! },
+                        get: { event.transactionData ?? transactionData },
                         set: { event.transactionData = $0 }
                     ))
                 }
             case .assetUpdate:
-                if event.assetUpdateData != nil {
+                if let assetData = event.assetUpdateData {
                     AssetUpdateCardContent(data: Binding(
-                        get: { event.assetUpdateData! },
+                        get: { event.assetUpdateData ?? assetData },
                         set: { event.assetUpdateData = $0 }
                     ))
                 }
             case .creditCardUpdate:
-                if event.creditCardData != nil {
+                if let cardData = event.creditCardData {
                     CreditCardUpdateCardContent(data: Binding(
-                        get: { event.creditCardData! },
+                        get: { event.creditCardData ?? cardData },
                         set: { event.creditCardData = $0 }
                     ))
                 }
             case .budget:
-                if event.budgetData != nil {
+                if let budgetData = event.budgetData {
                     BudgetCardContent(data: Binding(
-                        get: { event.budgetData! },
+                        get: { event.budgetData ?? budgetData },
                         set: { event.budgetData = $0 }
                     ))
                 }
@@ -1242,61 +1253,129 @@ struct AssetUpdateCardContent: View {
     }
 }
 
+// MARK: - 预算分类枚举（用于语音创建预算）
+enum VoiceBudgetCategory: String, CaseIterable {
+    case none = ""
+    case food = "FOOD"
+    case transport = "TRANSPORT"
+    case shopping = "SHOPPING"
+    case entertainment = "ENTERTAINMENT"
+    case health = "HEALTH"
+    case housing = "HOUSING"
+    case education = "EDUCATION"
+    case communication = "COMMUNICATION"
+    case sports = "SPORTS"
+    case beauty = "BEAUTY"
+    case travel = "TRAVEL"
+    case pets = "PETS"
+    case other = "OTHER"
+
+    var displayName: String {
+        switch self {
+        case .none: return "总预算"
+        case .food: return "餐饮"
+        case .transport: return "交通"
+        case .shopping: return "购物"
+        case .entertainment: return "娱乐"
+        case .health: return "医疗"
+        case .housing: return "住房"
+        case .education: return "教育"
+        case .communication: return "通讯"
+        case .sports: return "运动"
+        case .beauty: return "美容"
+        case .travel: return "旅行"
+        case .pets: return "宠物"
+        case .other: return "其他"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "📊"
+        case .food: return "🍜"
+        case .transport: return "🚗"
+        case .shopping: return "🛍️"
+        case .entertainment: return "🎬"
+        case .health: return "💊"
+        case .housing: return "🏠"
+        case .education: return "📚"
+        case .communication: return "📱"
+        case .sports: return "⚽"
+        case .beauty: return "💄"
+        case .travel: return "✈️"
+        case .pets: return "🐾"
+        case .other: return "📦"
+        }
+    }
+
+    static func from(_ category: String?) -> VoiceBudgetCategory {
+        guard let category = category else { return .none }
+        return VoiceBudgetCategory(rawValue: category) ?? .none
+    }
+}
+
 // MARK: - 预算卡片内容
 struct BudgetCardContent: View {
     @Binding var data: BudgetParsed
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
-            // 预算名称和金额
+            // 预算类型标签
             HStack {
-                Text(data.name.isEmpty ? "新预算" : data.name)
-                    .font(AppFont.body(size: 18, weight: .semibold))
-                    .foregroundColor(Theme.text)
-                
+                Text("📊")
+                    .font(.system(size: 16))
+                Text("总预算")
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Theme.bambooGreen)
+                    .cornerRadius(10)
                 Spacer()
-                
-                Text(formatAmount())
-                    .font(AppFont.monoNumber(size: 20, weight: .bold))
-                    .foregroundColor(.purple)
             }
-            
+
+            // 预算金额
+            Text(formatAmount())
+                .font(AppFont.monoNumber(size: 28, weight: .bold))
+                .foregroundColor(.purple)
+
             // 预算信息
             HStack(spacing: Spacing.medium) {
                 Label(mapAction(data.action), systemImage: actionIcon)
                     .font(AppFont.body(size: 14))
                     .foregroundColor(Theme.textSecondary)
-                
+
                 if let date = data.targetDate {
                     Label(date, systemImage: "calendar")
                         .font(AppFont.body(size: 14))
                         .foregroundColor(Theme.textSecondary)
                 }
-                
-                if let priority = data.priority {
-                    priorityBadge(priority)
-                }
             }
-            
+
             // 每月循环开关
             Divider()
                 .padding(.vertical, 4)
-            
+
             HStack {
                 Image(systemName: data.isRecurring ? "repeat.circle.fill" : "repeat.circle")
                     .foregroundColor(data.isRecurring ? Theme.bambooGreen : Theme.textSecondary)
                     .font(.system(size: 16))
-                
+
                 Text("每月自动应用")
                     .font(AppFont.body(size: 14))
                     .foregroundColor(Theme.text)
-                
+
                 Spacer()
-                
+
                 Toggle("", isOn: $data.isRecurring)
                     .labelsHidden()
                     .tint(Theme.bambooGreen)
             }
+
+            // 提示
+            Text("分类预算可在「预算管理」中设置")
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
         }
     }
     
@@ -1666,6 +1745,7 @@ struct CreditCardUpdateCardContent: View {
                 budgetData: BudgetParsed(
                     action: "CREATE_BUDGET",
                     name: "旅游基金",
+                    category: "TRAVEL",
                     targetAmount: 20000,
                     currency: "CNY",
                     targetDate: "2025-06",
@@ -1975,6 +2055,7 @@ struct CreditCardUpdateCardContent: View {
                 budgetData: BudgetParsed(
                     action: "CREATE_BUDGET",
                     name: "旅游基金",
+                    category: "TRAVEL",
                     targetAmount: 20000,
                     currency: "CNY",
                     targetDate: "2025-06",
@@ -1983,7 +2064,7 @@ struct CreditCardUpdateCardContent: View {
                 )
             ))
         )
-        
+
         EventConfirmCard(
             event: .constant(ParsedFinancialEvent(
                 eventType: .budget,
@@ -1993,6 +2074,7 @@ struct CreditCardUpdateCardContent: View {
                 budgetData: BudgetParsed(
                     action: "UPDATE_BUDGET",
                     name: "信用卡还款",
+                    category: nil,
                     targetAmount: 5000,
                     currency: "CNY",
                     targetDate: "2025-01",

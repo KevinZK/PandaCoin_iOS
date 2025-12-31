@@ -56,6 +56,10 @@ struct ChatRecordView: View {
     @StateObject private var speechService = SpeechRecognitionService()
     @StateObject private var recordService = RecordService()
     @ObservedObject private var accountService = AssetService.shared
+    @ObservedObject private var authService = AuthService.shared
+
+    // 登录提示
+    @State private var showLoginRequired = false
 
     @State private var messages: [ChatMessage] = []
     @State private var inputText: String = ""
@@ -146,10 +150,17 @@ struct ChatRecordView: View {
                 }
             }
         }
+        .sheet(isPresented: $showLoginRequired) {
+            LoginRequiredView(featureName: "记账")
+        }
     }
     
     // MARK: - 直接处理图片（无预览，直接 OCR + AI 解析）
     private func processImageDirectly(_ image: UIImage) {
+        guard authService.isAuthenticated else {
+            showLoginRequired = true
+            return
+        }
         guard !isProcessingImage else { return }
         isProcessingImage = true
         
@@ -232,8 +243,20 @@ struct ChatRecordView: View {
             }
             
             // 使用 EventConfirmCard（完整功能，包含账户选择）
-            ForEach(editableEvents.indices, id: \.self) { index in
-                EventConfirmCard(event: $editableEvents[index])
+            // 使用 id 而非索引绑定，避免 dismiss 时的 Index out of range 崩溃
+            ForEach(editableEvents) { event in
+                if let index = editableEvents.firstIndex(where: { $0.id == event.id }) {
+                    EventConfirmCard(event: Binding(
+                        get: {
+                            guard index < editableEvents.count else { return event }
+                            return editableEvents[index]
+                        },
+                        set: { newValue in
+                            guard index < editableEvents.count else { return }
+                            editableEvents[index] = newValue
+                        }
+                    ))
+                }
             }
             
             // 确认按钮
@@ -326,9 +349,13 @@ struct ChatRecordView: View {
     
     // MARK: - 发送文本消息
     private func sendTextMessage() {
+        guard authService.isAuthenticated else {
+            showLoginRequired = true
+            return
+        }
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        
+
         // 添加用户消息
         messages.append(ChatMessage(type: .userText(text)))
         inputText = ""
@@ -343,6 +370,11 @@ struct ChatRecordView: View {
     
     // MARK: - 开始录音
     private func startRecording() {
+        guard authService.isAuthenticated else {
+            isRecording = false
+            showLoginRequired = true
+            return
+        }
         do {
             try speechService.startRecording()
         } catch {
@@ -621,8 +653,14 @@ struct ChatRecordView: View {
     
     // MARK: - 取消事件
     private func cancelEvents() {
-        showingEventCards = false
-        editableEvents = []
+        // 先隐藏卡片区域，再清空数组，避免 Index out of range 崩溃
+        withAnimation(.easeOut(duration: 0.2)) {
+            showingEventCards = false
+        }
+        // 延迟清空数组，确保视图已经移除
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            editableEvents = []
+        }
         messages.append(ChatMessage(type: .assistantText("好的，已取消。有其他记账需要吗？")))
     }
 }

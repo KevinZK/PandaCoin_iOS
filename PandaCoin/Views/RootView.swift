@@ -9,15 +9,11 @@ import SwiftUI
 
 struct RootView: View {
     @StateObject private var authService = AuthService.shared
-    
+
     var body: some View {
-        Group {
-            if authService.isAuthenticated {
-                DashboardView()
-            } else {
-                LoginView()
-            }
-        }
+        // 不再强制登录，直接显示主界面
+        // 用户可以在 Settings 中选择登录
+        DashboardView()
     }
 }
 

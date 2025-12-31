@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct BudgetView: View {
     @StateObject private var viewModel: BudgetViewModel
@@ -7,7 +8,9 @@ struct BudgetView: View {
     @State private var selectedBudget: BudgetProgress?
     @State private var budgetToDelete: BudgetProgress?
     @State private var showingDeleteAlert = false
-    
+    @State private var showingExpenseDetail = false
+    @State private var selectedBudgetForDetail: BudgetProgress?
+
     init(viewModel: BudgetViewModel = BudgetViewModel()) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
@@ -56,6 +59,14 @@ struct BudgetView: View {
             .sheet(isPresented: $showingEditBudget) {
                 if let budget = selectedBudget {
                     EditBudgetSheet(viewModel: viewModel, budget: budget)
+                }
+            }
+            .sheet(isPresented: $showingExpenseDetail) {
+                if let budget = selectedBudgetForDetail {
+                    BudgetExpenseDetailSheet(
+                        budget: budget,
+                        month: viewModel.currentMonth
+                    )
                 }
             }
             .onAppear {
@@ -173,45 +184,57 @@ struct BudgetView: View {
             Text("分类预算")
                 .font(.headline)
                 .padding(.horizontal)
-            
+
             if budgets.isEmpty {
                 Text("暂无分类预算")
                     .foregroundColor(Theme.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding()
             } else {
-                ForEach(budgets) { budget in
-                    BudgetProgressRow(budget: budget)
-                        .onTapGesture {
-                            selectedBudget = budget
-                            showingEditBudget = true
-                        }
-                        .contextMenu {
-                            Button {
-                                selectedBudget = budget
-                                showingEditBudget = true
-                            } label: {
-                                Label("编辑", systemImage: "pencil")
-                            }
-                            
-                            Divider()
-                            
-                            if budget.isRecurring {
-                                Button(role: .destructive) {
-                                    budgetToDelete = budget
-                                    showingDeleteAlert = true
-                                } label: {
-                                    Label("删除预算", systemImage: "trash")
+                // 使用 List 以支持 swipeActions
+                List {
+                    ForEach(budgets) { budget in
+                        BudgetProgressRow(budget: budget)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .onTapGesture {
+                                // 分类预算点击查看消费明细，总预算点击编辑
+                                if budget.isTotalBudget {
+                                    selectedBudget = budget
+                                    showingEditBudget = true
+                                } else {
+                                    selectedBudgetForDetail = budget
+                                    showingExpenseDetail = true
                                 }
-                            } else {
+                            }
+                            // 左滑操作
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
-                                    deleteBudget(budget, cancelRecurring: false)
+                                    if budget.isRecurring {
+                                        budgetToDelete = budget
+                                        showingDeleteAlert = true
+                                    } else {
+                                        deleteBudget(budget, cancelRecurring: false)
+                                    }
                                 } label: {
                                     Label("删除", systemImage: "trash")
                                 }
+
+                                Button {
+                                    selectedBudget = budget
+                                    showingEditBudget = true
+                                } label: {
+                                    Label("编辑", systemImage: "pencil")
+                                }
+                                .tint(.blue)
                             }
-                        }
+                    }
                 }
+                .listStyle(.plain)
+                .background(Color.clear)
+                .frame(minHeight: CGFloat(budgets.count) * 120)
+                .modifier(HideListBackgroundModifier())
             }
         }
         .alert("删除循环预算", isPresented: $showingDeleteAlert, presenting: budgetToDelete) { budget in
@@ -281,43 +304,76 @@ struct BudgetView: View {
     }
 }
 
+// MARK: - 隐藏列表背景修饰器
+struct HideListBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content.scrollContentBackground(.hidden)
+        } else {
+            content
+        }
+    }
+}
+
 // MARK: - 预算进度行 (CFO 风格升级)
 struct BudgetProgressRow: View {
     let budget: BudgetProgress
-    
+
     var body: some View {
         VStack(spacing: 12) {
             HStack {
-                HStack(spacing: 6) {
-                Text(budget.displayCategory)
-                        .font(AppFont.body(size: 15, weight: .semibold))
-                        .foregroundColor(Theme.text)
-                    
-                    // 循环标记
-                    if budget.isRecurring {
-                        HStack(spacing: 2) {
-                            Image(systemName: "repeat.circle.fill")
-                                .font(.system(size: 10))
-                            Text("每月")
-                                .font(.system(size: 10, weight: .medium))
+                HStack(spacing: 8) {
+                    // 分类图标
+                    Text(budget.categoryIcon)
+                        .font(.system(size: 20))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(budget.displayCategory)
+                                .font(AppFont.body(size: 15, weight: .semibold))
+                                .foregroundColor(Theme.text)
+
+                            // 循环标记
+                            if budget.isRecurring {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "repeat.circle.fill")
+                                        .font(.system(size: 10))
+                                    Text("每月")
+                                        .font(.system(size: 10, weight: .medium))
+                                }
+                                .foregroundColor(Theme.bambooGreen)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Theme.bambooGreen.opacity(0.15))
+                                .cornerRadius(8)
+                            }
                         }
-                        .foregroundColor(Theme.bambooGreen)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Theme.bambooGreen.opacity(0.15))
-                        .cornerRadius(8)
+
+                        // 如果有消费记录，显示点击查看提示
+                        if budget.spentAmount > 0 && !budget.isTotalBudget {
+                            Text("点击查看消费明细")
+                                .font(.system(size: 10))
+                                .foregroundColor(Theme.textSecondary)
+                        }
                     }
                 }
-                
+
                 Spacer()
-                
+
                 HStack(spacing: 4) {
                     Text("¥\(String(format: "%.0f", budget.spentAmount))")
                         .foregroundColor(Theme.text)
                     Text("/ ¥\(String(format: "%.0f", budget.budgetAmount))")
                         .foregroundColor(Theme.textSecondary)
-            }
+                }
                 .font(AppFont.monoNumber(size: 13))
+
+                // 箭头指示可点击
+                if !budget.isTotalBudget {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                }
             }
             
             // 细进度条
@@ -369,30 +425,104 @@ struct BudgetProgressRow: View {
     }
 }
 
+// MARK: - 支出分类列表（用于预算，与AI解析输出保持一致）
+enum BudgetCategory: String, CaseIterable {
+    case food = "FOOD"
+    case transport = "TRANSPORT"
+    case shopping = "SHOPPING"
+    case housing = "HOUSING"
+    case entertainment = "ENTERTAINMENT"
+    case health = "HEALTH"
+    case education = "EDUCATION"
+    case communication = "COMMUNICATION"
+    case sports = "SPORTS"
+    case beauty = "BEAUTY"
+    case travel = "TRAVEL"
+    case pets = "PETS"
+    case subscription = "SUBSCRIPTION"
+    case feesAndTaxes = "FEES_AND_TAXES"
+    case loanRepayment = "LOAN_REPAYMENT"
+    case other = "OTHER"
+
+    var displayName: String {
+        switch self {
+        case .food: return "餐饮"
+        case .transport: return "交通"
+        case .shopping: return "购物"
+        case .housing: return "住房"
+        case .entertainment: return "娱乐"
+        case .health: return "医疗"
+        case .education: return "教育"
+        case .communication: return "通讯"
+        case .sports: return "运动"
+        case .beauty: return "美容"
+        case .travel: return "旅行"
+        case .pets: return "宠物"
+        case .subscription: return "订阅"
+        case .feesAndTaxes: return "税费"
+        case .loanRepayment: return "还贷"
+        case .other: return "其他"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .food: return "🍜"
+        case .transport: return "🚗"
+        case .shopping: return "🛍️"
+        case .housing: return "🏠"
+        case .entertainment: return "🎬"
+        case .health: return "💊"
+        case .education: return "📚"
+        case .communication: return "📱"
+        case .sports: return "⚽"
+        case .beauty: return "💄"
+        case .travel: return "✈️"
+        case .pets: return "🐾"
+        case .subscription: return "📺"
+        case .feesAndTaxes: return "🏛️"
+        case .loanRepayment: return "💳"
+        case .other: return "📦"
+        }
+    }
+}
+
 // MARK: - 添加预算 Sheet
 struct AddBudgetSheet: View {
     @ObservedObject var viewModel: BudgetViewModel
     @Environment(\.dismiss) private var dismiss
-    
-    @State private var category = ""
+
+    @State private var selectedCategory: BudgetCategory = .food
     @State private var amount = ""
     @State private var isTotal = false
     @State private var isRecurring = false
-    
+
     var body: some View {
         NavigationView {
             Form {
                 Section {
                     Toggle("设为总预算", isOn: $isTotal)
-                    
+
                     if !isTotal {
-                        TextField("分类名称", text: $category)
+                        Picker("选择分类", selection: $selectedCategory) {
+                            ForEach(BudgetCategory.allCases, id: \.self) { category in
+                                HStack {
+                                    Text(category.icon)
+                                    Text(category.displayName)
+                                }
+                                .tag(category)
+                            }
+                        }
                     }
-                    
-                    TextField("预算金额", text: $amount)
-                        .keyboardType(.decimalPad)
+
+                    HStack {
+                        Text("¥")
+                            .foregroundColor(Theme.textSecondary)
+                        TextField("预算金额", text: $amount)
+                            .keyboardType(.decimalPad)
+                    }
                 }
-                
+
                 Section {
                     Toggle(isOn: $isRecurring) {
                         HStack {
@@ -402,14 +532,14 @@ struct AddBudgetSheet: View {
                         }
                     }
                     .tint(Theme.bambooGreen)
-                    
+
                     if isRecurring {
                         Text("预算将在每个月自动创建")
                             .font(.caption)
                             .foregroundColor(Theme.textSecondary)
                     }
                 }
-                
+
                 Section {
                     Text("月份: \(viewModel.displayMonth)")
                         .foregroundColor(Theme.textSecondary)
@@ -423,16 +553,16 @@ struct AddBudgetSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") { saveBudget() }
-                        .disabled(amount.isEmpty || (!isTotal && category.isEmpty))
+                        .disabled(amount.isEmpty)
                 }
             }
         }
     }
-    
+
     private func saveBudget() {
         guard let amountValue = Double(amount) else { return }
         viewModel.createBudget(
-            category: isTotal ? nil : category,
+            category: isTotal ? nil : selectedCategory.rawValue,
             amount: amountValue,
             isRecurring: isRecurring
         ) { success in
@@ -506,6 +636,184 @@ struct EditBudgetSheet: View {
                 dismiss()
             }
         }
+    }
+}
+
+// MARK: - 预算消费明细 Sheet
+struct BudgetExpenseDetailSheet: View {
+    let budget: BudgetProgress
+    let month: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var records: [Record] = []
+    @State private var isLoading = true
+    @State private var cancellables = Set<AnyCancellable>()
+
+    private let networkManager = NetworkManager.shared
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // 预算摘要卡片
+                budgetSummaryCard
+                    .padding()
+
+                Divider()
+
+                // 消费记录列表
+                if isLoading {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                } else if records.isEmpty {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 48))
+                            .foregroundColor(Theme.textSecondary)
+                        Text("暂无消费记录")
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Spacer()
+                } else {
+                    List(records) { record in
+                        ExpenseRecordRow(record: record)
+                            .listRowBackground(Theme.cardBackground)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .background(Theme.background)
+            .navigationTitle("\(budget.displayCategory)消费明细")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { dismiss() }
+                }
+            }
+            .onAppear {
+                fetchRecords()
+            }
+        }
+    }
+
+    private var budgetSummaryCard: some View {
+        HStack(spacing: 16) {
+            // 图标
+            Text(budget.categoryIcon)
+                .font(.system(size: 36))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(budget.displayCategory)
+                    .font(AppFont.body(size: 18, weight: .semibold))
+                    .foregroundColor(Theme.text)
+
+                Text(month)
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("¥\(String(format: "%.0f", budget.spentAmount))")
+                    .font(AppFont.monoNumber(size: 20, weight: .bold))
+                    .foregroundColor(budget.isOverBudget ? .red : Theme.text)
+
+                Text("预算 ¥\(String(format: "%.0f", budget.budgetAmount))")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .padding()
+        .background(Theme.cardBackground)
+        .cornerRadius(12)
+    }
+
+    private func fetchRecords() {
+        guard let category = budget.category else {
+            isLoading = false
+            return
+        }
+
+        // 计算月份的起止日期
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM"
+        guard let startDate = dateFormatter.date(from: month) else {
+            isLoading = false
+            return
+        }
+
+        var components = Calendar.current.dateComponents([.year, .month], from: startDate)
+        components.month! += 1
+        guard let endDate = Calendar.current.date(from: components) else {
+            isLoading = false
+            return
+        }
+
+        // 构建请求参数
+        var params: [String: String] = [
+            "type": "EXPENSE",
+            "category": category
+        ]
+
+        let isoFormatter = ISO8601DateFormatter()
+        params["startDate"] = isoFormatter.string(from: startDate)
+        params["endDate"] = isoFormatter.string(from: endDate)
+
+        let queryString = params.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
+        let endpoint = "/records?\(queryString)"
+
+        print("📡 Fetching records: \(endpoint)")
+
+        // 直接使用 NetworkManager 发起请求
+        networkManager.request(endpoint: endpoint, method: "GET")
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isLoading = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to fetch records: \(error)")
+                        records = []
+                    }
+                },
+                receiveValue: { (fetchedRecords: [Record]) in
+                    print("✅ Fetched \(fetchedRecords.count) records")
+                    records = fetchedRecords.sorted { $0.date > $1.date }
+                }
+            )
+            .store(in: &cancellables)
+    }
+}
+
+// MARK: - 消费记录行
+struct ExpenseRecordRow: View {
+    let record: Record
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(record.description ?? "消费")
+                    .font(AppFont.body(size: 15, weight: .medium))
+                    .foregroundColor(Theme.text)
+
+                Text(formatDate(record.date))
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+
+            Spacer()
+
+            Text("-¥\(String(format: "%.2f", NSDecimalNumber(decimal: record.amount).doubleValue))")
+                .font(AppFont.monoNumber(size: 15, weight: .semibold))
+                .foregroundColor(.red)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM月dd日 HH:mm"
+        return formatter.string(from: date)
     }
 }
 

@@ -293,7 +293,8 @@ struct AssetsView: View {
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
         }
-        .frame(height: 200)
+        .frame(maxWidth: .infinity)
+        .frame(height: 400)
     }
     
     private var currencyFormatter: NumberFormatter {

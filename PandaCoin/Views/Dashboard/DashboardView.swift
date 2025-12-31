@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import PhotosUI
 
 // MARK: - 首页仪表盘
 struct DashboardView: View {
@@ -24,6 +25,10 @@ struct DashboardView: View {
     @State private var showCreditCards = false
     @State private var showSettings = false
 
+    // 登录提示
+    @State private var showLoginRequired = false
+    @State private var loginRequiredFeature = ""
+
     // 键盘输入栏显示状态
     @State private var showInputBar = false
     // 语音录音状态
@@ -31,9 +36,9 @@ struct DashboardView: View {
 
     // 拍照相关状态
     @State private var showingCamera = false
-    @State private var showingPhotoLibrary = false
     @State private var selectedImage: UIImage?
     @State private var chatModeImage: UIImage?
+    @State private var selectedPhotoItem: PhotosPickerItem?
     
     var body: some View {
         ZStack {
@@ -57,9 +62,16 @@ struct DashboardView: View {
             CameraImagePicker(selectedImage: $selectedImage)
                 .ignoresSafeArea()
         }
-        // 相册
-        .sheet(isPresented: $showingPhotoLibrary) {
-            PhotoLibraryPicker(selectedImage: $selectedImage)
+        // 监听相册选择 - 使用纯 SwiftUI PhotosPicker
+        .onChange(of: selectedPhotoItem) { newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    await MainActor.run {
+                        selectedImage = image
+                    }
+                }
+            }
         }
         // 监听图片选择 - 传递给 ChatRecordView 处理
         .onChange(of: selectedImage) { newImage in
@@ -109,8 +121,20 @@ struct DashboardView: View {
                 SettingsView()
             }
         }
+        .sheet(isPresented: $showLoginRequired) {
+            LoginRequiredView(featureName: loginRequiredFeature)
+        }
         .onAppear {
             loadData()
+        }
+        .onChange(of: authService.isAuthenticated) { isAuthenticated in
+            if isAuthenticated {
+                // 用户登录后自动加载数据
+                loadData()
+            } else {
+                // 用户登出后清空数据
+                netWorthValue = 0
+            }
         }
         .onReceive(transactionService.$netWorth) { netWorth in
             // 从后端获取完整的净资产数据
@@ -124,29 +148,31 @@ struct DashboardView: View {
     private var topNavigationBarSimple: some View {
         HStack {
             Spacer()
-            
+
             Menu {
-                Button(action: { showAccounts = true }) {
+                Button(action: { requireAuth("资产管理") { showAccounts = true } }) {
                     Label(L10n.TabBar.accounts, systemImage: "creditcard")
                 }
-                Button(action: { showCreditCards = true }) {
+                Button(action: { requireAuth("信用卡") { showCreditCards = true } }) {
                     Label("信用卡", systemImage: "creditcard.fill")
                 }
-                Button(action: { showRecords = true }) {
+                Button(action: { requireAuth("账单记录") { showRecords = true } }) {
                     Label(L10n.TabBar.records, systemImage: "list.bullet")
                 }
                 Button(action: { showStatistics = true }) {
                     Label(L10n.TabBar.statistics, systemImage: "chart.pie")
                 }
-                Button(action: { showBudget = true }) {
+                Button(action: { requireAuth("预算管理") { showBudget = true } }) {
                     Label(L10n.TabBar.budget, systemImage: "chart.bar.doc.horizontal")
                 }
                 Divider()
                 Button(action: { showSettings = true }) {
                     Label(L10n.TabBar.settings, systemImage: "gearshape")
                 }
-                Button(role: .destructive, action: { authService.logout() }) {
-                    Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
+                if authService.isAuthenticated {
+                    Button(role: .destructive, action: { authService.logout() }) {
+                        Label(L10n.Auth.logout, systemImage: "rectangle.portrait.and.arrow.right")
+                    }
                 }
             } label: {
                 Image(systemName: "line.3.horizontal")
@@ -159,6 +185,16 @@ struct DashboardView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
+    }
+
+    // MARK: - 登录检查辅助函数
+    private func requireAuth(_ feature: String, action: @escaping () -> Void) {
+        if authService.isAuthenticated {
+            action()
+        } else {
+            loginRequiredFeature = feature
+            showLoginRequired = true
+        }
     }
     
     // MARK: - 对话模式内容
@@ -187,28 +223,55 @@ struct DashboardView: View {
         HStack(spacing: 0) {
             // 拍照按钮
             actionButton(icon: "camera.fill", isActive: false) {
-                showingCamera = true
+                requireAuth("拍照记账") { showingCamera = true }
             }
 
             Spacer()
 
             // 语音按钮（带波浪动画）
-            VoiceActionButton(isRecording: $isRecording)
+            VoiceActionButton(isRecording: $isRecording, onTap: {
+                if !authService.isAuthenticated {
+                    loginRequiredFeature = "语音记账"
+                    showLoginRequired = true
+                }
+            })
 
             Spacer()
 
             // 键盘按钮
             actionButton(icon: showInputBar ? "keyboard.chevron.compact.down" : "keyboard", isActive: showInputBar) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    showInputBar.toggle()
+                requireAuth("键盘记账") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showInputBar.toggle()
+                    }
                 }
             }
 
             Spacer()
 
-            // 相册按钮
-            actionButton(icon: "photo.on.rectangle", isActive: false) {
-                showingPhotoLibrary = true
+            // 相册按钮 - 使用纯 SwiftUI PhotosPicker
+            if authService.isAuthenticated {
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    ZStack {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Circle()
+                                    .stroke(Theme.bambooGreen.opacity(0.2), lineWidth: 1)
+                            )
+                            .shadow(color: Theme.bambooGreen.opacity(0.1), radius: 4, x: 0, y: 2)
+
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(Theme.text.opacity(0.7))
+                    }
+                }
+            } else {
+                actionButton(icon: "photo.on.rectangle", isActive: false) {
+                    loginRequiredFeature = "图片记账"
+                    showLoginRequired = true
+                }
             }
         }
         .padding(.horizontal, 24)
@@ -262,6 +325,8 @@ struct DashboardView: View {
     }
     
     private func loadData() {
+        // 只有登录后才加载数据
+        guard authService.isAuthenticated else { return }
         accountService.fetchAccounts()
         transactionService.fetchNetWorth()
     }
@@ -270,9 +335,11 @@ struct DashboardView: View {
 // MARK: - 语音按钮（带波浪动画）
 struct VoiceActionButton: View {
     @Binding var isRecording: Bool
+    var onTap: (() -> Void)? = nil  // 点击前的回调（用于登录检查）
 
     @State private var waveScales: [CGFloat] = [1.0, 1.0, 1.0]
     @State private var isAnimating = false
+    @ObservedObject private var authService = AuthService.shared
 
     var body: some View {
         ZStack {
@@ -331,6 +398,12 @@ struct VoiceActionButton: View {
     }
 
     private func toggleRecording() {
+        // 未登录时点击，触发登录检查回调
+        if !isRecording && !authService.isAuthenticated {
+            onTap?()
+            return
+        }
+
         let impactFeedback = UIImpactFeedbackGenerator(style: isRecording ? .light : .medium)
         impactFeedback.impactOccurred()
 
