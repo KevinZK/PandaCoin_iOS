@@ -13,6 +13,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var languageManager = LanguageManager.shared
     @StateObject private var authService = AuthService.shared
+    @StateObject private var subscriptionService = SubscriptionService.shared
     @State private var showLanguagePicker = false
     @State private var showDeleteAccountAlert = false
     @State private var isLoading = false
@@ -24,6 +25,9 @@ struct SettingsView: View {
     @State private var showAutoIncome = false
     @State private var showLoginRequired = false
     @State private var loginRequiredFeature = ""
+
+    // 订阅相关
+    @State private var showSubscription = false
 
     var body: some View {
         List {
@@ -40,8 +44,47 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         if authService.isAuthenticated {
-                            Text(authService.currentUser?.name ?? "私人财务官用户")
-                                .font(AppFont.body(size: 18, weight: .bold))
+                            HStack(spacing: 8) {
+                                Text(authService.currentUser?.name ?? "私人财务官用户")
+                                    .font(AppFont.body(size: 18, weight: .bold))
+
+                                // Pro 会员标签
+                                if subscriptionService.isProMember {
+                                    if subscriptionService.isInTrialPeriod {
+                                        // 试用期标签
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "gift.fill")
+                                                .font(.system(size: 10))
+                                            Text("试用中")
+                                                .font(.system(size: 10, weight: .bold))
+                                        }
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(Color.orange)
+                                        .cornerRadius(8)
+                                    } else {
+                                        // 正式会员标签
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "crown.fill")
+                                                .font(.system(size: 10))
+                                            Text("PRO")
+                                                .font(.system(size: 10, weight: .bold))
+                                        }
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color.orange, Color.yellow],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .cornerRadius(8)
+                                    }
+                                }
+                            }
                             Text(authService.currentUser?.email ?? "PandaCoin 专业版")
                                 .font(.system(size: 13))
                                 .foregroundColor(Theme.bambooGreen)
@@ -55,6 +98,47 @@ struct SettingsView: View {
                     }
                 }
                 .padding(.vertical, 8)
+            }
+
+            // MARK: - 会员状态区域
+            Section("会员") {
+                if subscriptionService.isProMember {
+                    // 已订阅 - 显示会员状态
+                    ProMemberStatusView(subscriptionService: subscriptionService)
+                } else {
+                    // 未订阅 - 显示升级入口
+                    Button(action: { showSubscription = true }) {
+                        HStack {
+                            ZStack {
+                                Circle().fill(Color.orange.opacity(0.1)).frame(width: 30, height: 30)
+                                Image(systemName: "crown.fill").foregroundColor(.orange).font(.system(size: 14))
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("升级 Pro 会员")
+                                    .foregroundColor(Theme.text)
+                                Text("解锁全部功能")
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Text("首月免费")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.orange)
+                                .cornerRadius(8)
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(Theme.textSecondary.opacity(0.5))
+                        }
+                    }
+                }
             }
 
             // MARK: - 登录区域（未登录时显示）
@@ -250,6 +334,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showLoginRequired) {
             LoginRequiredView(featureName: loginRequiredFeature)
+        }
+        .sheet(isPresented: $showSubscription) {
+            SubscriptionView()
         }
         .alert("删除账号", isPresented: $showDeleteAccountAlert) {
             Button("取消", role: .cancel) { }

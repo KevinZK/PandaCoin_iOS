@@ -25,9 +25,11 @@ struct DashboardView: View {
     @State private var showCreditCards = false
     @State private var showSettings = false
 
-    // 登录提示
+    // 登录/订阅提示
     @State private var showLoginRequired = false
+    @State private var showSubscription = false
     @State private var loginRequiredFeature = ""
+    @StateObject private var subscriptionService = SubscriptionService.shared
 
     // 键盘输入栏显示状态
     @State private var showInputBar = false
@@ -124,6 +126,9 @@ struct DashboardView: View {
         .sheet(isPresented: $showLoginRequired) {
             LoginRequiredView(featureName: loginRequiredFeature)
         }
+        .sheet(isPresented: $showSubscription) {
+            SubscriptionView()
+        }
         .onAppear {
             loadData()
         }
@@ -187,14 +192,22 @@ struct DashboardView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - 登录检查辅助函数
+    // MARK: - 权限检查辅助函数（登录 + 订阅）
     private func requireAuth(_ feature: String, action: @escaping () -> Void) {
-        if authService.isAuthenticated {
-            action()
-        } else {
+        // 首先检查是否登录
+        guard authService.isAuthenticated else {
             loginRequiredFeature = feature
             showLoginRequired = true
+            return
         }
+
+        // 然后检查是否为 Pro 会员
+        guard subscriptionService.isProMember else {
+            showSubscription = true
+            return
+        }
+
+        action()
     }
     
     // MARK: - 对话模式内容
@@ -233,6 +246,8 @@ struct DashboardView: View {
                 if !authService.isAuthenticated {
                     loginRequiredFeature = "语音记账"
                     showLoginRequired = true
+                } else if !subscriptionService.isProMember {
+                    showSubscription = true
                 }
             })
 
@@ -250,7 +265,7 @@ struct DashboardView: View {
             Spacer()
 
             // 相册按钮 - 使用纯 SwiftUI PhotosPicker
-            if authService.isAuthenticated {
+            if authService.isAuthenticated && subscriptionService.isProMember {
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                     ZStack {
                         Circle()
@@ -269,8 +284,12 @@ struct DashboardView: View {
                 }
             } else {
                 actionButton(icon: "photo.on.rectangle", isActive: false) {
-                    loginRequiredFeature = "图片记账"
-                    showLoginRequired = true
+                    if !authService.isAuthenticated {
+                        loginRequiredFeature = "图片记账"
+                        showLoginRequired = true
+                    } else {
+                        showSubscription = true
+                    }
                 }
             }
         }
@@ -340,6 +359,7 @@ struct VoiceActionButton: View {
     @State private var waveScales: [CGFloat] = [1.0, 1.0, 1.0]
     @State private var isAnimating = false
     @ObservedObject private var authService = AuthService.shared
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
 
     var body: some View {
         ZStack {
@@ -398,8 +418,8 @@ struct VoiceActionButton: View {
     }
 
     private func toggleRecording() {
-        // 未登录时点击，触发登录检查回调
-        if !isRecording && !authService.isAuthenticated {
+        // 未登录或未订阅时点击，触发检查回调
+        if !isRecording && (!authService.isAuthenticated || !subscriptionService.isProMember) {
             onTap?()
             return
         }

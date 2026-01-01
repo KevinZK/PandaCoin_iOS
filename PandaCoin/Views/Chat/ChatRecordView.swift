@@ -57,9 +57,11 @@ struct ChatRecordView: View {
     @StateObject private var recordService = RecordService()
     @ObservedObject private var accountService = AssetService.shared
     @ObservedObject private var authService = AuthService.shared
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
 
-    // 登录提示
+    // 登录/订阅提示
     @State private var showLoginRequired = false
+    @State private var showSubscription = false
 
     @State private var messages: [ChatMessage] = []
     @State private var inputText: String = ""
@@ -153,12 +155,19 @@ struct ChatRecordView: View {
         .sheet(isPresented: $showLoginRequired) {
             LoginRequiredView(featureName: "记账")
         }
+        .sheet(isPresented: $showSubscription) {
+            SubscriptionView()
+        }
     }
     
     // MARK: - 直接处理图片（无预览，直接 OCR + AI 解析）
     private func processImageDirectly(_ image: UIImage) {
         guard authService.isAuthenticated else {
             showLoginRequired = true
+            return
+        }
+        guard subscriptionService.isProMember else {
+            showSubscription = true
             return
         }
         guard !isProcessingImage else { return }
@@ -353,6 +362,10 @@ struct ChatRecordView: View {
             showLoginRequired = true
             return
         }
+        guard subscriptionService.isProMember else {
+            showSubscription = true
+            return
+        }
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
@@ -373,6 +386,11 @@ struct ChatRecordView: View {
         guard authService.isAuthenticated else {
             isRecording = false
             showLoginRequired = true
+            return
+        }
+        guard subscriptionService.isProMember else {
+            isRecording = false
+            showSubscription = true
             return
         }
         do {
