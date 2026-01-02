@@ -49,7 +49,7 @@ struct SubscriptionStatus {
 
 // MARK: - 后端订阅响应
 struct BackendSubscriptionResponse: Codable {
-    let userId: String
+    let userId: String?  // 改为可选，以处理边缘情况
     let status: String
     let plan: String?
     let trialStartDate: String?
@@ -168,8 +168,9 @@ class SubscriptionService: ObservableObject {
 
         // 1. 先检查后端订阅状态（管理员可以直接设置）
         let backendStatus = await fetchBackendSubscriptionStatus()
+        print("📡 [Subscription] 后端检查结果: isActive=\(backendStatus.isActive), isInTrial=\(backendStatus.isInTrialPeriod)")
         if backendStatus.isActive {
-            print("✅ [Subscription] 后端订阅有效: isInTrial=\(backendStatus.isInTrialPeriod)")
+            print("✅ [Subscription] 使用后端订阅状态")
             subscriptionStatus = backendStatus
             return
         }
@@ -222,7 +223,7 @@ class SubscriptionService: ObservableObject {
             subscriptionStatus = .inactive
             purchasedProductIDs.removeAll()
         } else {
-            print("🎉 [Subscription] 订阅状态: isProMember=\(isProMember), isInTrialPeriod=\(isInTrialPeriod)")
+            print("🎉 [Subscription] 订阅状态: isProMember=\(isProMember), isInTrialPeriod=\(isInTrialPeriod), source=\(subscriptionStatus.source)")
         }
     }
 
@@ -251,7 +252,13 @@ class SubscriptionService: ObservableObject {
             }
 
             let decoder = JSONDecoder()
-            let backendResponse = try decoder.decode(BackendSubscriptionResponse.self, from: data)
+            // 解码 API 响应包装层
+            let apiResponse = try decoder.decode(APIResponse<BackendSubscriptionResponse>.self, from: data)
+            
+            guard let backendResponse = apiResponse.data else {
+                print("⚠️ [Subscription] 后端返回数据为空")
+                return .inactive
+            }
 
             print("📡 [Subscription] 后端订阅状态: status=\(backendResponse.status), isProMember=\(backendResponse.isProMember)")
 

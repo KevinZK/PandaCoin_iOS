@@ -100,42 +100,44 @@ struct SettingsView: View {
                 .padding(.vertical, 8)
             }
 
-            // MARK: - 会员状态区域
-            Section("会员") {
-                if subscriptionService.isProMember {
-                    // 已订阅 - 显示会员状态
-                    ProMemberStatusView(subscriptionService: subscriptionService)
-                } else {
-                    // 未订阅 - 显示升级入口
-                    Button(action: { showSubscription = true }) {
-                        HStack {
-                            ZStack {
-                                Circle().fill(Color.orange.opacity(0.1)).frame(width: 30, height: 30)
-                                Image(systemName: "crown.fill").foregroundColor(.orange).font(.system(size: 14))
-                            }
+            // MARK: - 会员状态区域（仅登录后显示）
+            if authService.isAuthenticated {
+                Section("会员") {
+                    if subscriptionService.isProMember {
+                        // 已订阅 - 显示会员状态
+                        ProMemberStatusView(subscriptionService: subscriptionService)
+                    } else {
+                        // 未订阅 - 显示升级入口
+                        Button(action: { showSubscription = true }) {
+                            HStack {
+                                ZStack {
+                                    Circle().fill(Color.orange.opacity(0.1)).frame(width: 30, height: 30)
+                                    Image(systemName: "crown.fill").foregroundColor(.orange).font(.system(size: 14))
+                                }
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("升级 Pro 会员")
-                                    .foregroundColor(Theme.text)
-                                Text("解锁全部功能")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("升级 Pro 会员")
+                                        .foregroundColor(Theme.text)
+                                    Text("解锁全部功能")
+                                        .font(.caption)
+                                        .foregroundColor(Theme.textSecondary)
+                                }
+
+                                Spacer()
+
+                                Text("首月免费")
                                     .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange)
+                                    .cornerRadius(8)
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(Theme.textSecondary.opacity(0.5))
                             }
-
-                            Spacer()
-
-                            Text("首月免费")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.orange)
-                                .cornerRadius(8)
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(Theme.textSecondary.opacity(0.5))
                         }
                     }
                 }
