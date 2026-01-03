@@ -211,6 +211,7 @@ class RecordService: ObservableObject {
                         transactionData: transactionData,
                         assetUpdateData: nil,
                         creditCardData: nil,
+                        holdingUpdateData: nil,
                         budgetData: nil
                     )
                     
@@ -251,6 +252,7 @@ class RecordService: ObservableObject {
                         transactionData: nil,
                         assetUpdateData: assetData,
                         creditCardData: nil,
+                        holdingUpdateData: nil,
                         budgetData: nil
                     )
                     
@@ -276,9 +278,35 @@ class RecordService: ObservableObject {
                         transactionData: nil,
                         assetUpdateData: nil,
                         creditCardData: creditCardData,
+                        holdingUpdateData: nil,
                         budgetData: nil
                     )
                     
+                case .holdingUpdate:
+                    // 持仓更新 (买入/卖出金融资产)
+                    let holdingData = HoldingUpdateParsed(
+                        name: data.name ?? "",
+                        holdingType: data.holding_type ?? "STOCK",
+                        holdingAction: data.holding_action ?? "BUY",
+                        quantity: data.quantity ?? 0,
+                        price: data.price ?? 0,
+                        currency: data.currency ?? "USD",
+                        date: self.parseDate(data.date) ?? Date(),
+                        market: data.market,
+                        tickerCode: data.ticker_code,
+                        accountName: data.account_name ?? data.source_account,
+                        fee: data.fee,
+                        note: data.note
+                    )
+                    return ParsedFinancialEvent(
+                        eventType: .holdingUpdate,
+                        transactionData: nil,
+                        assetUpdateData: nil,
+                        creditCardData: nil,
+                        holdingUpdateData: holdingData,
+                        budgetData: nil
+                    )
+
                 case .budget:
                     // 使用通用字段 name, amount, date, category
                     let budgetData = BudgetParsed(
@@ -296,9 +324,10 @@ class RecordService: ObservableObject {
                         transactionData: nil,
                         assetUpdateData: nil,
                         creditCardData: nil,
+                        holdingUpdateData: nil,
                         budgetData: budgetData
                     )
-                    
+
                 case .nullStatement:
                     logInfo("⚠️ 无效语句，跳过")
                     return nil
@@ -335,6 +364,7 @@ class RecordService: ObservableObject {
         let creditCardEvents = events.filter { $0.eventType == .creditCardUpdate }
         let transactionEvents = events.filter { $0.eventType == .transaction }
         let budgetEvents = events.filter { $0.eventType == .budget }
+        let holdingEvents = events.filter { $0.eventType == .holdingUpdate }
         
         // 第一阶段：先保存资产和信用卡更新（创建新账户）
         var phase1Publishers: [AnyPublisher<Void, APIError>] = []
@@ -361,6 +391,16 @@ class RecordService: ObservableObject {
         for event in budgetEvents {
                 if let data = event.budgetData {
                     let pub = saveBudget(data)
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+                phase1Publishers.append(pub)
+            }
+        }
+
+        // 保存持仓更新（买入/卖出）
+        for event in holdingEvents {
+            if let data = event.holdingUpdateData {
+                let pub = saveHoldingUpdate(data)
                     .map { _ in () }
                     .eraseToAnyPublisher()
                 phase1Publishers.append(pub)
@@ -568,9 +608,111 @@ class RecordService: ObservableObject {
     // MARK: - 保存信用卡更新
     private func saveCreditCardUpdate(_ data: CreditCardParsed) -> AnyPublisher<CreditCard, APIError> {
         logInfo("✅ 保存信用卡配置: 银行=\(data.institutionName ?? "未知"), 额度=\(data.creditLimit ?? 0)")
-        
+
         // 调用 CreditCardService 的正确方法保存到信用卡模块
         return CreditCardService.shared.saveCreditCardFromParsed(data)
+    }
+
+    // MARK: - 保存持仓更新 (买入/卖出)
+    private func saveHoldingUpdate(_ data: HoldingUpdateParsed) -> AnyPublisher<BuyHoldingResponse, APIError> {
+        logInfo("✅ 保存持仓更新: \(data.name), 动作=\(data.holdingAction), 数量=\(data.quantity), 价格=\(data.price)")
+
+        guard let accountId = data.accountId else {
+            logError("❌ 持仓更新失败: 未选择证券账户")
+            return Fail(error: APIError.serverError("请选择证券账户")).eraseToAnyPublisher()
+        }
+
+        let holdingService = HoldingService.shared
+
+        // 先尝试查找现有持仓
+        if let existingHolding = findExistingHolding(data, accountId: accountId) {
+            // 已有持仓，执行买入或卖出
+            if data.holdingAction == "BUY" {
+                return holdingService.buy(
+                    holdingId: existingHolding.id,
+                    quantity: data.quantity,
+                    price: data.price,
+                    fee: data.fee,
+                    date: data.date,
+                    note: data.note
+                )
+            } else {
+                return holdingService.sell(
+                    holdingId: existingHolding.id,
+                    quantity: data.quantity,
+                    price: data.price,
+                    fee: data.fee,
+                    date: data.date,
+                    note: data.note
+                )
+            }
+        } else {
+            // 首次买入，创建新持仓
+            if data.holdingAction == "SELL" {
+                logError("❌ 无法卖出: 找不到该资产的持仓记录")
+                return Fail(error: APIError.serverError("找不到持仓记录，无法卖出")).eraseToAnyPublisher()
+            }
+
+            return holdingService.buyNewHolding(
+                accountId: accountId,
+                name: data.name,
+                type: mapHoldingType(data.holdingType),
+                market: mapMarketType(data.market),
+                quantity: data.quantity,
+                price: data.price,
+                tickerCode: data.tickerCode,
+                displayName: nil,
+                fee: data.fee,
+                date: data.date,
+                note: data.note,
+                rawText: nil,
+                currency: data.currency
+            )
+        }
+    }
+
+    /// 查找已有的持仓（优先用代码匹配，其次用名称）
+    private func findExistingHolding(_ data: HoldingUpdateParsed, accountId: String) -> Holding? {
+        let holdingService = HoldingService.shared
+        let accountHoldings = holdingService.getHoldings(forAccountId: accountId)
+
+        // 优先匹配股票代码
+        if let code = data.tickerCode, !code.isEmpty {
+            if let matched = accountHoldings.first(where: { $0.tickerCode?.uppercased() == code.uppercased() }) {
+                return matched
+            }
+        }
+
+        // 名称模糊匹配
+        return accountHoldings.first { holding in
+            holding.name.lowercased().contains(data.name.lowercased()) ||
+            data.name.lowercased().contains(holding.name.lowercased())
+        }
+    }
+
+    /// 映射持仓类型
+    private func mapHoldingType(_ type: String) -> HoldingType {
+        switch type.uppercased() {
+        case "STOCK": return .stock
+        case "ETF": return .etf
+        case "FUND": return .fund
+        case "BOND": return .bond
+        case "CRYPTO": return .crypto
+        case "OPTION": return .option
+        default: return .other
+        }
+    }
+
+    /// 映射市场类型
+    private func mapMarketType(_ market: String?) -> MarketType {
+        switch market?.uppercased() {
+        case "US": return .us
+        case "HK": return .hk
+        case "CN": return .cn
+        case "CRYPTO": return .crypto
+        case "GLOBAL": return .global
+        default: return .us
+        }
     }
     
     // MARK: - 辅助方法
@@ -915,6 +1057,15 @@ struct FinancialEventData: Codable {
     // 自动还款配置
     let auto_repayment: Bool?       // 是否启用自动还款
     let repayment_type: String?     // 还款类型: "FULL" 或 "MIN"（信用卡用）
+
+    // HOLDING_UPDATE 字段
+    let holding_type: String?       // STOCK, ETF, FUND, BOND, CRYPTO, OPTION, OTHER
+    let holding_action: String?     // BUY, SELL
+    let market: String?             // US, HK, CN, CRYPTO, GLOBAL
+    let ticker_code: String?        // 股票代码
+    let account_name: String?       // 证券账户名称
+    let price: Double?              // 单价
+    let fee: Double?                // 交易手续费
 }
 
 // MARK: - 统一解析结果类型
@@ -922,6 +1073,7 @@ enum FinancialEventType: String, Codable {
     case transaction = "TRANSACTION"
     case assetUpdate = "ASSET_UPDATE"
     case creditCardUpdate = "CREDIT_CARD_UPDATE"
+    case holdingUpdate = "HOLDING_UPDATE"
     case budget = "BUDGET"
     case nullStatement = "NULL_STATEMENT"
 }
@@ -930,16 +1082,19 @@ enum FinancialEventType: String, Codable {
 struct ParsedFinancialEvent: Identifiable {
     let id = UUID()
     let eventType: FinancialEventType
-    
+
     // 交易数据
     var transactionData: AIRecordParsed?
-    
+
     // 资产更新数据
     var assetUpdateData: AssetUpdateParsed?
-    
+
     // 信用卡更新数据
     var creditCardData: CreditCardParsed?
-    
+
+    // 持仓更新数据
+    var holdingUpdateData: HoldingUpdateParsed?
+
     // 预算数据
     var budgetData: BudgetParsed?
 }
@@ -1007,4 +1162,66 @@ struct CreditCardParsed {
     var autoRepayment: Bool?        // 是否启用自动还款
     var repaymentType: String?      // 还款类型: "FULL" 或 "MIN"
     var sourceAccount: String?      // 扣款来源账户名称
+}
+
+// 持仓更新解析结果 (买入/卖出金融资产)
+struct HoldingUpdateParsed {
+    let name: String                // 资产名称 (如 "苹果", "比特币")
+    let holdingType: String         // STOCK, ETF, FUND, BOND, CRYPTO, OPTION, OTHER
+    let holdingAction: String       // BUY, SELL
+    let quantity: Double            // 买入/卖出数量
+    var price: Double               // 单价
+    let currency: String
+    let date: Date
+    let market: String?             // US, HK, CN, CRYPTO, GLOBAL
+    var tickerCode: String?         // 股票代码 (如 AAPL, BTC-USD)
+    var accountName: String?        // 证券账户名称
+    var accountId: String?          // 证券账户ID (用户选择后填充)
+    var fee: Double?                // 交易手续费
+    var note: String?               // 备注
+
+    // 计算属性
+    var amount: Double {
+        quantity * price
+    }
+
+    var totalCost: Double {
+        amount + (fee ?? 0)
+    }
+
+    // 格式化显示
+    var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: amount)) ?? "0.00"
+    }
+
+    var actionDisplayName: String {
+        holdingAction == "BUY" ? "买入" : "卖出"
+    }
+
+    var typeDisplayName: String {
+        switch holdingType {
+        case "STOCK": return "股票"
+        case "ETF": return "ETF"
+        case "FUND": return "基金"
+        case "BOND": return "债券"
+        case "CRYPTO": return "数字货币"
+        case "OPTION": return "期权"
+        default: return "其他"
+        }
+    }
+
+    var marketDisplayName: String {
+        switch market {
+        case "US": return "美股"
+        case "HK": return "港股"
+        case "CN": return "A股"
+        case "CRYPTO": return "加密货币"
+        case "GLOBAL": return "全球"
+        default: return "美股"
+        }
+    }
 }

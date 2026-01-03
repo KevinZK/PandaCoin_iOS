@@ -1,0 +1,697 @@
+//
+//  InvestmentAccountDetailView.swift
+//  PandaCoin
+//
+//  证券账户详情视图 - 显示持仓列表和市值
+//
+
+import SwiftUI
+import Combine
+
+struct InvestmentAccountDetailView: View {
+    let asset: Asset
+    @StateObject private var holdingService = HoldingService.shared
+    @State private var holdings: [Holding] = []
+    @State private var summary: HoldingsSummaryData?
+    @State private var isLoading = true
+    @State private var showAddHolding = false
+    @State private var cancellables = Set<AnyCancellable>()
+
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // 账户概览卡片
+                accountOverviewCard
+                    .padding(.horizontal)
+                    .padding(.top)
+
+                // 持仓列表
+                if isLoading {
+                    Spacer()
+                    ProgressView("加载中...")
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                } else if holdings.isEmpty {
+                    Spacer()
+                    emptyState
+                    Spacer()
+                } else {
+                    holdingsList
+                }
+            }
+        }
+        .navigationTitle(asset.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showAddHolding = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(Theme.bambooGreen)
+                }
+            }
+        }
+        .sheet(isPresented: $showAddHolding) {
+            AddHoldingView(accountId: asset.id)
+                .onDisappear {
+                    fetchHoldings()
+                }
+        }
+        .onAppear {
+            fetchHoldings()
+        }
+    }
+
+    // MARK: - 账户概览卡片
+    private var accountOverviewCard: some View {
+        VStack(spacing: 16) {
+            // 上半部分：账户信息
+            HStack {
+                // 图标
+                ZStack {
+                    Circle()
+                        .fill(assetColor.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: asset.type.icon)
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundColor(assetColor)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(asset.name)
+                        .font(AppFont.body(size: 18, weight: .bold))
+                        .foregroundColor(Theme.text)
+
+                    HStack(spacing: 8) {
+                        Text(asset.type.displayName)
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textSecondary)
+
+                        if !holdings.isEmpty {
+                            Text("·")
+                                .foregroundColor(Theme.textSecondary)
+                            Text("\(holdings.count) 只持仓")
+                                .font(.subheadline)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+
+            Divider()
+
+            // 下半部分：资产统计（水平布局）
+            HStack(spacing: 0) {
+
+                // 持仓市值（暂显示为待计算，后期添加实时行情）
+                VStack(spacing: 6) {
+                    Text("持仓市值")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+
+                    if holdings.isEmpty {
+                        Text("--")
+                            .font(AppFont.monoNumber(size: 18, weight: .bold))
+                            .foregroundColor(Theme.textSecondary)
+                    } else {
+                        Text("待获取")
+                            .font(AppFont.body(size: 14, weight: .medium))
+                            .foregroundColor(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
+                Divider()
+                    .frame(height: 40)
+
+                // 总资产
+                VStack(spacing: 6) {
+                    Text("总资产")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+
+                    Text(formattedTotalValue)
+                        .font(AppFont.monoNumber(size: 18, weight: .bold))
+                        .foregroundColor(Theme.text)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(20)
+        .background(Theme.cardBackground)
+        .cornerRadius(CornerRadius.large)
+        .shadow(color: Theme.cfoShadow, radius: 10, x: 0, y: 5)
+    }
+
+    private func assetStatItem(title: String, amount: Double, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+
+            Text("¥\(formattedNumber(amount))")
+                .font(AppFont.monoNumber(size: 14, weight: .semibold))
+                .foregroundColor(color)
+        }
+    }
+
+    // MARK: - 持仓列表
+    private var holdingsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(holdings) { holding in
+                    NavigationLink(destination: HoldingDetailView(holding: holding)) {
+                        HoldingCard(holding: holding)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 20)
+        }
+    }
+
+    // MARK: - 空状态
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "chart.line.uptrend.xyaxis")
+                .font(.system(size: 48))
+                .foregroundColor(Theme.textSecondary.opacity(0.5))
+
+            Text("暂无持仓")
+                .font(.headline)
+                .foregroundColor(Theme.textSecondary)
+
+            Text("点击右上角 + 添加持仓")
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary.opacity(0.7))
+
+            Button(action: { showAddHolding = true }) {
+                Label("添加持仓", systemImage: "plus.circle.fill")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Theme.bambooGreen)
+                    .cornerRadius(12)
+            }
+            .padding(.top, 8)
+        }
+    }
+
+    // MARK: - 计算属性
+    private var totalValue: Double {
+        // 暂时只显示现金余额，后期添加实时行情后再计算持仓市值
+        Double(truncating: asset.balance as NSDecimalNumber)
+    }
+
+    private var formattedTotalValue: String {
+        "¥\(formattedNumber(totalValue))"
+    }
+
+    private var assetColor: Color {
+        switch asset.type {
+        case .investment: return .orange
+        case .crypto: return .yellow
+        default: return Theme.bambooGreen
+        }
+    }
+
+    private func formattedNumber(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "0.00"
+    }
+
+    // MARK: - 数据获取
+    private func fetchHoldings() {
+        isLoading = true
+
+        holdingService.fetchAccountHoldings(accountId: asset.id)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isLoading = false
+                    if case .failure(let error) = completion {
+                        print("获取持仓失败: \(error)")
+                    }
+                },
+                receiveValue: { response in
+                    self.holdings = response.holdings
+                    self.summary = response.summary
+                }
+            )
+            .store(in: &cancellables)
+    }
+}
+
+// MARK: - 持仓卡片
+struct HoldingCard: View {
+    let holding: Holding
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 图标
+            ZStack {
+                Circle()
+                    .fill(typeColor.opacity(0.12))
+                    .frame(width: 48, height: 48)
+                Image(systemName: holding.type.icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(typeColor)
+            }
+
+            // 信息
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(holding.displayName ?? holding.name)
+                        .font(AppFont.body(size: 16, weight: .semibold))
+                        .foregroundColor(Theme.text)
+
+                    if let code = holding.tickerCode {
+                        Text(code)
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.textSecondary.opacity(0.1))
+                            .cornerRadius(4)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Text("\(formattedQuantity)\(unitName)")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+
+                    Text(holding.market.displayName)
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+
+            Spacer()
+
+            // 类型标签
+            Text(holding.type.displayName)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(typeColor)
+                .cornerRadius(6)
+        }
+        .padding(16)
+        .background(Theme.cardBackground)
+        .cornerRadius(CornerRadius.medium)
+        .shadow(color: Theme.cfoShadow, radius: 8, x: 0, y: 4)
+    }
+
+    private var unitName: String {
+        holding.type == .crypto ? "个" : "股"
+    }
+
+    private var typeColor: Color {
+        switch holding.type {
+        case .stock: return .blue
+        case .etf: return .purple
+        case .fund: return .green
+        case .bond: return .orange
+        case .crypto: return .yellow
+        case .option: return .red
+        case .other: return .gray
+        }
+    }
+
+    private var formattedQuantity: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = holding.type == .crypto ? 8 : 0
+        return formatter.string(from: NSNumber(value: holding.quantity)) ?? "0"
+    }
+}
+
+// MARK: - 持仓详情视图
+struct HoldingDetailView: View {
+    let holding: Holding
+    @StateObject private var holdingService = HoldingService.shared
+    @State private var transactions: [HoldingTransaction] = []
+    @State private var isLoading = true
+    @State private var showBuySheet = false
+    @State private var showSellSheet = false
+    @State private var cancellables = Set<AnyCancellable>()
+
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 20) {
+                    // 持仓概览
+                    holdingOverviewCard
+
+                    // 操作按钮
+                    actionButtons
+
+                    // 交易记录
+                    if !transactions.isEmpty {
+                        transactionSection
+                    }
+                }
+                .padding()
+            }
+        }
+        .navigationTitle(holding.displayName ?? holding.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showBuySheet) {
+            BuySellHoldingView(holding: holding, action: .buy)
+        }
+        .sheet(isPresented: $showSellSheet) {
+            BuySellHoldingView(holding: holding, action: .sell)
+        }
+        .onAppear {
+            fetchTransactions()
+        }
+    }
+
+    private var holdingOverviewCard: some View {
+        VStack(spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Text(holding.displayName ?? holding.name)
+                            .font(AppFont.body(size: 20, weight: .bold))
+                            .foregroundColor(Theme.text)
+
+                        if let code = holding.tickerCode {
+                            Text(code)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Theme.bambooGreen)
+                                .cornerRadius(6)
+                        }
+                    }
+
+                    HStack(spacing: 12) {
+                        Label(holding.type.displayName, systemImage: holding.type.icon)
+                        Label(holding.market.displayName, systemImage: "globe")
+                    }
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                }
+
+                Spacer()
+            }
+
+            Divider()
+
+            // 持仓信息
+            HStack(spacing: 0) {
+                infoItem(title: "持仓数量", value: formattedQuantity)
+                Spacer()
+                infoItem(title: "成本价", value: "¥\(formattedNumber(holding.avgCostPrice))")
+                Spacer()
+                infoItem(title: "现价", value: "¥\(formattedNumber(holding.currentPrice ?? holding.avgCostPrice))")
+            }
+
+            Divider()
+
+            // 市值和盈亏
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("市值")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                    Text("¥\(holding.formattedMarketValue)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.text)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("浮动盈亏")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+
+                    HStack(spacing: 8) {
+                        Text(holding.formattedPnL)
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(holding.isProfitable ? Theme.income : Theme.expense)
+
+                        Text(holding.formattedPnLPercent)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(holding.isProfitable ? Theme.income : Theme.expense)
+                            .cornerRadius(4)
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(Theme.cardBackground)
+        .cornerRadius(CornerRadius.large)
+        .shadow(color: Theme.cfoShadow, radius: 10, x: 0, y: 5)
+    }
+
+    private func infoItem(title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+            Text(value)
+                .font(AppFont.monoNumber(size: 14, weight: .semibold))
+                .foregroundColor(Theme.text)
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 16) {
+            Button(action: { showBuySheet = true }) {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                    Text("买入")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Theme.income)
+                .cornerRadius(12)
+            }
+
+            Button(action: { showSellSheet = true }) {
+                HStack {
+                    Image(systemName: "minus.circle.fill")
+                    Text("卖出")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Theme.expense)
+                .cornerRadius(12)
+            }
+            .disabled(holding.quantity <= 0)
+            .opacity(holding.quantity <= 0 ? 0.5 : 1)
+        }
+    }
+
+    private var transactionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("交易记录")
+                .font(.headline)
+                .foregroundColor(Theme.text)
+
+            ForEach(transactions) { tx in
+                HoldingTransactionRow(transaction: tx)
+            }
+        }
+    }
+
+    private var formattedQuantity: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = holding.type == .crypto ? 8 : 0
+        return formatter.string(from: NSNumber(value: holding.quantity)) ?? "0"
+    }
+
+    private func formattedNumber(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "0.00"
+    }
+
+    private func fetchTransactions() {
+        holdingService.fetchTransactions(holdingId: holding.id)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in
+                    isLoading = false
+                },
+                receiveValue: { txs in
+                    self.transactions = txs
+                }
+            )
+            .store(in: &cancellables)
+    }
+}
+
+// MARK: - 交易记录行
+struct HoldingTransactionRow: View {
+    let transaction: HoldingTransaction
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 类型图标
+            ZStack {
+                Circle()
+                    .fill(typeColor.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                Image(systemName: typeIcon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(typeColor)
+            }
+
+            // 信息
+            VStack(alignment: .leading, spacing: 4) {
+                Text(transaction.type.displayName)
+                    .font(AppFont.body(size: 15, weight: .medium))
+                    .foregroundColor(Theme.text)
+
+                Text("\(formattedQuantity) x ¥\(formattedPrice)")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+
+            Spacer()
+
+            // 金额和日期
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(formattedAmount)
+                    .font(AppFont.monoNumber(size: 15, weight: .bold))
+                    .foregroundColor(typeColor)
+
+                Text(formattedDate)
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .padding(12)
+        .background(Theme.cardBackground)
+        .cornerRadius(12)
+    }
+
+    private var typeColor: Color {
+        switch transaction.type {
+        case .buy, .transferIn: return Theme.expense
+        case .sell, .dividend, .transferOut: return Theme.income
+        }
+    }
+
+    private var typeIcon: String {
+        switch transaction.type {
+        case .buy: return "arrow.down.circle.fill"
+        case .sell: return "arrow.up.circle.fill"
+        case .dividend: return "gift.fill"
+        case .transferIn: return "arrow.right.circle.fill"
+        case .transferOut: return "arrow.left.circle.fill"
+        }
+    }
+
+    private var formattedQuantity: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 4
+        return formatter.string(from: NSNumber(value: transaction.quantity)) ?? "0"
+    }
+
+    private var formattedPrice: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: transaction.price)) ?? "0.00"
+    }
+
+    private var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let amount = formatter.string(from: NSNumber(value: transaction.amount)) ?? "0.00"
+        let prefix = (transaction.type == .buy || transaction.type == .transferIn) ? "-" : "+"
+        return "\(prefix)¥\(amount)"
+    }
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd HH:mm"
+        return formatter.string(from: transaction.date)
+    }
+}
+
+// MARK: - 添加持仓视图 (占位)
+struct AddHoldingView: View {
+    let accountId: String
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        NavigationView {
+            Text("添加持仓")
+                .navigationTitle("添加持仓")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("取消") { dismiss() }
+                    }
+                }
+        }
+    }
+}
+
+// MARK: - 买入/卖出视图 (占位)
+struct BuySellHoldingView: View {
+    let holding: Holding
+    let action: Action
+    @Environment(\.dismiss) var dismiss
+
+    enum Action {
+        case buy, sell
+
+        var title: String {
+            switch self {
+            case .buy: return "买入"
+            case .sell: return "卖出"
+            }
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            Text("\(action.title) \(holding.name)")
+                .navigationTitle(action.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("取消") { dismiss() }
+                    }
+                }
+        }
+    }
+}

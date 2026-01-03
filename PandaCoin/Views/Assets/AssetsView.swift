@@ -11,7 +11,7 @@ import Combine
 struct AssetsView: View {
     @ObservedObject private var accountService = AssetService.shared
     @State private var showAddAccount = false
-    
+
     // MARK: - 资产分类计算属性
     
     /// 净资产列表（非负债）
@@ -34,7 +34,8 @@ struct AssetsView: View {
         liabilities.filter { $0.type.liabilityCategory == .loan }
     }
     
-    /// 净资产总额
+    /// 净资产总额（账户余额）
+    /// 注：暂不包含持仓市值，后期添加实时价格后再计算
     private var totalNetAssets: Decimal {
         netAssets.reduce(0) { $0 + $1.balance }
     }
@@ -139,7 +140,7 @@ struct AssetsView: View {
                 accountService.fetchAccounts()
         }
     }
-    
+
     // MARK: - 净值概览卡片 (CFO 风格升级)
     private var netWorthCard: some View {
         VStack(spacing: 20) {
@@ -321,8 +322,11 @@ struct AccountCard: View {
     
     var body: some View {
         ZStack {
-            // 隐藏的 NavigationLink
-            NavigationLink(destination: AssetDetailView(asset: account), isActive: $navigateToDetail) {
+            // 隐藏的 NavigationLink - 根据账户类型导航到不同视图
+            NavigationLink(
+                destination: destinationView,
+                isActive: $navigateToDetail
+            ) {
                 EmptyView()
             }
             .opacity(0)
@@ -417,7 +421,17 @@ struct AccountCard: View {
             )
             .store(in: &accountService.cancellables)
     }
-    
+
+    /// 根据账户类型返回对应的详情视图
+    @ViewBuilder
+    private var destinationView: some View {
+        if account.type == .investment || account.type == .crypto {
+            InvestmentAccountDetailView(asset: account)
+        } else {
+            AssetDetailView(asset: account)
+        }
+    }
+
     private var accountColor: Color {
         switch account.type {
         case .bank: return Theme.bambooGreen
