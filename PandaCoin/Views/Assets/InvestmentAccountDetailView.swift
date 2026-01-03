@@ -16,6 +16,12 @@ struct InvestmentAccountDetailView: View {
     @State private var isLoading = true
     @State private var showAddHolding = false
     @State private var cancellables = Set<AnyCancellable>()
+    
+    // 编辑/删除相关状态
+    @State private var showEditHolding = false
+    @State private var selectedHolding: Holding?
+    @State private var showDeleteConfirm = false
+    @State private var holdingToDelete: Holding?
 
     var body: some View {
         ZStack {
@@ -58,9 +64,47 @@ struct InvestmentAccountDetailView: View {
                     fetchHoldings()
                 }
         }
+        .sheet(isPresented: $showEditHolding) {
+            if let holding = selectedHolding {
+                EditHoldingView(holding: holding)
+                    .onDisappear {
+                        fetchHoldings()
+                    }
+            }
+        }
+        .alert("确认删除", isPresented: $showDeleteConfirm) {
+            Button("取消", role: .cancel) {
+                holdingToDelete = nil
+            }
+            Button("删除", role: .destructive) {
+                if let holding = holdingToDelete {
+                    deleteHolding(holding)
+                }
+            }
+        } message: {
+            if let holding = holdingToDelete {
+                Text("确定要删除「\(holding.displayName ?? holding.name)」吗？\n删除后不会影响账户余额。")
+            }
+        }
         .onAppear {
             fetchHoldings()
         }
+    }
+    
+    // MARK: - 删除持仓
+    private func deleteHolding(_ holding: Holding) {
+        holdingService.deleteHolding(id: holding.id)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    print("删除失败: \(error.localizedDescription)")
+                }
+                holdingToDelete = nil
+            } receiveValue: { _ in
+                // 从本地列表中移除
+                holdings.removeAll { $0.id == holding.id }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - 账户概览卡片
@@ -160,19 +204,35 @@ struct InvestmentAccountDetailView: View {
 
     // MARK: - 持仓列表
     private var holdingsList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(holdings) { holding in
-                    NavigationLink(destination: HoldingDetailView(holding: holding)) {
-                        HoldingCard(holding: holding)
+        List {
+            ForEach(holdings) { holding in
+                NavigationLink(destination: HoldingDetailView(holding: holding)) {
+                    HoldingCard(holding: holding)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    // 删除按钮
+                    Button(role: .destructive) {
+                        holdingToDelete = holding
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    
+                    // 编辑按钮
+                    Button {
+                        selectedHolding = holding
+                        showEditHolding = true
+                    } label: {
+                        Label("编辑", systemImage: "pencil")
+                    }
+                    .tint(.orange)
                 }
             }
-            .padding(.horizontal)
-            .padding(.top, 16)
-            .padding(.bottom, 20)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
     }
 
     // MARK: - 空状态
@@ -340,13 +400,24 @@ struct HoldingCard: View {
 
 // MARK: - 持仓详情视图
 struct HoldingDetailView: View {
-    let holding: Holding
+    let initialHolding: Holding
     @StateObject private var holdingService = HoldingService.shared
+    @State private var holding: Holding?  // 可变的持仓数据
     @State private var transactions: [HoldingTransaction] = []
     @State private var isLoading = true
     @State private var showBuySheet = false
     @State private var showSellSheet = false
+    @State private var showEditSheet = false
     @State private var cancellables = Set<AnyCancellable>()
+    
+    // 使用当前持仓数据或初始数据
+    private var currentHolding: Holding {
+        holding ?? initialHolding
+    }
+
+    init(holding: Holding) {
+        self.initialHolding = holding
+    }
 
     var body: some View {
         ZStack {
@@ -368,17 +439,53 @@ struct HoldingDetailView: View {
                 .padding()
             }
         }
-        .navigationTitle(holding.displayName ?? holding.name)
+        .navigationTitle(currentHolding.displayName ?? currentHolding.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEditSheet = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .foregroundColor(Theme.bambooGreen)
+                }
+            }
+        }
         .sheet(isPresented: $showBuySheet) {
-            BuySellHoldingView(holding: holding, action: .buy)
+            BuySellHoldingView(holding: currentHolding, action: .buy)
+                .onDisappear {
+                    refreshHolding()
+                }
         }
         .sheet(isPresented: $showSellSheet) {
-            BuySellHoldingView(holding: holding, action: .sell)
+            BuySellHoldingView(holding: currentHolding, action: .sell)
+                .onDisappear {
+                    refreshHolding()
+                }
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EditHoldingView(holding: currentHolding)
+                .onDisappear {
+                    refreshHolding()
+                }
         }
         .onAppear {
+            refreshHolding()
             fetchTransactions()
         }
+    }
+    
+    // MARK: - 刷新持仓数据
+    private func refreshHolding() {
+        holdingService.fetchHolding(id: initialHolding.id)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { updatedHolding in
+                    self.holding = updatedHolding
+                }
+            )
+            .store(in: &cancellables)
     }
 
     private var holdingOverviewCard: some View {
@@ -386,11 +493,11 @@ struct HoldingDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        Text(holding.displayName ?? holding.name)
+                        Text(currentHolding.displayName ?? currentHolding.name)
                             .font(AppFont.body(size: 20, weight: .bold))
                             .foregroundColor(Theme.text)
 
-                        if let code = holding.tickerCode {
+                        if let code = currentHolding.tickerCode {
                             Text(code)
                                 .font(.caption)
                                 .fontWeight(.medium)
@@ -403,8 +510,8 @@ struct HoldingDetailView: View {
                     }
 
                     HStack(spacing: 12) {
-                        Label(holding.type.displayName, systemImage: holding.type.icon)
-                        Label(holding.market.displayName, systemImage: "globe")
+                        Label(currentHolding.type.displayName, systemImage: currentHolding.type.icon)
+                        Label(currentHolding.market.displayName, systemImage: "globe")
                     }
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
@@ -419,9 +526,9 @@ struct HoldingDetailView: View {
             HStack(spacing: 0) {
                 infoItem(title: "持仓数量", value: formattedQuantity)
                 Spacer()
-                infoItem(title: "成本价", value: "¥\(formattedNumber(holding.avgCostPrice))")
+                infoItem(title: "成本价", value: "¥\(formattedNumber(currentHolding.avgCostPrice))")
                 Spacer()
-                infoItem(title: "现价", value: "¥\(formattedNumber(holding.currentPrice ?? holding.avgCostPrice))")
+                infoItem(title: "现价", value: "¥\(formattedNumber(currentHolding.currentPrice ?? currentHolding.avgCostPrice))")
             }
 
             Divider()
@@ -432,7 +539,7 @@ struct HoldingDetailView: View {
                     Text("市值")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
-                    Text("¥\(holding.formattedMarketValue)")
+                    Text("¥\(currentHolding.formattedMarketValue)")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.text)
                 }
@@ -445,17 +552,17 @@ struct HoldingDetailView: View {
                         .foregroundColor(Theme.textSecondary)
 
                     HStack(spacing: 8) {
-                        Text(holding.formattedPnL)
+                        Text(currentHolding.formattedPnL)
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(holding.isProfitable ? Theme.income : Theme.expense)
+                            .foregroundColor(currentHolding.isProfitable ? Theme.income : Theme.expense)
 
-                        Text(holding.formattedPnLPercent)
+                        Text(currentHolding.formattedPnLPercent)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(holding.isProfitable ? Theme.income : Theme.expense)
+                            .background(currentHolding.isProfitable ? Theme.income : Theme.expense)
                             .cornerRadius(4)
                     }
                 }
@@ -505,8 +612,8 @@ struct HoldingDetailView: View {
                 .background(Theme.expense)
                 .cornerRadius(12)
             }
-            .disabled(holding.quantity <= 0)
-            .opacity(holding.quantity <= 0 ? 0.5 : 1)
+            .disabled(currentHolding.quantity <= 0)
+            .opacity(currentHolding.quantity <= 0 ? 0.5 : 1)
         }
     }
 
@@ -525,8 +632,8 @@ struct HoldingDetailView: View {
     private var formattedQuantity: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
-        formatter.maximumFractionDigits = holding.type == .crypto ? 8 : 0
-        return formatter.string(from: NSNumber(value: holding.quantity)) ?? "0"
+        formatter.maximumFractionDigits = currentHolding.type == .crypto ? 8 : 0
+        return formatter.string(from: NSNumber(value: currentHolding.quantity)) ?? "0"
     }
 
     private func formattedNumber(_ value: Double) -> String {
@@ -538,7 +645,7 @@ struct HoldingDetailView: View {
     }
 
     private func fetchTransactions() {
-        holdingService.fetchTransactions(holdingId: holding.id)
+        holdingService.fetchTransactions(holdingId: initialHolding.id)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in
@@ -693,5 +800,142 @@ struct BuySellHoldingView: View {
                     }
                 }
         }
+    }
+}
+
+// MARK: - 编辑持仓视图
+struct EditHoldingView: View {
+    let holding: Holding
+    @Environment(\.dismiss) var dismiss
+    @StateObject private var holdingService = HoldingService.shared
+    
+    @State private var name: String = ""
+    @State private var displayName: String = ""
+    @State private var tickerCode: String = ""
+    @State private var quantity: String = ""
+    @State private var avgCostPrice: String = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var cancellables = Set<AnyCancellable>()
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                
+                Form {
+                    Section(header: Text("基本信息")) {
+                        HStack {
+                            Text("名称")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            TextField("资产名称", text: $name)
+                                .multilineTextAlignment(.trailing)
+                                .foregroundColor(Theme.text)
+                        }
+                        
+                        HStack {
+                            Text("显示名称")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            TextField("可选", text: $displayName)
+                                .multilineTextAlignment(.trailing)
+                                .foregroundColor(Theme.text)
+                        }
+                        
+                        HStack {
+                            Text("代码")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            TextField("如 AAPL", text: $tickerCode)
+                                .multilineTextAlignment(.trailing)
+                                .foregroundColor(Theme.text)
+                                .autocapitalization(.allCharacters)
+                        }
+                    }
+                    
+                    Section(header: Text("持仓信息")) {
+                        HStack {
+                            Text("数量")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            TextField("0", text: $quantity)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.decimalPad)
+                                .foregroundColor(Theme.text)
+                        }
+                        
+                        HStack {
+                            Text("成本价")
+                                .foregroundColor(Theme.textSecondary)
+                            Spacer()
+                            TextField("0.00", text: $avgCostPrice)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.decimalPad)
+                                .foregroundColor(Theme.text)
+                        }
+                    }
+                    
+                    if let error = errorMessage {
+                        Section {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("编辑持仓")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") { dismiss() }
+                        .foregroundColor(Theme.textSecondary)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("保存") { saveChanges() }
+                        .foregroundColor(Theme.bambooGreen)
+                        .disabled(isSaving || name.isEmpty)
+                }
+            }
+            .onAppear {
+                // 初始化表单数据
+                name = holding.name
+                displayName = holding.displayName ?? ""
+                tickerCode = holding.tickerCode ?? ""
+                quantity = String(format: holding.type == .crypto ? "%.8f" : "%.0f", holding.quantity)
+                avgCostPrice = String(format: "%.2f", holding.avgCostPrice)
+            }
+        }
+    }
+    
+    private func saveChanges() {
+        isSaving = true
+        errorMessage = nil
+        
+        let request = UpdateHoldingRequest(
+            name: name != holding.name ? name : nil,
+            displayName: displayName.isEmpty ? nil : (displayName != holding.displayName ? displayName : nil),
+            tickerCode: tickerCode.isEmpty ? nil : (tickerCode != holding.tickerCode ? tickerCode : nil),
+            codeVerified: tickerCode.isEmpty ? nil : true,
+            quantity: Double(quantity),
+            avgCostPrice: Double(avgCostPrice),
+            currentPrice: nil,
+            market: nil
+        )
+        
+        holdingService.updateHolding(id: holding.id, request: request)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                isSaving = false
+                if case .failure(let error) = completion {
+                    errorMessage = "保存失败: \(error.localizedDescription)"
+                }
+            } receiveValue: { _ in
+                dismiss()
+            }
+            .store(in: &cancellables)
     }
 }

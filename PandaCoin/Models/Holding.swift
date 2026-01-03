@@ -107,10 +107,23 @@ struct Holding: Codable, Identifiable, Hashable {
     let market: MarketType
     let tickerCode: String?
     let codeVerified: Bool
+    let codeSource: String?           // AI, YFINANCE, COINGECKO, MANUAL
     let quantity: Double
     let avgCostPrice: Double
+    
+    // 价格信息 (定时更新)
     let currentPrice: Double?
+    let previousClose: Double?         // 前收盘价
+    let priceChange: Double?           // 价格变动
+    let priceChangePercent: Double?    // 价格变动百分比
     let lastPriceAt: Date?
+    let priceSource: String?           // YFINANCE, COINGECKO, AKSHARE, MANUAL
+    
+    // 计算字段 (后端计算)
+    let currentValue: Double?          // 当前市值
+    let profitLoss: Double?            // 盈亏金额
+    let profitLossPercent: Double?     // 盈亏百分比
+    
     let currency: String
     let createdAt: Date
     let updatedAt: Date
@@ -118,8 +131,9 @@ struct Holding: Codable, Identifiable, Hashable {
     // 可选的账户信息
     let account: AccountInfo?
 
-    // 计算属性
+    // 计算属性 - 使用后端计算的值，如果没有则本地计算
     var marketValue: Double {
+        if let value = currentValue { return value }
         let price = currentPrice ?? avgCostPrice
         return quantity * price
     }
@@ -129,16 +143,40 @@ struct Holding: Codable, Identifiable, Hashable {
     }
 
     var unrealizedPnL: Double {
+        if let pnl = profitLoss { return pnl }
         return marketValue - totalCost
     }
 
     var unrealizedPnLPercent: Double {
+        if let pnlPercent = profitLossPercent { return pnlPercent }
         guard totalCost > 0 else { return 0 }
         return (unrealizedPnL / totalCost) * 100
     }
 
     var isProfitable: Bool {
         return unrealizedPnL >= 0
+    }
+    
+    // 今日涨跌 - 使用后端计算的值
+    var todayChange: Double {
+        return priceChange ?? 0
+    }
+    
+    var todayChangePercent: Double {
+        return priceChangePercent ?? 0
+    }
+    
+    // 是否有实时价格
+    var hasRealTimePrice: Bool {
+        return currentPrice != nil && lastPriceAt != nil
+    }
+    
+    // 价格更新时间格式化
+    var formattedPriceUpdateTime: String? {
+        guard let date = lastPriceAt else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter.string(from: date)
     }
 
     // 格式化市值显示
@@ -173,8 +211,10 @@ struct Holding: Codable, Identifiable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, accountId, userId, name, displayName, type, market
-        case tickerCode, codeVerified, quantity, avgCostPrice, currentPrice
-        case lastPriceAt, currency, createdAt, updatedAt, account
+        case tickerCode, codeVerified, codeSource, quantity, avgCostPrice
+        case currentPrice, previousClose, priceChange, priceChangePercent
+        case lastPriceAt, priceSource, currentValue, profitLoss, profitLossPercent
+        case currency, createdAt, updatedAt, account
     }
 
     init(from decoder: Decoder) throws {
@@ -188,9 +228,22 @@ struct Holding: Codable, Identifiable, Hashable {
         market = try container.decodeIfPresent(MarketType.self, forKey: .market) ?? .us
         tickerCode = try container.decodeIfPresent(String.self, forKey: .tickerCode)
         codeVerified = try container.decodeIfPresent(Bool.self, forKey: .codeVerified) ?? false
+        codeSource = try container.decodeIfPresent(String.self, forKey: .codeSource)
         quantity = try container.decode(Double.self, forKey: .quantity)
         avgCostPrice = try container.decode(Double.self, forKey: .avgCostPrice)
+        
+        // 价格信息
         currentPrice = try container.decodeIfPresent(Double.self, forKey: .currentPrice)
+        previousClose = try container.decodeIfPresent(Double.self, forKey: .previousClose)
+        priceChange = try container.decodeIfPresent(Double.self, forKey: .priceChange)
+        priceChangePercent = try container.decodeIfPresent(Double.self, forKey: .priceChangePercent)
+        priceSource = try container.decodeIfPresent(String.self, forKey: .priceSource)
+        
+        // 计算字段
+        currentValue = try container.decodeIfPresent(Double.self, forKey: .currentValue)
+        profitLoss = try container.decodeIfPresent(Double.self, forKey: .profitLoss)
+        profitLossPercent = try container.decodeIfPresent(Double.self, forKey: .profitLossPercent)
+        
         currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
         account = try container.decodeIfPresent(AccountInfo.self, forKey: .account)
 

@@ -212,7 +212,8 @@ class RecordService: ObservableObject {
                         assetUpdateData: nil,
                         creditCardData: nil,
                         holdingUpdateData: nil,
-                        budgetData: nil
+                        budgetData: nil,
+                        needMoreInfoData: nil
                     )
                     
                 case .assetUpdate:
@@ -253,7 +254,8 @@ class RecordService: ObservableObject {
                         assetUpdateData: assetData,
                         creditCardData: nil,
                         holdingUpdateData: nil,
-                        budgetData: nil
+                        budgetData: nil,
+                        needMoreInfoData: nil
                     )
                     
                 case .creditCardUpdate:
@@ -279,7 +281,8 @@ class RecordService: ObservableObject {
                         assetUpdateData: nil,
                         creditCardData: creditCardData,
                         holdingUpdateData: nil,
-                        budgetData: nil
+                        budgetData: nil,
+                        needMoreInfoData: nil
                     )
                     
                 case .holdingUpdate:
@@ -304,7 +307,8 @@ class RecordService: ObservableObject {
                         assetUpdateData: nil,
                         creditCardData: nil,
                         holdingUpdateData: holdingData,
-                        budgetData: nil
+                        budgetData: nil,
+                        needMoreInfoData: nil
                     )
 
                 case .budget:
@@ -325,9 +329,53 @@ class RecordService: ObservableObject {
                         assetUpdateData: nil,
                         creditCardData: nil,
                         holdingUpdateData: nil,
-                        budgetData: budgetData
+                        budgetData: budgetData,
+                        needMoreInfoData: nil
                     )
 
+                case .needMoreInfo:
+                    // 缺少关键信息，需要追问用户
+                    logInfo("❓ 需要更多信息: \(data.question ?? "")")
+                    
+                    // 解析原始意图
+                    let originalIntent = FinancialEventType(rawValue: data.original_intent ?? "") ?? .nullStatement
+                    
+                    // 构建已解析的部分数据
+                    var partialHoldingData: HoldingUpdateParsed? = nil
+                    if let partial = data.partial_data {
+                        partialHoldingData = HoldingUpdateParsed(
+                            name: partial.name ?? "",
+                            holdingType: partial.holding_type ?? "STOCK",
+                            holdingAction: partial.holding_action ?? "BUY",
+                            quantity: partial.quantity ?? 0,
+                            price: 0, // 价格待补充
+                            currency: partial.currency ?? "CNY",
+                            date: self.parseDate(partial.date) ?? Date(),
+                            market: partial.market,
+                            tickerCode: partial.ticker_code,
+                            accountName: nil,
+                            fee: nil,
+                            note: nil
+                        )
+                    }
+                    
+                    let needMoreInfoData = NeedMoreInfoParsed(
+                        originalIntent: originalIntent,
+                        missingFields: data.missing_fields ?? [],
+                        question: data.question ?? "请提供更多信息",
+                        partialData: partialHoldingData
+                    )
+                    
+                    return ParsedFinancialEvent(
+                        eventType: .needMoreInfo,
+                        transactionData: nil,
+                        assetUpdateData: nil,
+                        creditCardData: nil,
+                        holdingUpdateData: nil,
+                        budgetData: nil,
+                        needMoreInfoData: needMoreInfoData
+                    )
+                    
                 case .nullStatement:
                     logInfo("⚠️ 无效语句，跳过")
                     return nil
@@ -1066,6 +1114,24 @@ struct FinancialEventData: Codable {
     let account_name: String?       // 证券账户名称
     let price: Double?              // 单价
     let fee: Double?                // 交易手续费
+    
+    // NEED_MORE_INFO 字段
+    let original_intent: String?    // 原始意图事件类型
+    let missing_fields: [String]?   // 缺失的字段列表
+    let question: String?           // AI 追问的问题
+    let partial_data: PartialDataResponse?  // 已解析的部分数据
+}
+
+// 部分数据响应（用于 NEED_MORE_INFO）
+struct PartialDataResponse: Codable {
+    let name: String?
+    let holding_type: String?
+    let holding_action: String?
+    let quantity: Double?
+    let market: String?
+    let currency: String?
+    let ticker_code: String?
+    let date: String?
 }
 
 // MARK: - 统一解析结果类型
@@ -1076,6 +1142,7 @@ enum FinancialEventType: String, Codable {
     case holdingUpdate = "HOLDING_UPDATE"
     case budget = "BUDGET"
     case nullStatement = "NULL_STATEMENT"
+    case needMoreInfo = "NEED_MORE_INFO"  // 缺少关键信息，需要追问
 }
 
 // 统一的解析结果，支持多种事件类型
@@ -1097,6 +1164,17 @@ struct ParsedFinancialEvent: Identifiable {
 
     // 预算数据
     var budgetData: BudgetParsed?
+    
+    // 追问数据（缺少关键信息时）
+    var needMoreInfoData: NeedMoreInfoParsed?
+}
+
+// 追问数据结构
+struct NeedMoreInfoParsed {
+    let originalIntent: FinancialEventType  // 原始意图
+    let missingFields: [String]             // 缺失的字段
+    let question: String                    // AI 追问的问题
+    let partialData: HoldingUpdateParsed?   // 已解析的部分数据（目前主要用于 HOLDING_UPDATE）
 }
 
 // 资产更新解析结果

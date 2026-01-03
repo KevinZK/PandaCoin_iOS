@@ -245,7 +245,7 @@ struct EventConfirmCard: View {
                         set: { event.budgetData = $0 }
                     ))
                 }
-            case .nullStatement:
+            case .nullStatement, .needMoreInfo:
                 EmptyView()
             }
         }
@@ -280,6 +280,7 @@ struct EventConfirmCard: View {
         case .holdingUpdate: return "持仓交易"
         case .budget: return "预算"
         case .nullStatement: return "无效"
+        case .needMoreInfo: return "追问"
         }
     }
 
@@ -291,6 +292,7 @@ struct EventConfirmCard: View {
         case .holdingUpdate: return "chart.line.uptrend.xyaxis"
         case .budget: return "target"
         case .nullStatement: return "xmark"
+        case .needMoreInfo: return "questionmark.circle"
         }
     }
 
@@ -310,6 +312,7 @@ struct EventConfirmCard: View {
             return .green
         case .budget: return .purple
         case .nullStatement: return Theme.textSecondary
+        case .needMoreInfo: return .gray
         }
     }
 }

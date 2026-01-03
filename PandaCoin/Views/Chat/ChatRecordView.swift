@@ -68,6 +68,9 @@ struct ChatRecordView: View {
     @State private var editableEvents: [ParsedFinancialEvent] = []  // 可编辑的事件列表
     @State private var showingEventCards = false  // 是否显示事件确认卡片
     @State private var cancellables = Set<AnyCancellable>()
+    
+    // 追问状态：保存部分数据，等待用户补充信息
+    @State private var pendingPartialData: NeedMoreInfoParsed? = nil
 
     // 图片处理状态
     @State private var isProcessingImage = false  // 正在处理图片
@@ -374,11 +377,47 @@ struct ChatRecordView: View {
         inputText = ""
         
         // 显示解析中状态
-        let parsingMessageId = UUID()
         messages.append(ChatMessage(type: .assistantParsing))
         
-        // 调用AI解析
-        parseAndRespond(text: text, parsingMessageId: parsingMessageId)
+        // 检查是否是追问回复（有待处理的部分数据）
+        if let pending = pendingPartialData, let partialData = pending.partialData {
+            // 将用户输入与部分数据合并，形成完整的请求
+            let combinedText = buildCombinedText(userInput: text, partialData: partialData, missingFields: pending.missingFields)
+            pendingPartialData = nil  // 清除待处理数据
+            parseAndRespond(text: combinedText, parsingMessageId: nil)
+        } else {
+            // 正常流程
+            parseAndRespond(text: text, parsingMessageId: nil)
+        }
+    }
+    
+    // MARK: - 构建合并后的文本（用于追问回复）
+    private func buildCombinedText(userInput: String, partialData: HoldingUpdateParsed, missingFields: [String]) -> String {
+        // 根据缺失字段类型，将用户输入的值合并到完整描述中
+        var combinedText = ""
+        
+        // 判断用户输入的内容类型
+        if missingFields.contains("price") {
+            // 用户补充了价格
+            let priceStr = userInput.replacingOccurrences(of: "元", with: "")
+                .replacingOccurrences(of: "块", with: "")
+                .replacingOccurrences(of: "美元", with: "")
+                .replacingOccurrences(of: "港币", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            
+            let actionStr = partialData.holdingAction == "SELL" ? "卖出" : "买入"
+            let currencyStr = partialData.currency == "USD" ? "美元" : (partialData.currency == "HKD" ? "港币" : "元")
+            
+            combinedText = "\(actionStr)\(Int(partialData.quantity))股\(partialData.name)，每股\(priceStr)\(currencyStr)"
+        } else if missingFields.contains("quantity") && missingFields.contains("price") {
+            // 用户同时补充了数量和价格
+            combinedText = userInput  // 假设用户输入的是完整描述
+        } else {
+            // 其他情况，直接使用用户输入
+            combinedText = userInput
+        }
+        
+        return combinedText
     }
     
     // MARK: - 开始录音
@@ -418,8 +457,14 @@ struct ChatRecordView: View {
         // 显示解析中
         messages.append(ChatMessage(type: .assistantParsing))
         
-        // 调用AI解析
-        parseAndRespond(text: recognizedText, parsingMessageId: nil)
+        // 检查是否是追问回复
+        if let pending = pendingPartialData, let partialData = pending.partialData {
+            let combinedText = buildCombinedText(userInput: recognizedText, partialData: partialData, missingFields: pending.missingFields)
+            pendingPartialData = nil
+            parseAndRespond(text: combinedText, parsingMessageId: nil)
+        } else {
+            parseAndRespond(text: recognizedText, parsingMessageId: nil)
+        }
     }
     
     // MARK: - AI解析并响应
@@ -446,9 +491,18 @@ struct ChatRecordView: View {
                 if events.isEmpty {
                     self.messages.append(ChatMessage(type: .assistantText("抱歉，没有识别出记账信息，请换个方式描述试试~")))
                 } else {
-                    // 设置可编辑事件并显示确认卡片
-                    self.editableEvents = events
-                    self.showingEventCards = true
+                    // 检查是否有 NEED_MORE_INFO 事件（需要追问）
+                    if let needMoreInfoEvent = events.first(where: { $0.eventType == .needMoreInfo }),
+                       let needMoreInfo = needMoreInfoEvent.needMoreInfoData {
+                        // 保存部分数据，等待用户补充
+                        self.pendingPartialData = needMoreInfo
+                        // 显示追问消息
+                        self.messages.append(ChatMessage(type: .assistantText(needMoreInfo.question)))
+                    } else {
+                        // 正常流程：设置可编辑事件并显示确认卡片
+                        self.editableEvents = events
+                        self.showingEventCards = true
+                    }
                 }
             }
             .store(in: &cancellables)
