@@ -18,8 +18,7 @@ struct InvestmentAccountDetailView: View {
     @State private var cancellables = Set<AnyCancellable>()
     
     // 编辑/删除相关状态
-    @State private var showEditHolding = false
-    @State private var selectedHolding: Holding?
+    @State private var holdingToEdit: Holding?
     @State private var showDeleteConfirm = false
     @State private var holdingToDelete: Holding?
 
@@ -64,13 +63,11 @@ struct InvestmentAccountDetailView: View {
                     fetchHoldings()
                 }
         }
-        .sheet(isPresented: $showEditHolding) {
-            if let holding = selectedHolding {
-                EditHoldingView(holding: holding)
-                    .onDisappear {
-                        fetchHoldings()
-                    }
-            }
+        .sheet(item: $holdingToEdit) { holding in
+            EditHoldingView(holding: holding)
+                .onDisappear {
+                    fetchHoldings()
+                }
         }
         .alert("确认删除", isPresented: $showDeleteConfirm) {
             Button("取消", role: .cancel) {
@@ -206,11 +203,18 @@ struct InvestmentAccountDetailView: View {
     private var holdingsList: some View {
         List {
             ForEach(holdings) { holding in
-                NavigationLink(destination: HoldingDetailView(holding: holding)) {
+                ZStack {
+                    // 隐藏的NavigationLink，去掉箭头
+                    NavigationLink(destination: HoldingDetailView(holding: holding)) {
+                        EmptyView()
+                    }
+                    .opacity(0)
+
                     HoldingCard(holding: holding)
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowSeparator(.hidden)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     // 删除按钮
                     Button(role: .destructive) {
@@ -219,11 +223,10 @@ struct InvestmentAccountDetailView: View {
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
-                    
+
                     // 编辑按钮
                     Button {
-                        selectedHolding = holding
-                        showEditHolding = true
+                        holdingToEdit = holding
                     } label: {
                         Label("编辑", systemImage: "pencil")
                     }
@@ -316,59 +319,111 @@ struct HoldingCard: View {
     let holding: Holding
 
     var body: some View {
-        HStack(spacing: 12) {
-            // 图标
-            ZStack {
-                Circle()
-                    .fill(typeColor.opacity(0.12))
-                    .frame(width: 48, height: 48)
-                Image(systemName: holding.type.icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(typeColor)
-            }
+        VStack(spacing: 12) {
+            // 上半部分：图标 + 名称/代码 + 市值
+            HStack(spacing: 12) {
+                // 图标
+                ZStack {
+                    Circle()
+                        .fill(typeColor.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: holding.type.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(typeColor)
+                }
 
-            // 信息
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(holding.displayName ?? holding.name)
-                        .font(AppFont.body(size: 16, weight: .semibold))
-                        .foregroundColor(Theme.text)
+                // 名称和代码
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(holding.displayName ?? holding.name)
+                            .font(AppFont.body(size: 15, weight: .semibold))
+                            .foregroundColor(Theme.text)
+                            .lineLimit(1)
 
+                        
+                    }
                     if let code = holding.tickerCode {
                         Text(code)
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundColor(Theme.textSecondary)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(Theme.textSecondary.opacity(0.1))
                             .cornerRadius(4)
                     }
+
+                    HStack(spacing: 6) {
+                        Text("\(formattedQuantity)\(unitName)")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+
+                        Text("·")
+                            .foregroundColor(Theme.textSecondary)
+
+                        Text(holding.market.displayName)
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
                 }
 
-                HStack(spacing: 8) {
-                    Text("\(formattedQuantity)\(unitName)")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
+                Spacer()
 
-                    Text(holding.market.displayName)
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                // 市值
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("¥\(holding.formattedMarketValue)")
+                        .font(AppFont.monoNumber(size: 16, weight: .bold))
+                        .foregroundColor(Theme.text)
+
+                    // 盈亏金额和百分比
+                    HStack(spacing: 4) {
+                        Text(holding.formattedPnL)
+                            .font(AppFont.monoNumber(size: 12, weight: .medium))
+                            .foregroundColor(pnlColor)
+
+                        Text(holding.formattedPnLPercent)
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(pnlColor)
+                            .cornerRadius(4)
+                    }
                 }
             }
 
-            Spacer()
+            // 分割线
+            Divider()
 
-            // 类型标签
-            Text(holding.type.displayName)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(typeColor)
-                .cornerRadius(6)
+            // 下半部分：最新价 | 成本价
+            HStack(spacing: 0) {
+                // 最新价
+                VStack(spacing: 2) {
+                    Text("最新价")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                    Text("¥\(formattedPrice(holding.currentPrice ?? holding.avgCostPrice))")
+                        .font(AppFont.monoNumber(size: 13, weight: .medium))
+                        .foregroundColor(Theme.text)
+                }
+                .frame(maxWidth: .infinity)
+
+                Divider()
+                    .frame(height: 28)
+
+                // 成本价
+                VStack(spacing: 2) {
+                    Text("成本价")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                    Text("¥\(formattedPrice(holding.avgCostPrice))")
+                        .font(AppFont.monoNumber(size: 13, weight: .medium))
+                        .foregroundColor(Theme.text)
+                }
+                .frame(maxWidth: .infinity)
+            }
         }
-        .padding(16)
+        .padding(14)
         .background(Theme.cardBackground)
         .cornerRadius(CornerRadius.medium)
         .shadow(color: Theme.cfoShadow, radius: 8, x: 0, y: 4)
@@ -376,6 +431,10 @@ struct HoldingCard: View {
 
     private var unitName: String {
         holding.type == .crypto ? "个" : "股"
+    }
+
+    private var pnlColor: Color {
+        holding.isProfitable ? Theme.income : Theme.expense
     }
 
     private var typeColor: Color {
@@ -396,6 +455,14 @@ struct HoldingCard: View {
         formatter.maximumFractionDigits = holding.type == .crypto ? 8 : 0
         return formatter.string(from: NSNumber(value: holding.quantity)) ?? "0"
     }
+
+    private func formattedPrice(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "0.00"
+    }
 }
 
 // MARK: - 持仓详情视图
@@ -407,7 +474,6 @@ struct HoldingDetailView: View {
     @State private var isLoading = true
     @State private var showBuySheet = false
     @State private var showSellSheet = false
-    @State private var showEditSheet = false
     @State private var cancellables = Set<AnyCancellable>()
     
     // 使用当前持仓数据或初始数据
@@ -441,16 +507,6 @@ struct HoldingDetailView: View {
         }
         .navigationTitle(currentHolding.displayName ?? currentHolding.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showEditSheet = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .foregroundColor(Theme.bambooGreen)
-                }
-            }
-        }
         .sheet(isPresented: $showBuySheet) {
             BuySellHoldingView(holding: currentHolding, action: .buy)
                 .onDisappear {
@@ -459,12 +515,6 @@ struct HoldingDetailView: View {
         }
         .sheet(isPresented: $showSellSheet) {
             BuySellHoldingView(holding: currentHolding, action: .sell)
-                .onDisappear {
-                    refreshHolding()
-                }
-        }
-        .sheet(isPresented: $showEditSheet) {
-            EditHoldingView(holding: currentHolding)
                 .onDisappear {
                     refreshHolding()
                 }
@@ -772,11 +822,22 @@ struct AddHoldingView: View {
     }
 }
 
-// MARK: - 买入/卖出视图 (占位)
+// MARK: - 买入/卖出视图
 struct BuySellHoldingView: View {
     let holding: Holding
     let action: Action
     @Environment(\.dismiss) var dismiss
+    @StateObject private var holdingService = HoldingService.shared
+
+    @State private var quantity: String = ""
+    @State private var price: String = ""
+    @State private var fee: String = ""
+    @State private var note: String = ""
+    @State private var transactionDate = Date()
+    @State private var showDatePicker = false
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+    @State private var cancellables = Set<AnyCancellable>()
 
     enum Action {
         case buy, sell
@@ -787,19 +848,358 @@ struct BuySellHoldingView: View {
             case .sell: return "卖出"
             }
         }
+
+        var buttonColor: Color {
+            switch self {
+            case .buy: return Theme.income
+            case .sell: return Theme.expense
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .buy: return "plus.circle.fill"
+            case .sell: return "minus.circle.fill"
+            }
+        }
+    }
+
+    // 计算交易金额
+    private var transactionAmount: Double {
+        let qty = Double(quantity) ?? 0
+        let prc = Double(price) ?? 0
+        let feeAmount = Double(fee) ?? 0
+        return qty * prc + (action == .buy ? feeAmount : -feeAmount)
+    }
+
+    // 验证输入
+    private var isValidInput: Bool {
+        guard let qty = Double(quantity), qty > 0,
+              let prc = Double(price), prc > 0 else {
+            return false
+        }
+        // 卖出时检查数量不能超过持仓
+        if action == .sell && qty > holding.quantity {
+            return false
+        }
+        return true
     }
 
     var body: some View {
         NavigationView {
-            Text("\(action.title) \(holding.name)")
-                .navigationTitle(action.title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("取消") { dismiss() }
+            ZStack {
+                Theme.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // 持仓信息卡片
+                        holdingInfoCard
+
+                        // 交易表单
+                        transactionForm
+
+                        // 交易预览
+                        if isValidInput {
+                            transactionPreview
+                        }
+
+                        // 错误信息
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.horizontal)
+                        }
+
+                        // 提交按钮
+                        submitButton
                     }
+                    .padding()
                 }
+            }
+            .navigationTitle(action.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") { dismiss() }
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
         }
+    }
+
+    // MARK: - 持仓信息卡片
+    private var holdingInfoCard: some View {
+        HStack(spacing: 12) {
+            // 图标
+            ZStack {
+                Circle()
+                    .fill(action.buttonColor.opacity(0.15))
+                    .frame(width: 50, height: 50)
+                Image(systemName: action.icon)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(action.buttonColor)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(holding.displayName ?? holding.name)
+                    .font(AppFont.body(size: 17, weight: .bold))
+                    .foregroundColor(Theme.text)
+
+                HStack(spacing: 8) {
+                    if let code = holding.tickerCode {
+                        Text(code)
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Text("持有 \(formattedHoldingQuantity)")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("现价")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+                Text("¥\(formattedCurrentPrice)")
+                    .font(AppFont.monoNumber(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.text)
+            }
+        }
+        .padding(16)
+        .background(Theme.cardBackground)
+        .cornerRadius(CornerRadius.medium)
+    }
+
+    // MARK: - 交易表单
+    private var transactionForm: some View {
+        VStack(spacing: 0) {
+            // 数量输入
+            formRow(title: "数量", placeholder: action == .sell ? "最多 \(formattedHoldingQuantity)" : "输入数量") {
+                TextField("0", text: $quantity)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .foregroundColor(Theme.text)
+                    .font(AppFont.monoNumber(size: 16, weight: .medium))
+            }
+
+            Divider().padding(.leading, 16)
+
+            // 价格输入
+            formRow(title: "价格", placeholder: "输入价格") {
+                HStack(spacing: 4) {
+                    Text("¥")
+                        .foregroundColor(Theme.textSecondary)
+                    TextField("0.00", text: $price)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundColor(Theme.text)
+                        .font(AppFont.monoNumber(size: 16, weight: .medium))
+                }
+            }
+
+            Divider().padding(.leading, 16)
+
+            // 手续费输入（可选）
+            formRow(title: "手续费", placeholder: "可选") {
+                HStack(spacing: 4) {
+                    Text("¥")
+                        .foregroundColor(Theme.textSecondary)
+                    TextField("0.00", text: $fee)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundColor(Theme.text)
+                        .font(AppFont.monoNumber(size: 16, weight: .medium))
+                }
+            }
+
+            Divider().padding(.leading, 16)
+
+            // 日期选择
+            formRow(title: "日期", placeholder: "") {
+                Button {
+                    showDatePicker.toggle()
+                } label: {
+                    Text(formattedDate)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.text)
+                }
+            }
+
+            if showDatePicker {
+                DatePicker("", selection: $transactionDate, displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.graphical)
+                    .padding(.horizontal)
+            }
+
+            Divider().padding(.leading, 16)
+
+            // 备注输入（可选）
+            formRow(title: "备注", placeholder: "可选") {
+                TextField("添加备注...", text: $note)
+                    .multilineTextAlignment(.trailing)
+                    .foregroundColor(Theme.text)
+            }
+        }
+        .background(Theme.cardBackground)
+        .cornerRadius(CornerRadius.medium)
+    }
+
+    private func formRow<Content: View>(title: String, placeholder: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(Theme.textSecondary)
+
+            Spacer()
+
+            content()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    // MARK: - 交易预览
+    private var transactionPreview: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("交易金额")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Text("¥\(formattedTransactionAmount)")
+                    .font(AppFont.monoNumber(size: 20, weight: .bold))
+                    .foregroundColor(action.buttonColor)
+            }
+
+            if action == .sell, let qty = Double(quantity) {
+                let remainingQty = holding.quantity - qty
+                HStack {
+                    Text("卖出后剩余")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                    Text("\(formatQuantity(remainingQty)) \(unitName)")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
+        }
+        .padding(16)
+        .background(action.buttonColor.opacity(0.1))
+        .cornerRadius(CornerRadius.medium)
+    }
+
+    // MARK: - 提交按钮
+    private var submitButton: some View {
+        Button {
+            submitTransaction()
+        } label: {
+            HStack {
+                if isSubmitting {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Image(systemName: action.icon)
+                    Text("确认\(action.title)")
+                }
+            }
+            .font(.headline)
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(isValidInput && !isSubmitting ? action.buttonColor : Color.gray)
+            .cornerRadius(CornerRadius.medium)
+        }
+        .disabled(!isValidInput || isSubmitting)
+    }
+
+    // MARK: - 提交交易
+    private func submitTransaction() {
+        guard let qty = Double(quantity), let prc = Double(price) else { return }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        let feeAmount = Double(fee)
+        let noteText = note.isEmpty ? nil : note
+
+        let publisher: AnyPublisher<BuyHoldingResponse, APIError>
+
+        switch action {
+        case .buy:
+            publisher = holdingService.buy(
+                holdingId: holding.id,
+                quantity: qty,
+                price: prc,
+                fee: feeAmount,
+                date: transactionDate,
+                note: noteText
+            )
+        case .sell:
+            publisher = holdingService.sell(
+                holdingId: holding.id,
+                quantity: qty,
+                price: prc,
+                fee: feeAmount,
+                date: transactionDate,
+                note: noteText
+            )
+        }
+
+        publisher
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                isSubmitting = false
+                if case .failure(let error) = completion {
+                    errorMessage = "\(action.title)失败: \(error.localizedDescription)"
+                }
+            } receiveValue: { _ in
+                dismiss()
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - 格式化方法
+    private var formattedHoldingQuantity: String {
+        formatQuantity(holding.quantity)
+    }
+
+    private var formattedCurrentPrice: String {
+        let price = holding.currentPrice ?? holding.avgCostPrice
+        return formatPrice(price)
+    }
+
+    private var formattedTransactionAmount: String {
+        formatPrice(transactionAmount)
+    }
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: transactionDate)
+    }
+
+    private var unitName: String {
+        holding.type == .crypto ? "个" : "股"
+    }
+
+    private func formatQuantity(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = holding.type == .crypto ? 8 : 0
+        return formatter.string(from: NSNumber(value: value)) ?? "0"
+    }
+
+    private func formatPrice(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "0.00"
     }
 }
 
