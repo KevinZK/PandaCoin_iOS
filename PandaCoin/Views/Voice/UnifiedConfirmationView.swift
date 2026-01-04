@@ -37,13 +37,15 @@ struct UnifiedConfirmationView: View {
                             Text("🐼")
                                 .font(.system(size: 50))
 
-                            Text("熊猫识别了\(editableEvents.count)条记录")
+                            Text(headerTitle)
                                 .font(AppFont.body(size: 16, weight: .medium))
                                  .foregroundColor(Theme.text)
 
-                            Text("请确认是否正确")
-                                .font(AppFont.body(size: 14))
-                                .foregroundColor(Theme.textSecondary)
+                            if hasSaveableEvents {
+                                Text("请确认是否正确")
+                                    .font(AppFont.body(size: 14))
+                                    .foregroundColor(Theme.textSecondary)
+                            }
                         }
                         .padding(.top, Spacing.large)
 
@@ -67,33 +69,50 @@ struct UnifiedConfirmationView: View {
                         .padding(.horizontal, Spacing.medium)
 
                         // 按钮
-                        HStack(spacing: Spacing.medium) {
-                        Button(action: {
-                            dismiss()
-                        }) {
-                            Text("取消")
-                                .font(AppFont.body(size: 16, weight: .medium))
-                                .foregroundColor(Theme.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(Theme.cardBackground)
-                                .cornerRadius(CornerRadius.medium)
-                        }
+                        if hasSaveableEvents {
+                            HStack(spacing: Spacing.medium) {
+                                Button(action: {
+                                    dismiss()
+                                }) {
+                                    Text("取消")
+                                        .font(AppFont.body(size: 16, weight: .medium))
+                                        .foregroundColor(Theme.textSecondary)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 50)
+                                        .background(Theme.cardBackground)
+                                        .cornerRadius(CornerRadius.medium)
+                                }
 
+                                Button(action: {
+                                    handleConfirm()
+                                }) {
+                                    Text("确认保存")
+                                        .font(AppFont.body(size: 16, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 50)
+                                        .background(Theme.bambooGreen)
+                                        .cornerRadius(CornerRadius.medium)
+                                }
+                            }
+                            .padding(.horizontal, Spacing.medium)
+                            .padding(.bottom, Spacing.large)
+                        } else {
+                            // 查询类结果只显示关闭按钮
                             Button(action: {
-                                handleConfirm()
+                                dismiss()
                             }) {
-                                Text("确认保存")
-                                    .font(AppFont.body(size: 16, weight: .bold))
+                                Text("关闭")
+                                    .font(AppFont.body(size: 16, weight: .medium))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 50)
                                     .background(Theme.bambooGreen)
                                     .cornerRadius(CornerRadius.medium)
                             }
+                            .padding(.horizontal, Spacing.medium)
+                            .padding(.bottom, Spacing.large)
                         }
-                        .padding(.horizontal, Spacing.medium)
-                        .padding(.bottom, Spacing.large)
                     }
                 }
             }
@@ -146,6 +165,31 @@ struct UnifiedConfirmationView: View {
         }
     }
 
+    // MARK: - 计算属性
+    
+    /// 是否有可保存的事件（非查询类型）
+    private var hasSaveableEvents: Bool {
+        editableEvents.contains { event in
+            switch event.eventType {
+            case .transaction, .assetUpdate, .creditCardUpdate, .holdingUpdate, .budget:
+                return true
+            case .queryResponse, .nullStatement, .needMoreInfo:
+                return false
+            }
+        }
+    }
+    
+    /// 标题文字
+    private var headerTitle: String {
+        if hasSaveableEvents {
+            return "熊猫识别了\(editableEvents.count)条记录"
+        } else if editableEvents.first?.eventType == .queryResponse {
+            return "熊猫为您查询到以下信息"
+        } else {
+            return "熊猫识别结果"
+        }
+    }
+    
     // MARK: - 确认逻辑
 
     private func handleConfirm() {
@@ -245,6 +289,10 @@ struct EventConfirmCard: View {
                         set: { event.budgetData = $0 }
                     ))
                 }
+            case .queryResponse:
+                if let queryData = event.queryResponseData {
+                    QueryResponseCardContent(data: queryData)
+                }
             case .nullStatement, .needMoreInfo:
                 EmptyView()
             }
@@ -279,6 +327,7 @@ struct EventConfirmCard: View {
         case .creditCardUpdate: return "信用卡"
         case .holdingUpdate: return "持仓交易"
         case .budget: return "预算"
+        case .queryResponse: return "查询结果"
         case .nullStatement: return "无效"
         case .needMoreInfo: return "追问"
         }
@@ -291,6 +340,7 @@ struct EventConfirmCard: View {
         case .creditCardUpdate: return "creditcard"
         case .holdingUpdate: return "chart.line.uptrend.xyaxis"
         case .budget: return "target"
+        case .queryResponse: return "chart.bar.doc.horizontal"
         case .nullStatement: return "xmark"
         case .needMoreInfo: return "questionmark.circle"
         }
@@ -311,6 +361,7 @@ struct EventConfirmCard: View {
             }
             return .green
         case .budget: return .purple
+        case .queryResponse: return .teal
         case .nullStatement: return Theme.textSecondary
         case .needMoreInfo: return .gray
         }
@@ -1446,6 +1497,106 @@ struct BudgetCardContent: View {
             .padding(.vertical, 2)
             .background(color.opacity(0.1))
             .cornerRadius(8)
+    }
+}
+
+// MARK: - 查询响应卡片内容
+struct QueryResponseCardContent: View {
+    let data: QueryResponseParsed
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            // 技能标签
+            HStack {
+                Text("📊")
+                    .font(.system(size: 16))
+                Text(skillName)
+                    .font(AppFont.body(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.teal)
+                    .cornerRadius(10)
+                Spacer()
+            }
+            
+            // 摘要
+            Text(data.summary)
+                .font(AppFont.body(size: 16, weight: .medium))
+                .foregroundColor(Theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            // 金额信息
+            if let totalExpense = data.totalExpense {
+                HStack {
+                    Text("总支出")
+                        .font(AppFont.body(size: 14))
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                    Text(formatAmount(totalExpense))
+                        .font(AppFont.monoNumber(size: 20, weight: .bold))
+                        .foregroundColor(Theme.expense)
+                }
+            }
+            
+            if let dailyAverage = data.dailyAverage {
+                HStack {
+                    Text("日均消费")
+                        .font(AppFont.body(size: 14))
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                    Text(formatAmount(dailyAverage))
+                        .font(AppFont.monoNumber(size: 16, weight: .medium))
+                        .foregroundColor(Theme.text)
+                }
+            }
+            
+            // 洞察
+            if let insights = data.insights, !insights.isEmpty {
+                Divider().padding(.vertical, 4)
+                ForEach(insights, id: \.self) { insight in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("💡")
+                            .font(.system(size: 12))
+                        Text(insight)
+                            .font(AppFont.body(size: 13))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+            
+            // 建议
+            if let suggestions = data.suggestions, !suggestions.isEmpty {
+                Divider().padding(.vertical, 4)
+                ForEach(suggestions, id: \.self) { suggestion in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("📌")
+                            .font(.system(size: 12))
+                        Text(suggestion)
+                            .font(AppFont.body(size: 13))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var skillName: String {
+        switch data.skillUsed {
+        case "bill-analysis": return "消费分析"
+        case "budget-advisor": return "预算顾问"
+        case "investment": return "投资分析"
+        case "loan-advisor": return "贷款顾问"
+        default: return "智能分析"
+        }
+    }
+    
+    private func formatAmount(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return "¥\(formatter.string(from: NSNumber(value: amount)) ?? "0.00")"
     }
 }
 

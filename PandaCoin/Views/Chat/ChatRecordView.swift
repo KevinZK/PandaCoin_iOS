@@ -245,13 +245,15 @@ struct ChatRecordView: View {
                     .font(.system(size: 28))
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("好的，帮你记录\(editableEvents.count > 1 ? "\(editableEvents.count)笔" : "")：")
+                    Text(eventSectionTitle)
                         .font(AppFont.body(size: 15))
                         .foregroundColor(Theme.text)
                     
-                    Text("请确认信息是否正确")
-                        .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
+                    if hasSaveableEvents {
+                        Text("请确认信息是否正确")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
             }
             
@@ -272,33 +274,47 @@ struct ChatRecordView: View {
                 }
             }
             
-            // 确认按钮
-            HStack(spacing: 12) {
-                Button(action: cancelEvents) {
-                    Text("取消")
-                        .font(AppFont.body(size: 14, weight: .medium))
-                        .foregroundColor(Theme.textSecondary)
+            // 按钮区域
+            if hasSaveableEvents {
+                HStack(spacing: 12) {
+                    Button(action: cancelEvents) {
+                        Text("取消")
+                            .font(AppFont.body(size: 14, weight: .medium))
+                            .foregroundColor(Theme.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Theme.separator)
+                            .cornerRadius(22)
+                    }
+                    
+                    Button(action: { confirmEvents(editableEvents) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("确认保存")
+                                .font(AppFont.body(size: 14, weight: .bold))
+                        }
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
-                        .background(Theme.separator)
+                        .background(Theme.bambooGreen)
                         .cornerRadius(22)
-                }
-                
-                Button(action: { confirmEvents(editableEvents) }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("确认保存")
-                            .font(AppFont.body(size: 14, weight: .bold))
                     }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Theme.bambooGreen)
-                    .cornerRadius(22)
                 }
+                .padding(.top, 8)
+            } else {
+//                // 查询类结果只显示关闭按钮
+//                Button(action: cancelEvents) {
+//                    Text("关闭")
+//                        .font(AppFont.body(size: 14, weight: .medium))
+//                        .foregroundColor(.white)
+//                        .frame(maxWidth: .infinity)
+//                        .frame(height: 44)
+//                        .background(Theme.bambooGreen)
+//                        .cornerRadius(22)
+//                }
+//                .padding(.top, 8)
             }
-            .padding(.top, 8)
         }
         .padding(16)
         .background(Theme.cardBackground)
@@ -724,6 +740,31 @@ struct ChatRecordView: View {
 
         // 使用 CategoryMapper 从 category 推断
         return CategoryMapper.inferIncomeType(from: record.category)
+    }
+    
+    // MARK: - 计算属性
+    
+    /// 是否有可保存的事件（非查询类型）
+    private var hasSaveableEvents: Bool {
+        editableEvents.contains { event in
+            switch event.eventType {
+            case .transaction, .assetUpdate, .creditCardUpdate, .holdingUpdate, .budget:
+                return true
+            case .queryResponse, .nullStatement, .needMoreInfo:
+                return false
+            }
+        }
+    }
+    
+    /// 事件区域标题
+    private var eventSectionTitle: String {
+        if hasSaveableEvents {
+            return "好的，帮你记录\(editableEvents.count > 1 ? "\(editableEvents.count)笔" : "")："
+        } else if editableEvents.first?.eventType == .queryResponse {
+            return "为您查询到以下信息："
+        } else {
+            return "识别结果："
+        }
     }
     
     // MARK: - 取消事件

@@ -213,7 +213,8 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: nil,
-                        needMoreInfoData: nil
+                        needMoreInfoData: nil,
+                        queryResponseData: nil
                     )
                     
                 case .assetUpdate:
@@ -255,7 +256,8 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: nil,
-                        needMoreInfoData: nil
+                        needMoreInfoData: nil,
+                        queryResponseData: nil
                     )
                     
                 case .creditCardUpdate:
@@ -282,7 +284,8 @@ class RecordService: ObservableObject {
                         creditCardData: creditCardData,
                         holdingUpdateData: nil,
                         budgetData: nil,
-                        needMoreInfoData: nil
+                        needMoreInfoData: nil,
+                        queryResponseData: nil
                     )
                     
                 case .holdingUpdate:
@@ -308,7 +311,8 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: holdingData,
                         budgetData: nil,
-                        needMoreInfoData: nil
+                        needMoreInfoData: nil,
+                        queryResponseData: nil
                     )
 
                 case .budget:
@@ -330,7 +334,8 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: budgetData,
-                        needMoreInfoData: nil
+                        needMoreInfoData: nil,
+                        queryResponseData: nil
                     )
 
                 case .needMoreInfo:
@@ -373,7 +378,31 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: nil,
-                        needMoreInfoData: needMoreInfoData
+                        needMoreInfoData: needMoreInfoData,
+                        queryResponseData: nil
+                    )
+                    
+                case .queryResponse:
+                    // 查询响应：消费分析、预算查询等
+                    logInfo("📊 查询响应: \(data.summary ?? "")")
+                    let queryData = QueryResponseParsed(
+                        skillUsed: data.skill_used ?? "",
+                        summary: data.summary ?? "",
+                        analysisType: data.analysisType,
+                        totalExpense: data.data?.totalExpense,
+                        dailyAverage: data.data?.dailyAverage,
+                        insights: data.insights,
+                        suggestions: data.suggestions
+                    )
+                    return ParsedFinancialEvent(
+                        eventType: .queryResponse,
+                        transactionData: nil,
+                        assetUpdateData: nil,
+                        creditCardData: nil,
+                        holdingUpdateData: nil,
+                        budgetData: nil,
+                        needMoreInfoData: nil,
+                        queryResponseData: queryData
                     )
                     
                 case .nullStatement:
@@ -1120,6 +1149,28 @@ struct FinancialEventData: Codable {
     let missing_fields: [String]?   // 缺失的字段列表
     let question: String?           // AI 追问的问题
     let partial_data: PartialDataResponse?  // 已解析的部分数据
+    
+    // QUERY_RESPONSE 字段
+    let skill_used: String?         // 使用的技能名称
+    let summary: String?            // 分析摘要
+    let analysisType: String?       // 分析类型
+    let insights: [String]?         // 洞察
+    let suggestions: [String]?      // 建议
+    let data: QueryDataResponse?    // 嵌套的分析数据
+}
+
+// 查询响应嵌套数据
+struct QueryDataResponse: Codable {
+    let totalExpense: Double?
+    let dailyAverage: Double?
+    let comparison: QueryComparisonData?
+}
+
+struct QueryComparisonData: Codable {
+    let currentPeriod: Double?
+    let previousPeriod: Double?
+    let changeAmount: Double?
+    let changePercent: Double?
 }
 
 // 部分数据响应（用于 NEED_MORE_INFO）
@@ -1141,6 +1192,7 @@ enum FinancialEventType: String, Codable {
     case creditCardUpdate = "CREDIT_CARD_UPDATE"
     case holdingUpdate = "HOLDING_UPDATE"
     case budget = "BUDGET"
+    case queryResponse = "QUERY_RESPONSE"  // 查询响应（消费分析、预算查询等）
     case nullStatement = "NULL_STATEMENT"
     case needMoreInfo = "NEED_MORE_INFO"  // 缺少关键信息，需要追问
 }
@@ -1167,6 +1219,20 @@ struct ParsedFinancialEvent: Identifiable {
     
     // 追问数据（缺少关键信息时）
     var needMoreInfoData: NeedMoreInfoParsed?
+    
+    // 查询响应数据（消费分析、预算查询等）
+    var queryResponseData: QueryResponseParsed?
+}
+
+// 查询响应数据结构
+struct QueryResponseParsed {
+    let skillUsed: String           // 使用的技能名称
+    let summary: String             // 分析摘要
+    let analysisType: String?       // 分析类型
+    let totalExpense: Double?       // 总支出
+    let dailyAverage: Double?       // 日均消费
+    let insights: [String]?         // 洞察
+    let suggestions: [String]?      // 建议
 }
 
 // 追问数据结构
