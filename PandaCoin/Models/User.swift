@@ -20,6 +20,10 @@ struct User: Codable, Identifiable {
     let defaultIncomeAccountId: String?
     let defaultIncomeAccountType: String?  // "ACCOUNT"（收入只能进入账户，不能进入信用卡）
 
+    // 订阅状态（从后端获取，避免额外请求）
+    let isProMember: Bool?
+    let isInTrialPeriod: Bool?
+
     enum CodingKeys: String, CodingKey {
         case id
         case email
@@ -31,6 +35,8 @@ struct User: Codable, Identifiable {
         case defaultExpenseAccountType
         case defaultIncomeAccountId
         case defaultIncomeAccountType
+        case isProMember
+        case isInTrialPeriod
     }
 }
 

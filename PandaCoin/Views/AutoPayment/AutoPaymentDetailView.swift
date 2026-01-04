@@ -11,14 +11,23 @@ import Combine
 struct AutoPaymentDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let payment: AutoPayment
-    
+
     @State private var logs: [AutoPaymentLog] = []
     @State private var isLoadingLogs = false
     @State private var showingEditSheet = false
     @State private var showingExecuteConfirm = false
+    @State private var showingDeleteConfirm = false
     @State private var isExecuting = false
+    @State private var isToggling = false
+    @State private var isDeleting = false
+    @State private var currentIsEnabled: Bool
     @State private var executionResult: AutoPaymentExecutionResult?
     @State private var cancellables = Set<AnyCancellable>()
+
+    init(payment: AutoPayment) {
+        self.payment = payment
+        self._currentIsEnabled = State(initialValue: payment.isEnabled)
+    }
     
     var body: some View {
         ScrollView {
@@ -41,9 +50,12 @@ struct AutoPaymentDetailView: View {
                 logsCard
                 
                 // 手动执行按钮
-                if payment.isEnabled {
+                if currentIsEnabled {
                     manualExecuteButton
                 }
+
+                // 删除按钮
+                deleteButton
             }
             .padding()
         }
@@ -69,6 +81,14 @@ struct AutoPaymentDetailView: View {
             }
         } message: {
             Text("确定要立即执行此自动还款吗？将从您的账户扣款。")
+        }
+        .alert("确认删除", isPresented: $showingDeleteConfirm) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                deletePayment()
+            }
+        } message: {
+            Text("确定要删除「\(payment.name)」吗？此操作不可恢复。")
         }
         .alert("执行结果", isPresented: .constant(executionResult != nil)) {
             Button("确定") {
@@ -113,16 +133,25 @@ struct AutoPaymentDetailView: View {
                 }
                 
                 Spacer()
-                
+
                 // 状态开关
                 VStack(alignment: .trailing) {
-                    Toggle("", isOn: .constant(payment.isEnabled))
-                        .labelsHidden()
-                        .disabled(true)
-                    
-                    Text(payment.isEnabled ? "已启用" : "已禁用")
+                    if isToggling {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Toggle("", isOn: $currentIsEnabled)
+                            .labelsHidden()
+                            .onChange(of: currentIsEnabled) { newValue in
+                                if newValue != payment.isEnabled {
+                                    toggleEnabled()
+                                }
+                            }
+                    }
+
+                    Text(currentIsEnabled ? "已启用" : "已禁用")
                         .font(.caption)
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(currentIsEnabled ? Theme.bambooGreen : Theme.textSecondary)
                 }
             }
             
@@ -375,7 +404,7 @@ struct AutoPaymentDetailView: View {
     }
     
     // MARK: - 手动执行按钮
-    
+
     private var manualExecuteButton: some View {
         Button(action: { showingExecuteConfirm = true }) {
             HStack {
@@ -395,6 +424,29 @@ struct AutoPaymentDetailView: View {
             .cornerRadius(12)
         }
         .disabled(isExecuting)
+    }
+
+    // MARK: - 删除按钮
+
+    private var deleteButton: some View {
+        Button(action: { showingDeleteConfirm = true }) {
+            HStack {
+                if isDeleting {
+                    ProgressView()
+                        .tint(.red)
+                } else {
+                    Image(systemName: "trash")
+                }
+                Text("删除自动还款")
+            }
+            .font(.headline)
+            .foregroundColor(.red)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.red.opacity(0.1))
+            .cornerRadius(12)
+        }
+        .disabled(isDeleting)
     }
     
     // MARK: - 辅助方法
@@ -451,7 +503,7 @@ struct AutoPaymentDetailView: View {
     
     private func executeNow() {
         isExecuting = true
-        
+
         AutoPaymentService.shared.executeAutoPayment(id: payment.id)
             .receive(on: DispatchQueue.main)
             .sink(
@@ -470,6 +522,43 @@ struct AutoPaymentDetailView: View {
                     executionResult = result
                     loadLogs() // 刷新日志
                 }
+            )
+            .store(in: &cancellables)
+    }
+
+    private func toggleEnabled() {
+        isToggling = true
+
+        AutoPaymentService.shared.toggleAutoPayment(id: payment.id)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isToggling = false
+                    if case .failure = completion {
+                        // 恢复原状态
+                        currentIsEnabled = payment.isEnabled
+                    }
+                },
+                receiveValue: { updatedPayment in
+                    currentIsEnabled = updatedPayment.isEnabled
+                }
+            )
+            .store(in: &cancellables)
+    }
+
+    private func deletePayment() {
+        isDeleting = true
+
+        AutoPaymentService.shared.deleteAutoPayment(id: payment.id)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    isDeleting = false
+                    if case .finished = completion {
+                        dismiss()
+                    }
+                },
+                receiveValue: { _ in }
             )
             .store(in: &cancellables)
     }

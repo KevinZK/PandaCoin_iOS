@@ -569,20 +569,27 @@ struct AssetDetailView: View {
             }
             
             // 本月统计（根据资产类型显示不同内容）
-            HStack(spacing: 20) {
-                monthStatItem(title: "本月收入", amount: monthlyIncome, color: Theme.income)
+            if asset.type == .loan || asset.type == .mortgage {
+                // 贷款类资产只显示本月还款
+                HStack(spacing: 20) {
+                    monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.bambooGreen)
+                }
+            } else {
+                HStack(spacing: 20) {
+                    monthStatItem(title: "本月收入", amount: monthlyIncome, color: Theme.income)
 
-                Divider()
-                    .frame(height: 30)
-
-                monthStatItem(title: "本月支出", amount: monthlyExpense, color: Theme.expense)
-
-                // 只有负债类资产才显示本月还款
-                if asset.type.isLiability {
                     Divider()
                         .frame(height: 30)
 
-                    monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.warning)
+                    monthStatItem(title: "本月支出", amount: monthlyExpense, color: Theme.expense)
+
+                    // 其他负债类资产（如信用卡）显示本月还款
+                    if asset.type.isLiability {
+                        Divider()
+                            .frame(height: 30)
+
+                        monthStatItem(title: "本月还款", amount: monthlyPayment, color: Theme.warning)
+                    }
                 }
             }
             
@@ -703,21 +710,29 @@ struct AssetDetailView: View {
     private var recordsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(groupedRecords.keys.sorted(by: >), id: \.self) { date in
-                    Section {
-                        ForEach(groupedRecords[date] ?? []) { record in
-                            AssetRecordRow(record: record)
+                if asset.type == .loan || asset.type == .mortgage {
+                    // 贷款类资产：只显示还款记录，不按日期分组
+                    ForEach(paymentRecords) { record in
+                        LoanPaymentRow(record: record)
+                    }
+                } else {
+                    // 其他资产：按日期分组显示所有记录
+                    ForEach(groupedRecords.keys.sorted(by: >), id: \.self) { date in
+                        Section {
+                            ForEach(groupedRecords[date] ?? []) { record in
+                                AssetRecordRow(record: record)
+                            }
+                        } header: {
+                            HStack {
+                                Text(dateSectionFormatter.string(from: date))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Theme.textSecondary)
+                                Spacer()
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 8)
                         }
-                    } header: {
-                        HStack {
-                            Text(dateSectionFormatter.string(from: date))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(Theme.textSecondary)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
                     }
                 }
             }
@@ -756,7 +771,12 @@ struct AssetDetailView: View {
     private var monthlyPayment: Decimal {
         records.filter { $0.type == .payment }.reduce(0) { $0 + $1.amount }
     }
-    
+
+    // 贷款类资产的还款记录（按日期降序）
+    private var paymentRecords: [Record] {
+        records.filter { $0.type == .payment }.sorted { $0.date > $1.date }
+    }
+
     private var groupedRecords: [Date: [Record]] {
         let calendar = Calendar.current
         return Dictionary(grouping: records) { record in
@@ -922,6 +942,62 @@ struct AssetRecordRow: View {
     private var timeFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
+        return formatter
+    }
+}
+
+// MARK: - 贷款还款记录行
+struct LoanPaymentRow: View {
+    let record: Record
+
+    var body: some View {
+        HStack(spacing: 14) {
+            // 图标
+            ZStack {
+                Circle()
+                    .fill(Theme.bambooGreen.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(Theme.bambooGreen)
+            }
+
+            // 信息
+            VStack(alignment: .leading, spacing: 4) {
+                Text("还款成功")
+                    .font(AppFont.body(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.text)
+
+                Text(dateFormatter.string(from: record.date))
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+
+            Spacer()
+
+            // 金额
+            Text("-¥\(formattedAmount)")
+                .font(AppFont.monoNumber(size: 17, weight: .bold))
+                .foregroundColor(Theme.bambooGreen)
+        }
+        .padding(14)
+        .background(Theme.cardBackground)
+        .cornerRadius(CornerRadius.medium)
+        .shadow(color: Theme.cfoShadow, radius: 4, x: 0, y: 2)
+    }
+
+    private var formattedAmount: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: record.amount as NSDecimalNumber) ?? "0.00"
+    }
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月d日 HH:mm"
+        formatter.locale = Locale(identifier: "zh_CN")
         return formatter
     }
 }

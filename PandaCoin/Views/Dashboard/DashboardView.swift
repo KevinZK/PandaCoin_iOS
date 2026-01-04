@@ -201,8 +201,8 @@ struct DashboardView: View {
             return
         }
 
-        // 然后检查是否为 Pro 会员
-        guard subscriptionService.isProMember else {
+        // 只有状态已加载且非Pro时才显示订阅页面
+        if subscriptionService.isStatusLoaded && !subscriptionService.isProMember {
             showSubscription = true
             return
         }
@@ -246,7 +246,7 @@ struct DashboardView: View {
                 if !authService.isAuthenticated {
                     loginRequiredFeature = "语音记账"
                     showLoginRequired = true
-                } else if !subscriptionService.isProMember {
+                } else if subscriptionService.isStatusLoaded && !subscriptionService.isProMember {
                     showSubscription = true
                 }
             })
@@ -265,7 +265,8 @@ struct DashboardView: View {
             Spacer()
 
             // 相册按钮 - 使用纯 SwiftUI PhotosPicker
-            if authService.isAuthenticated && subscriptionService.isProMember {
+            // 状态未加载完成或已确认为Pro时显示PhotosPicker
+            if authService.isAuthenticated && (!subscriptionService.isStatusLoaded || subscriptionService.isProMember) {
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                     ZStack {
                         Circle()
@@ -287,7 +288,7 @@ struct DashboardView: View {
                     if !authService.isAuthenticated {
                         loginRequiredFeature = "图片记账"
                         showLoginRequired = true
-                    } else {
+                    } else if subscriptionService.isStatusLoaded && !subscriptionService.isProMember {
                         showSubscription = true
                     }
                 }

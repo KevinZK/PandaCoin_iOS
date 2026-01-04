@@ -169,7 +169,8 @@ struct ChatRecordView: View {
             showLoginRequired = true
             return
         }
-        guard subscriptionService.isProMember else {
+        // 只有状态已加载且非Pro时才显示订阅页面（状态未加载时乐观允许操作）
+        if subscriptionService.isStatusLoaded && !subscriptionService.isProMember {
             showSubscription = true
             return
         }
@@ -365,7 +366,8 @@ struct ChatRecordView: View {
             showLoginRequired = true
             return
         }
-        guard subscriptionService.isProMember else {
+        // 只有状态已加载且非Pro时才显示订阅页面
+        if subscriptionService.isStatusLoaded && !subscriptionService.isProMember {
             showSubscription = true
             return
         }
@@ -427,7 +429,8 @@ struct ChatRecordView: View {
             showLoginRequired = true
             return
         }
-        guard subscriptionService.isProMember else {
+        // 只有状态已加载且非Pro时才显示订阅页面
+        if subscriptionService.isStatusLoaded && !subscriptionService.isProMember {
             isRecording = false
             showSubscription = true
             return

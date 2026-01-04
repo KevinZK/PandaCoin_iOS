@@ -47,19 +47,6 @@ struct SubscriptionStatus {
     )
 }
 
-// MARK: - 后端订阅响应
-struct BackendSubscriptionResponse: Codable {
-    let userId: String?  // 改为可选，以处理边缘情况
-    let status: String
-    let plan: String?
-    let trialStartDate: String?
-    let trialEndDate: String?
-    let subscriptionStartDate: String?
-    let subscriptionEndDate: String?
-    let isProMember: Bool
-    let isInTrialPeriod: Bool
-}
-
 // MARK: - 订阅服务
 @MainActor
 class SubscriptionService: ObservableObject {
@@ -77,6 +64,7 @@ class SubscriptionService: ObservableObject {
     @Published var subscriptionStatus: SubscriptionStatus = .inactive
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published var isStatusLoaded: Bool = false  // 订阅状态是否已加载完成
 
     // MARK: - Computed Properties
 
@@ -88,6 +76,39 @@ class SubscriptionService: ObservableObject {
     /// 是否在试用期
     var isInTrialPeriod: Bool {
         subscriptionStatus.isInTrialPeriod
+    }
+
+    /// 等待订阅状态加载完成（最多等待 3 秒）
+    func waitForStatusLoaded() async {
+        if isStatusLoaded { return }
+
+        // 最多等待 3 秒
+        for _ in 0..<30 {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
+            if isStatusLoaded { return }
+        }
+        print("⚠️ [Subscription] 等待状态加载超时")
+    }
+
+    /// 从用户数据同步订阅状态（由 AuthService 调用）
+    func syncFromUserData(isProMember: Bool, isInTrialPeriod: Bool) {
+        print("🔄 [Subscription] 从用户数据同步: isProMember=\(isProMember), isInTrialPeriod=\(isInTrialPeriod)")
+
+        if isProMember {
+            subscriptionStatus = SubscriptionStatus(
+                isActive: true,
+                productId: nil,
+                expirationDate: nil,
+                isInTrialPeriod: isInTrialPeriod,
+                willAutoRenew: true,
+                source: .backend
+            )
+        } else {
+            subscriptionStatus = .inactive
+        }
+
+        isStatusLoaded = true
+        print("✅ [Subscription] 状态同步完成: isProMember=\(self.isProMember)")
     }
 
     /// 月度产品
@@ -162,133 +183,17 @@ class SubscriptionService: ObservableObject {
         isLoading = false
     }
 
-    // MARK: - 更新订阅状态（综合后端和 Apple）
+    // MARK: - 更新订阅状态（检查 Apple 订阅并同步）
     func updateSubscriptionStatus() async {
         print("🔍 [Subscription] 开始检查订阅状态...")
 
-        // 1. 先检查后端订阅状态（管理员可以直接设置）
-        let backendStatus = await fetchBackendSubscriptionStatus()
-        print("📡 [Subscription] 后端检查结果: isActive=\(backendStatus.isActive), isInTrial=\(backendStatus.isInTrialPeriod)")
-        if backendStatus.isActive {
-            print("✅ [Subscription] 使用后端订阅状态")
-            subscriptionStatus = backendStatus
-            return
-        }
+        // 检查 Apple StoreKit 订阅并同步到后端
+        await syncAppleSubscriptionsToBackend()
 
-        // 2. 后端无有效订阅，检查 Apple StoreKit
-        var foundActiveSubscription = false
+        // 刷新用户数据获取最新订阅状态（订阅状态现在通过用户数据返回）
+        AuthService.shared.fetchCurrentUser()
 
-        for await result in Transaction.currentEntitlements {
-            do {
-                let transaction = try checkVerified(result)
-
-                print("📦 [Subscription] 发现 Apple 交易: productID=\(transaction.productID), offerType=\(String(describing: transaction.offerType)), expirationDate=\(String(describing: transaction.expirationDate))")
-
-                // 检查是否为我们的订阅产品
-                if productIds.contains(transaction.productID) {
-                    purchasedProductIDs.insert(transaction.productID)
-
-                    // 获取订阅详情
-                    if let expirationDate = transaction.expirationDate {
-                        let isInTrial = transaction.offerType == .introductory
-
-                        print("✅ [Subscription] Apple 有效订阅: isInTrial=\(isInTrial), expirationDate=\(expirationDate)")
-
-                        subscriptionStatus = SubscriptionStatus(
-                            isActive: true,
-                            productId: transaction.productID,
-                            expirationDate: expirationDate,
-                            isInTrialPeriod: isInTrial,
-                            willAutoRenew: transaction.revocationDate == nil,
-                            source: .apple
-                        )
-                        foundActiveSubscription = true
-
-                        // 同步到后端
-                        await syncSubscriptionToBackend(
-                            productId: transaction.productID,
-                            transactionId: String(transaction.id),
-                            isInTrial: isInTrial,
-                            expirationDate: expirationDate
-                        )
-                    }
-                }
-            } catch {
-                print("❌ [Subscription] 验证交易失败: \(error)")
-            }
-        }
-
-        if !foundActiveSubscription {
-            print("⚪ [Subscription] 未找到有效订阅")
-            subscriptionStatus = .inactive
-            purchasedProductIDs.removeAll()
-        } else {
-            print("🎉 [Subscription] 订阅状态: isProMember=\(isProMember), isInTrialPeriod=\(isInTrialPeriod), source=\(subscriptionStatus.source)")
-        }
-    }
-
-    // MARK: - 从后端获取订阅状态
-    private func fetchBackendSubscriptionStatus() async -> SubscriptionStatus {
-        guard let token = NetworkManager.shared.accessToken else {
-            print("⚪ [Subscription] 未登录，跳过后端检查")
-            return .inactive
-        }
-
-        guard let url = URL(string: "\(AppConfig.apiBaseURL)/subscription/status") else {
-            return .inactive
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                print("⚠️ [Subscription] 后端返回非 200 状态")
-                return .inactive
-            }
-
-            let decoder = JSONDecoder()
-            // 解码 API 响应包装层
-            let apiResponse = try decoder.decode(APIResponse<BackendSubscriptionResponse>.self, from: data)
-            
-            guard let backendResponse = apiResponse.data else {
-                print("⚠️ [Subscription] 后端返回数据为空")
-                return .inactive
-            }
-
-            print("📡 [Subscription] 后端订阅状态: status=\(backendResponse.status), isProMember=\(backendResponse.isProMember)")
-
-            if backendResponse.isProMember {
-                // 解析到期时间
-                var expirationDate: Date? = nil
-                let dateFormatter = ISO8601DateFormatter()
-                dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-                if backendResponse.isInTrialPeriod, let trialEnd = backendResponse.trialEndDate {
-                    expirationDate = dateFormatter.date(from: trialEnd)
-                } else if let subEnd = backendResponse.subscriptionEndDate {
-                    expirationDate = dateFormatter.date(from: subEnd)
-                }
-
-                return SubscriptionStatus(
-                    isActive: true,
-                    productId: nil,
-                    expirationDate: expirationDate,
-                    isInTrialPeriod: backendResponse.isInTrialPeriod,
-                    willAutoRenew: true,
-                    source: .backend
-                )
-            }
-
-            return .inactive
-        } catch {
-            print("❌ [Subscription] 获取后端订阅状态失败: \(error)")
-            return .inactive
-        }
+        print("✅ [Subscription] 订阅状态检查完成")
     }
 
     // MARK: - 同步订阅到后端
@@ -336,7 +241,21 @@ class SubscriptionService: ObservableObject {
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
-                await updateSubscriptionStatus()
+
+                // 同步订阅到后端
+                if let expirationDate = transaction.expirationDate {
+                    let isInTrial = transaction.offerType == .introductory
+                    await syncSubscriptionToBackend(
+                        productId: transaction.productID,
+                        transactionId: String(transaction.id),
+                        isInTrial: isInTrial,
+                        expirationDate: expirationDate
+                    )
+                }
+
+                // 刷新用户数据（会自动同步订阅状态）
+                AuthService.shared.fetchCurrentUser()
+
                 await transaction.finish()
                 isLoading = false
                 return true
@@ -384,7 +303,15 @@ class SubscriptionService: ObservableObject {
 
         do {
             try await AppStore.sync()
-            await updateSubscriptionStatus()
+
+            // 检查 Apple 订阅并同步到后端
+            await syncAppleSubscriptionsToBackend()
+
+            // 刷新用户数据获取最新订阅状态
+            AuthService.shared.fetchCurrentUser()
+
+            // 等待一下让用户数据刷新
+            try? await Task.sleep(nanoseconds: 500_000_000)
 
             if !isProMember {
                 errorMessage = "未找到可恢复的订阅"
@@ -394,6 +321,29 @@ class SubscriptionService: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    // MARK: - 同步 Apple 订阅到后端
+    private func syncAppleSubscriptionsToBackend() async {
+        for await result in Transaction.currentEntitlements {
+            do {
+                let transaction = try checkVerified(result)
+
+                if productIds.contains(transaction.productID),
+                   let expirationDate = transaction.expirationDate {
+                    let isInTrial = transaction.offerType == .introductory
+
+                    await syncSubscriptionToBackend(
+                        productId: transaction.productID,
+                        transactionId: String(transaction.id),
+                        isInTrial: isInTrial,
+                        expirationDate: expirationDate
+                    )
+                }
+            } catch {
+                print("❌ [Subscription] 同步 Apple 订阅失败: \(error)")
+            }
+        }
     }
 
     // MARK: - 验证交易

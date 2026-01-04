@@ -121,6 +121,13 @@ class AuthService: ObservableObject {
                 },
                 receiveValue: { [weak self] (user: User) in
                     self?.currentUser = user
+                    // 同步订阅状态到 SubscriptionService
+                    Task { @MainActor in
+                        SubscriptionService.shared.syncFromUserData(
+                            isProMember: user.isProMember ?? false,
+                            isInTrialPeriod: user.isInTrialPeriod ?? false
+                        )
+                    }
                 }
             )
             .store(in: &cancellables)
@@ -202,6 +209,8 @@ class AuthService: ObservableObject {
         currentUser = response.user
         isAuthenticated = true
         fetchDefaultExpenseAccount()
+        // 登录后立即获取完整用户数据（包含订阅状态）
+        fetchCurrentUser()
     }
 
     private func handleAppleAuthSuccess(_ response: AppleAuthResponse) {
@@ -209,5 +218,7 @@ class AuthService: ObservableObject {
         currentUser = response.user
         isAuthenticated = true
         fetchDefaultExpenseAccount()
+        // 登录后立即获取完整用户数据（包含订阅状态）
+        fetchCurrentUser()
     }
 }
