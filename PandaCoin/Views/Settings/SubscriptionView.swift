@@ -16,6 +16,7 @@ struct SubscriptionView: View {
     @State private var isPurchasing = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showSuccess = false
 
     var body: some View {
         NavigationView {
@@ -96,6 +97,13 @@ struct SubscriptionView: View {
                 Button("确定", role: .cancel) {}
             } message: {
                 Text(errorMessage)
+            }
+            .alert("订阅成功", isPresented: $showSuccess) {
+                Button("好的") {
+                    dismiss()
+                }
+            } message: {
+                Text("恭喜您成为 Pro 会员！享受完整功能吧 🎉")
             }
             .task {
                 await loadData()
@@ -354,7 +362,7 @@ struct SubscriptionView: View {
             do {
                 let success = try await subscriptionService.purchase(product)
                 if success {
-                    dismiss()
+                    showSuccess = true  // 显示成功提示，用户点击后再关闭
                 }
             } catch {
                 errorMessage = error.localizedDescription

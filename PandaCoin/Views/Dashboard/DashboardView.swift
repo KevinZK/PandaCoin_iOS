@@ -419,8 +419,8 @@ struct VoiceActionButton: View {
     }
 
     private func toggleRecording() {
-        // 未登录或未订阅时点击，触发检查回调
-        if !isRecording && (!authService.isAuthenticated || !subscriptionService.isProMember) {
+        // 未登录或（状态已加载且未订阅）时点击，触发检查回调
+        if !isRecording && (!authService.isAuthenticated || (subscriptionService.isStatusLoaded && !subscriptionService.isProMember)) {
             onTap?()
             return
         }

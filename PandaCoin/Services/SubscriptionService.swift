@@ -197,13 +197,15 @@ class SubscriptionService: ObservableObject {
     }
 
     // MARK: - 同步订阅到后端
-    private func syncSubscriptionToBackend(productId: String, transactionId: String, isInTrial: Bool, expirationDate: Date) async {
+    private func syncSubscriptionToBackend(productId: String, transactionId: String, isInTrial: Bool, expirationDate: Date) async throws {
         guard let token = NetworkManager.shared.accessToken else {
-            return
+            print("❌ [Subscription] 同步失败: 未登录")
+            throw StoreError.syncFailed
         }
 
         guard let url = URL(string: "\(AppConfig.apiBaseURL)/subscription/sync-apple") else {
-            return
+            print("❌ [Subscription] 同步失败: URL 无效")
+            throw StoreError.syncFailed
         }
 
         var request = URLRequest(url: url)
@@ -224,9 +226,16 @@ class SubscriptionService: ObservableObject {
 
             if let httpResponse = response as? HTTPURLResponse {
                 print("📤 [Subscription] 同步到后端: status=\(httpResponse.statusCode)")
+                if httpResponse.statusCode >= 400 {
+                    print("❌ [Subscription] 后端同步失败: HTTP \(httpResponse.statusCode)")
+                    throw StoreError.syncFailed
+                }
             }
+        } catch let error as StoreError {
+            throw error
         } catch {
             print("❌ [Subscription] 同步到后端失败: \(error)")
+            throw StoreError.syncFailed
         }
     }
 
@@ -234,30 +243,39 @@ class SubscriptionService: ObservableObject {
     func purchase(_ product: Product) async throws -> Bool {
         isLoading = true
         errorMessage = nil
+        
+        print("🛒 [Subscription] 开始购买: productId=\(product.id), displayName=\(product.displayName)")
 
         do {
+            print("🛒 [Subscription] 调用 product.purchase()...")
             let result = try await product.purchase()
+            print("🛒 [Subscription] product.purchase() 返回结果: \(result)")
 
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
+                print("✅ [Subscription] Apple 购买成功: \(transaction.productID)")
 
-                // 同步订阅到后端
+                // 同步订阅到后端（如果失败会抛出异常）
                 if let expirationDate = transaction.expirationDate {
                     let isInTrial = transaction.offerType == .introductory
-                    await syncSubscriptionToBackend(
+                    try await syncSubscriptionToBackend(
                         productId: transaction.productID,
                         transactionId: String(transaction.id),
                         isInTrial: isInTrial,
                         expirationDate: expirationDate
                     )
+                    print("✅ [Subscription] 后端同步成功")
+                } else {
+                    print("⚠️ [Subscription] 无过期日期，跳过后端同步")
                 }
 
-                // 刷新用户数据（会自动同步订阅状态）
-                AuthService.shared.fetchCurrentUser()
+                // 刷新用户数据并等待完成
+                await refreshUserDataAndWait()
 
                 await transaction.finish()
                 isLoading = false
+                print("✅ [Subscription] 购买流程完成, isProMember=\(isProMember)")
                 return true
 
             case .pending:
@@ -266,6 +284,7 @@ class SubscriptionService: ObservableObject {
                 return false
 
             case .userCancelled:
+                print("ℹ️ [Subscription] 用户取消购买")
                 isLoading = false
                 return false
 
@@ -273,11 +292,31 @@ class SubscriptionService: ObservableObject {
                 isLoading = false
                 return false
             }
+        } catch let error as StoreError {
+            errorMessage = error.localizedDescription
+            isLoading = false
+            throw error
         } catch {
             errorMessage = "购买失败: \(error.localizedDescription)"
             isLoading = false
             throw error
         }
+    }
+    
+    // MARK: - 刷新用户数据并等待完成
+    private func refreshUserDataAndWait() async {
+        // 触发用户数据刷新
+        AuthService.shared.fetchCurrentUser()
+        
+        // 等待订阅状态更新（最多等待 3 秒）
+        for _ in 0..<30 {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
+            if isProMember {
+                print("✅ [Subscription] 订阅状态已更新: isProMember=true")
+                return
+            }
+        }
+        print("⚠️ [Subscription] 等待订阅状态更新超时")
     }
 
     // MARK: - 检查免费试用资格
@@ -333,7 +372,7 @@ class SubscriptionService: ObservableObject {
                    let expirationDate = transaction.expirationDate {
                     let isInTrial = transaction.offerType == .introductory
 
-                    await syncSubscriptionToBackend(
+                    try await syncSubscriptionToBackend(
                         productId: transaction.productID,
                         transactionId: String(transaction.id),
                         isInTrial: isInTrial,
@@ -412,15 +451,18 @@ enum StoreError: Error, LocalizedError {
     case failedVerification
     case productNotFound
     case purchaseFailed
+    case syncFailed  // 后端同步失败
 
     var errorDescription: String? {
         switch self {
         case .failedVerification:
-            return "交易验证失败"
+            return "交易验证失败，请稍后重试"
         case .productNotFound:
-            return "未找到产品"
+            return "未找到订阅产品"
         case .purchaseFailed:
-            return "购买失败"
+            return "购买失败，请检查网络后重试"
+        case .syncFailed:
+            return "订阅同步失败，Apple 已扣费，请点击「恢复购买」来激活会员"
         }
     }
 }

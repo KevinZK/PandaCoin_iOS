@@ -44,6 +44,28 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         authorizationStatus = SFSpeechRecognizer.authorizationStatus()
     }
     
+    /// 请求所有需要的权限（语音识别 + 麦克风）
+    private func requestAllAuthorizations() {
+        // 先请求语音识别权限
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async {
+                self?.authorizationStatus = status
+                if status == .authorized {
+                    // 语音识别授权成功，继续请求麦克风权限
+                    AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                        DispatchQueue.main.async {
+                            if !granted {
+                                self?.errorMessage = "需要麦克风权限才能使用语音功能"
+                            }
+                        }
+                    }
+                } else {
+                    self?.errorMessage = "需要语音识别权限才能使用此功能"
+                }
+            }
+        }
+    }
+    
     // MARK: - Recording Control
     func startRecording() throws {
         // 检查权限
@@ -51,18 +73,8 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         
         switch currentStatus {
         case .notDetermined:
-            // 未请求过权限，弹出系统授权框
-            SFSpeechRecognizer.requestAuthorization { [weak self] status in
-                DispatchQueue.main.async {
-                    self?.authorizationStatus = status
-                    if status == .authorized {
-                        // 授权成功后重试启动
-                        try? self?.startRecording()
-                    } else {
-                        self?.errorMessage = "需要语音识别权限才能使用此功能"
-                    }
-                }
-            }
+            // 未请求过权限，先请求语音识别权限，然后请求麦克风权限
+            requestAllAuthorizations()
             throw SpeechRecognitionError.notAuthorized
             
         case .denied, .restricted:
@@ -103,6 +115,9 @@ class SpeechRecognitionService: NSObject, ObservableObject {
         
         // 获取音频输入节点
         let inputNode = audioEngine.inputNode
+        
+        // 确保移除已存在的 tap，避免崩溃
+        inputNode.removeTap(onBus: 0)
         
         // 开始识别任务
         recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
@@ -150,9 +165,13 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     func stopRecording() {
         if audioEngine.isRunning {
             audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)  // 确保移除 tap
             recognitionRequest?.endAudio()
         }
         
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
         isRecording = false
     }
     
