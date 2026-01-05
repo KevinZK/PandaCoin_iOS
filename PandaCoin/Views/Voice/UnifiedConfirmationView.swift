@@ -449,35 +449,27 @@ struct TransactionCardContent: View {
     @State private var cardIdentifier: String = ""
     @State private var showAccountPicker = false
     @State private var selectedAccountType: SelectedAccountInfo?
-    @State private var isSmartRecommended = false  // 是否是智能推荐的（用户可以修改）
-    @State private var originalCardIdentifier: String? = nil  // 保存 AI 原始返回的 cardIdentifier
-    @State private var originalAccountName: String = ""  // 保存 AI 原始返回的账户名（用于判断是否需要显示选择器）
-    @State private var usedDefaultAccount = false  // 是否使用了默认账户预填
+    @State private var isSmartRecommended = false
+    @State private var originalCardIdentifier: String? = nil
+    @State private var originalAccountName: String = ""
+    @State private var usedDefaultAccount = false
     
     @ObservedObject private var authService = AuthService.shared
     @ObservedObject private var accountService = AssetService.shared
     @ObservedObject private var creditCardService = CreditCardService.shared
     
-    // 是否涉及信用卡（根据账户名称判断）- 用于 AI 识别出信用卡但没有具体尾号的情况
     private var involvesCreditCard: Bool {
         data.accountName.contains("信用卡") || data.cardIdentifier != nil
     }
     
-    // 是否需要显示账户选择器
-    // 支出和收入类型都应该允许用户选择/修改账户，确保资金流向可追踪
     private var shouldShowAccountPicker: Bool {
-        // 支出类型：显示账户选择器（除非是信用卡消费，那种情况由信用卡选择器处理）
-        // 收入类型：显示账户选择器，用于选择收款账户
         (data.type == .expense && !involvesCreditCard) || data.type == .income
     }
     
-    // 是否需要显示信用卡选择器
-    // 当交易涉及信用卡时，始终显示选择器让用户确认或修改
     private var shouldShowCreditCardPicker: Bool {
         involvesCreditCard
     }
     
-    // 是否已经选择了账户（通过选择器或智能推荐或默认账户）
     private var hasSelectedAccount: Bool {
         selectedAccountType != nil
     }
@@ -487,13 +479,10 @@ struct TransactionCardContent: View {
         if let selected = selectedAccountType {
             return selected.displayName
         }
-        
-        // 如果有卡片标识，显示在账户名称后面
         if let identifier = data.cardIdentifier, !identifier.isEmpty {
             if data.accountName.isEmpty {
                 return "信用卡 (\(identifier))"
             }
-            // 避免重复显示尾号（如账户名已经包含尾号）
             if !data.accountName.contains(identifier) {
                 return "\(data.accountName) (\(identifier))"
             }
@@ -528,13 +517,12 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.textSecondary)
             }
             
-            // 支出账户选择 - 始终显示以便用户确认或修改资金来源
+            // 支出账户选择
             if shouldShowAccountPicker {
                 Divider()
                     .padding(.vertical, 4)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    // 状态提示
                     accountPickerStatusView
                     
                     Button(action: { showAccountPicker = true }) {
@@ -575,13 +563,12 @@ struct TransactionCardContent: View {
                 }
             }
             
-            // 信用卡选择器 - 始终显示以便用户确认或修改
+            // 信用卡选择器
             if shouldShowCreditCardPicker {
                 Divider()
                     .padding(.vertical, 4)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    // 状态提示
                     creditCardPickerStatusView
                     
                     Button(action: { showAccountPicker = true }) {
@@ -619,7 +606,6 @@ struct TransactionCardContent: View {
             }
         }
         .onAppear {
-            // 保存 AI 原始返回的值，用于判断是否需要显示选择器
             originalAccountName = data.accountName
             originalCardIdentifier = data.cardIdentifier
             cardIdentifier = data.cardIdentifier ?? ""
@@ -638,10 +624,9 @@ struct TransactionCardContent: View {
             }
         }
         .sheet(isPresented: $showAccountPicker, onDismiss: {
-            // 用户从选择器中选择后，清除智能推荐和默认账户标记
             if selectedAccountType != nil {
                 isSmartRecommended = false
-                usedDefaultAccount = false  // 用户手动选择了，不再是默认账户
+                usedDefaultAccount = false
             }
         }) {
             ExpenseAccountPickerSheet(
@@ -657,7 +642,6 @@ struct TransactionCardContent: View {
     @ViewBuilder
     private var creditCardPickerStatusView: some View {
         if !hasSelectedAccount {
-            // 未选择信用卡
             HStack {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundColor(.orange)
@@ -667,7 +651,6 @@ struct TransactionCardContent: View {
                     .foregroundColor(.orange)
             }
         } else if isSmartRecommended {
-            // 智能推荐的
             HStack {
                 Image(systemName: "sparkles")
                     .foregroundColor(Theme.bambooGreen)
@@ -677,7 +660,6 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.bambooGreen)
             }
         } else if originalCardIdentifier != nil && !(originalCardIdentifier?.isEmpty ?? true) {
-            // AI 直接识别出卡号
             HStack {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(Theme.bambooGreen)
@@ -687,7 +669,6 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.bambooGreen)
             }
         } else {
-            // 用户手动选择的
             HStack {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(Theme.bambooGreen)
@@ -703,9 +684,8 @@ struct TransactionCardContent: View {
     @ViewBuilder
     private var accountPickerStatusView: some View {
         let accountTypeText = data.type == .income ? "收入账户" : "支出账户"
-
+        
         if !hasSelectedAccount {
-            // 未选择账户
             HStack {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundColor(.orange)
@@ -715,7 +695,6 @@ struct TransactionCardContent: View {
                     .foregroundColor(.orange)
             }
         } else if usedDefaultAccount {
-            // 使用了默认账户
             HStack {
                 Image(systemName: "star.fill")
                     .foregroundColor(Theme.bambooGreen)
@@ -725,7 +704,6 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.bambooGreen)
             }
         } else if !originalAccountName.isEmpty {
-            // AI 识别并匹配成功
             HStack {
                 Image(systemName: "sparkles")
                     .foregroundColor(Theme.bambooGreen)
@@ -735,7 +713,6 @@ struct TransactionCardContent: View {
                     .foregroundColor(Theme.bambooGreen)
             }
         } else {
-            // 用户手动选择的
             HStack {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(Theme.bambooGreen)
@@ -748,13 +725,10 @@ struct TransactionCardContent: View {
     }
     
     private func loadDefaultAccountIfNeeded() {
-        // 支出类型且没有涉及信用卡（信用卡由智能推荐处理），或者收入类型
         guard (data.type == .expense && !involvesCreditCard) || data.type == .income,
               selectedAccountType == nil else { return }
-
-        // 如果 AI 识别出了账户名，先尝试匹配现有账户
+        
         if !originalAccountName.isEmpty {
-            // 尝试匹配现有账户
             if let matchedAccount = accountService.accounts.first(where: { $0.name == originalAccountName }) {
                 selectedAccountType = SelectedAccountInfo(
                     id: matchedAccount.id,
@@ -767,13 +741,11 @@ struct TransactionCardContent: View {
                 return
             }
         }
-
-        // AI 没有识别出账户或匹配失败，尝试加载默认账户
-        // 收入类型：使用默认收入账户；支出类型：使用默认支出账户
+        
         if let user = authService.currentUser {
             let defaultAccountId: String?
             let defaultAccountType: String?
-
+            
             if data.type == .income {
                 defaultAccountId = user.defaultIncomeAccountId
                 defaultAccountType = user.defaultIncomeAccountType
@@ -781,7 +753,7 @@ struct TransactionCardContent: View {
                 defaultAccountId = user.defaultExpenseAccountId
                 defaultAccountType = user.defaultExpenseAccountType
             }
-
+            
             if let accountId = defaultAccountId, let accountType = defaultAccountType {
                 if accountType == "ACCOUNT" {
                     if let account = accountService.accounts.first(where: { $0.id == accountId }) {
@@ -792,10 +764,9 @@ struct TransactionCardContent: View {
                             icon: account.type.icon,
                             cardIdentifier: nil
                         )
-                        usedDefaultAccount = true  // 标记使用了默认账户
+                        usedDefaultAccount = true
                     }
                 } else if accountType == "CREDIT_CARD" && data.type == .expense {
-                    // 信用卡只能用于支出
                     if let card = creditCardService.creditCards.first(where: { $0.id == accountId }) {
                         selectedAccountType = SelectedAccountInfo(
                             id: card.id,
@@ -804,16 +775,14 @@ struct TransactionCardContent: View {
                             icon: "creditcard.circle.fill",
                             cardIdentifier: card.cardIdentifier
                         )
-                        usedDefaultAccount = true  // 标记使用了默认账户
+                        usedDefaultAccount = true
                     }
                 }
             }
         }
     }
     
-    /// 尝试智能推荐或匹配信用卡
     private func trySmartRecommendation() {
-        // 情况1: AI 识别出具体卡号，直接匹配
         if let identifier = data.cardIdentifier, !identifier.isEmpty {
             if let matchedCard = creditCardService.creditCards.first(where: { $0.cardIdentifier == identifier }) {
                 selectedAccountType = SelectedAccountInfo(
@@ -823,31 +792,27 @@ struct TransactionCardContent: View {
                     icon: "creditcard.circle.fill",
                     cardIdentifier: matchedCard.cardIdentifier
                 )
-                isSmartRecommended = false  // 精确匹配，不是推荐
+                isSmartRecommended = false
                 return
             }
         }
         
-        // 情况2: AI 识别出机构名称但没有卡号，智能推荐
         guard !data.accountName.isEmpty,
               data.accountName.contains("信用卡"),
               data.cardIdentifier == nil else { return }
         
-        // 提取机构名称（去掉"信用卡"后缀）
         let institutionName = data.accountName
             .replacingOccurrences(of: "信用卡", with: "")
             .trimmingCharacters(in: .whitespaces)
         
         guard !institutionName.isEmpty else { return }
         
-        // 调用后端 API 获取推荐的信用卡
         authService.getRecommendedAccount(institutionName: institutionName)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in },
                 receiveValue: { [self] response in
                     if let recommended = response.recommended {
-                        // 智能推荐信用卡（用户可以修改）
                         self.selectedAccountType = SelectedAccountInfo(
                             id: recommended.id,
                             displayName: recommended.displayName,
@@ -856,9 +821,8 @@ struct TransactionCardContent: View {
                             cardIdentifier: recommended.cardIdentifier
                         )
                         self.cardIdentifier = recommended.cardIdentifier
-                        self.isSmartRecommended = true  // 标记为智能推荐，用户可以修改
+                        self.isSmartRecommended = true
                     }
-                    // 如果没有匹配或有多张匹配，让用户手动选择（不预填充）
                 }
             )
             .store(in: &creditCardService.cancellables)
@@ -1877,7 +1841,6 @@ struct HoldingUpdateCardContent: View {
     @State private var selectedAccountId: String?
     @State private var isLoadingAccounts = true
 
-    // 可用的投资/加密货币账户
     private var investmentAccounts: [Asset] {
         accountService.accounts.filter { $0.type == .investment || $0.type == .crypto }
     }
@@ -2023,11 +1986,9 @@ struct HoldingUpdateCardContent: View {
             }
         }
         .onAppear {
-            // 先刷新账户列表，确保获取最新数据（用户可能刚创建了证券账户）
             refreshAccountsAndMatch()
         }
         .onChange(of: selectedAccountId) { newValue in
-            // 同步选中的账户ID到数据绑定
             data.accountId = newValue
             if let id = newValue,
                let account = investmentAccounts.first(where: { $0.id == id }) {
@@ -2048,7 +2009,6 @@ struct HoldingUpdateCardContent: View {
 
         let holdingService = HoldingService.shared
 
-        // 并行刷新账户列表和持仓数据
         Publishers.Zip(
             accountService.fetchAssets(),
             holdingService.fetchHoldings()
@@ -2057,7 +2017,6 @@ struct HoldingUpdateCardContent: View {
         .sink(
             receiveCompletion: { _ in
                 isLoadingAccounts = false
-                // 刷新完成后尝试匹配
                 matchAccountAfterRefresh()
             },
             receiveValue: { _, _ in }
@@ -2066,12 +2025,10 @@ struct HoldingUpdateCardContent: View {
     }
 
     private func matchAccountAfterRefresh() {
-        // 卖出时：从所有持仓中查找匹配的持仓，自动选择正确的账户
         if data.holdingAction == "SELL" {
             let holdingService = HoldingService.shared
             let allHoldings = holdingService.holdings
 
-            // 优先用股票代码匹配
             if let code = data.tickerCode, !code.isEmpty {
                 if let matched = allHoldings.first(where: { $0.tickerCode?.uppercased() == code.uppercased() }) {
                     selectedAccountId = matched.accountId
@@ -2083,7 +2040,6 @@ struct HoldingUpdateCardContent: View {
                 }
             }
 
-            // 名称模糊匹配
             if let matched = allHoldings.first(where: { holding in
                 holding.name.lowercased().contains(data.name.lowercased()) ||
                 data.name.lowercased().contains(holding.name.lowercased())
@@ -2097,7 +2053,6 @@ struct HoldingUpdateCardContent: View {
             }
         }
 
-        // 买入时：尝试匹配 AI 识别出的账户名
         if let accountName = data.accountName {
             if let matched = investmentAccounts.first(where: { $0.name.contains(accountName) || accountName.contains($0.name) }) {
                 selectedAccountId = matched.id
@@ -2105,7 +2060,6 @@ struct HoldingUpdateCardContent: View {
                 return
             }
         }
-        // 如果只有一个投资账户，自动选中
         if selectedAccountId == nil && investmentAccounts.count == 1 {
             selectedAccountId = investmentAccounts.first?.id
             data.accountId = investmentAccounts.first?.id

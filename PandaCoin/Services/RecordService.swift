@@ -374,47 +374,141 @@ class RecordService: ObservableObject {
                     
                     // 解析原始意图
                     let originalIntent = FinancialEventType(rawValue: data.original_intent ?? "") ?? .nullStatement
+                    let partial = data.partial_data
                     
-                    // 构建已解析的部分数据（持仓）
+                    // 根据原始意图类型构建对应的部分数据
                     var partialHoldingData: HoldingUpdateParsed? = nil
-                    if let partial = data.partial_data, originalIntent == .holdingUpdate {
-                        partialHoldingData = HoldingUpdateParsed(
-                            name: partial.name ?? "",
-                            holdingType: partial.holding_type ?? "STOCK",
-                            holdingAction: partial.holding_action ?? "BUY",
-                            quantity: partial.quantity ?? 0,
-                            price: 0, // 价格待补充
-                            currency: partial.currency ?? "CNY",
-                            date: self.parseDate(partial.date) ?? Date(),
-                            market: partial.market,
-                            tickerCode: partial.ticker_code,
-                            accountName: nil,
-                            fee: nil,
-                            note: nil
-                        )
+                    var partialAutoPaymentData: AutoPaymentParsed? = nil
+                    var partialTransactionData: AIRecordParsed? = nil
+                    var partialAssetData: AssetUpdateParsed? = nil
+                    var partialCreditCardData: CreditCardParsed? = nil
+                    var partialBudgetData: BudgetParsed? = nil
+                    
+                    if let partial = partial {
+                        switch originalIntent {
+                        case .holdingUpdate:
+                            partialHoldingData = HoldingUpdateParsed(
+                                name: partial.name ?? "",
+                                holdingType: partial.holding_type ?? "STOCK",
+                                holdingAction: partial.holding_action ?? "BUY",
+                                quantity: partial.quantity ?? 0,
+                                price: partial.price ?? 0,
+                                currency: partial.currency ?? "CNY",
+                                date: self.parseDate(partial.date) ?? Date(),
+                                market: partial.market,
+                                tickerCode: partial.ticker_code,
+                                accountName: nil,
+                                fee: nil,
+                                note: partial.note
+                            )
+                            
+                        case .autoPayment:
+                            partialAutoPaymentData = AutoPaymentParsed(
+                                name: partial.name ?? "",
+                                paymentType: partial.payment_type ?? "SUBSCRIPTION",
+                                amount: Decimal(partial.amount ?? 0),
+                                currency: partial.currency ?? "CNY",
+                                dayOfMonth: partial.day_of_month,
+                                sourceAccount: partial.source_account,
+                                category: partial.category ?? "SUBSCRIPTION",
+                                note: partial.note
+                            )
+                            
+                        case .transaction:
+                            let txType: RecordType = {
+                                switch partial.transaction_type?.uppercased() {
+                                case "INCOME": return .income
+                                case "TRANSFER": return .transfer
+                                default: return .expense
+                                }
+                            }()
+                            partialTransactionData = AIRecordParsed(
+                                type: txType,
+                                amount: Decimal(partial.amount ?? 0),
+                                category: partial.category ?? "OTHER",
+                                accountName: partial.source_account ?? "",
+                                description: partial.name ?? "",
+                                date: self.parseDate(partial.date) ?? Date(),
+                                confidence: nil,
+                                cardIdentifier: partial.card_identifier
+                            )
+                            
+                        case .assetUpdate:
+                            partialAssetData = AssetUpdateParsed(
+                                assetType: partial.asset_type ?? "OTHER_ASSET",
+                                assetName: partial.name ?? "",
+                                totalValue: Decimal(partial.amount ?? 0),
+                                currency: partial.currency ?? "CNY",
+                                date: self.parseDate(partial.date) ?? Date(),
+                                institutionName: partial.institution_name,
+                                quantity: nil,
+                                interestRateAPY: partial.interest_rate,
+                                maturityDate: nil,
+                                isInitialRecord: true,
+                                costBasis: nil,
+                                costBasisCurrency: nil,
+                                projectedValue: nil,
+                                location: nil,
+                                repaymentAmount: partial.monthly_payment,
+                                repaymentSchedule: nil,
+                                cardIdentifier: nil,
+                                loanTermMonths: partial.loan_term_months,
+                                interestRate: partial.interest_rate,
+                                monthlyPayment: partial.monthly_payment,
+                                repaymentDay: partial.repayment_day,
+                                autoRepayment: nil,
+                                sourceAccount: partial.source_account
+                            )
+                            
+                        case .creditCardUpdate:
+                            partialCreditCardData = CreditCardParsed(
+                                name: partial.name ?? "",
+                                outstandingBalance: Decimal(partial.outstanding_balance ?? 0),
+                                currency: partial.currency ?? "CNY",
+                                date: self.parseDate(partial.date) ?? Date(),
+                                institutionName: partial.institution_name,
+                                creditLimit: partial.credit_limit,
+                                repaymentDueDate: partial.repayment_due_date,
+                                cardIdentifier: partial.card_identifier,
+                                autoRepayment: nil,
+                                repaymentType: nil,
+                                sourceAccount: partial.source_account
+                            )
+                            
+                        case .budget:
+                            partialBudgetData = BudgetParsed(
+                                action: "CREATE_BUDGET",
+                                name: partial.name ?? "",
+                                category: partial.category,
+                                targetAmount: Decimal(partial.target_amount ?? partial.amount ?? 0),
+                                currency: partial.currency,
+                                targetDate: partial.date,
+                                priority: nil,
+                                isRecurring: partial.is_recurring ?? false
+                            )
+                            
+                        default:
+                            break
+                        }
                     }
                     
-                    // 构建已解析的部分数据（自动扣款）
-                    var partialAutoPaymentData: AutoPaymentParsed? = nil
-                    if let partial = data.partial_data, originalIntent == .autoPayment {
-                        partialAutoPaymentData = AutoPaymentParsed(
-                            name: partial.name ?? "",
-                            paymentType: partial.payment_type ?? "SUBSCRIPTION",
-                            amount: Decimal(partial.amount ?? 0),
-                            currency: partial.currency ?? "CNY",
-                            dayOfMonth: nil,  // 缺失的字段
-                            sourceAccount: nil,
-                            category: partial.category ?? "SUBSCRIPTION",
-                            note: nil
-                        )
-                    }
+                    // 根据缺失字段和原始意图确定选择器类型
+                    let pickerType = self.determinePickerType(
+                        originalIntent: originalIntent,
+                        missingFields: data.missing_fields ?? []
+                    )
                     
                     let needMoreInfoData = NeedMoreInfoParsed(
                         originalIntent: originalIntent,
                         missingFields: data.missing_fields ?? [],
                         question: data.question ?? "请提供更多信息",
-                        partialData: partialHoldingData,
-                        partialAutoPaymentData: partialAutoPaymentData
+                        pickerType: pickerType,
+                        partialHoldingData: partialHoldingData,
+                        partialAutoPaymentData: partialAutoPaymentData,
+                        partialTransactionData: partialTransactionData,
+                        partialAssetData: partialAssetData,
+                        partialCreditCardData: partialCreditCardData,
+                        partialBudgetData: partialBudgetData
                     )
                     
                     return ParsedFinancialEvent(
@@ -473,6 +567,39 @@ class RecordService: ObservableObject {
             }
         )
         .eraseToAnyPublisher()
+    }
+    
+    // MARK: - 确定选择器类型
+    private func determinePickerType(originalIntent: FinancialEventType, missingFields: [String]) -> FollowUpPickerType? {
+        // 根据缺失字段和原始意图确定需要的选择器类型
+        
+        // 支出类型缺少账户 → 支出账户选择器（储蓄卡+信用卡）
+        if originalIntent == .transaction {
+            if missingFields.contains("source_account") || missingFields.contains("account") {
+                return .expenseAccount
+            }
+            if missingFields.contains("card_identifier") {
+                return .creditCard
+            }
+        }
+        
+        // 收入类型缺少账户 → 收入账户选择器（仅储蓄卡）
+        if originalIntent == .transaction && missingFields.contains("target_account") {
+            return .incomeAccount
+        }
+        
+        // 持仓更新缺少账户 → 投资账户选择器
+        if originalIntent == .holdingUpdate && missingFields.contains("account") {
+            return .investmentAccount
+        }
+        
+        // 自动扣款缺少来源账户 → 自动扣款来源选择器
+        if originalIntent == .autoPayment && missingFields.contains("source_account") {
+            return .autoPaymentSource
+        }
+        
+        // 默认返回文本输入
+        return .textInput
     }
     
     // MARK: - 统一保存事件（支持多类型）
@@ -1295,19 +1422,48 @@ struct QueryComparisonData: Codable {
 
 // 部分数据响应（用于 NEED_MORE_INFO）
 struct PartialDataResponse: Codable {
+    // 通用字段
     let name: String?
+    let amount: Double?
+    let currency: String?
+    let date: String?
+    let category: String?
+    let note: String?
+    
+    // HOLDING_UPDATE 字段
     let holding_type: String?
     let holding_action: String?
     let quantity: Double?
     let market: String?
-    let currency: String?
     let ticker_code: String?
-    let date: String?
+    let price: Double?
     
-    // AUTO_PAYMENT 部分数据
+    // AUTO_PAYMENT 字段
     let payment_type: String?
-    let amount: Double?
-    let category: String?
+    let day_of_month: Int?
+    
+    // TRANSACTION 字段
+    let transaction_type: String?
+    let source_account: String?
+    let target_account: String?
+    let card_identifier: String?
+    
+    // ASSET_UPDATE 字段
+    let asset_type: String?
+    let institution_name: String?
+    let interest_rate: Double?
+    let loan_term_months: Int?
+    let monthly_payment: Double?
+    let repayment_day: Int?
+    
+    // CREDIT_CARD_UPDATE 字段
+    let credit_limit: Double?
+    let outstanding_balance: Double?
+    let repayment_due_date: String?
+    
+    // BUDGET 字段
+    let target_amount: Double?
+    let is_recurring: Bool?
 }
 
 // MARK: - 统一解析结果类型
@@ -1364,13 +1520,40 @@ struct QueryResponseParsed {
     let suggestions: [String]?      // 建议
 }
 
+// MARK: - 选择器追问类型
+enum FollowUpPickerType: String, Codable {
+    case expenseAccount = "EXPENSE_ACCOUNT"     // 支出账户选择（储蓄卡+信用卡）
+    case incomeAccount = "INCOME_ACCOUNT"       // 收入账户选择（仅储蓄卡）
+    case creditCard = "CREDIT_CARD"             // 信用卡选择
+    case investmentAccount = "INVESTMENT_ACCOUNT" // 投资账户选择
+    case autoPaymentSource = "AUTO_PAYMENT_SOURCE" // 自动扣款来源账户
+    case textInput = "TEXT_INPUT"               // 文本输入（默认）
+}
+
 // 追问数据结构
 struct NeedMoreInfoParsed {
     let originalIntent: FinancialEventType  // 原始意图
     let missingFields: [String]             // 缺失的字段
     let question: String                    // AI 追问的问题
-    let partialData: HoldingUpdateParsed?   // 已解析的部分数据（目前主要用于 HOLDING_UPDATE）
-    let partialAutoPaymentData: AutoPaymentParsed?  // 已解析的自动扣款部分数据
+    
+    // 选择器类型（如果需要用户从列表选择）
+    let pickerType: FollowUpPickerType?
+    
+    // 各类型的部分数据
+    let partialHoldingData: HoldingUpdateParsed?    // 持仓更新
+    let partialAutoPaymentData: AutoPaymentParsed?  // 自动扣款
+    let partialTransactionData: AIRecordParsed?     // 交易记录
+    let partialAssetData: AssetUpdateParsed?        // 资产更新
+    let partialCreditCardData: CreditCardParsed?    // 信用卡更新
+    let partialBudgetData: BudgetParsed?            // 预算
+    
+    // 兼容旧版本的别名
+    var partialData: HoldingUpdateParsed? { partialHoldingData }
+    
+    // 是否需要选择器
+    var requiresPicker: Bool {
+        pickerType != nil && pickerType != .textInput
+    }
 }
 
 // 自动扣款解析结果

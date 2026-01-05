@@ -25,6 +25,7 @@ enum ChatMessageType {
     case assistantError(String)                // 错误提示
     case savedConfirmation(Int)                // 保存成功确认（保存了几条）
     case autoIncomePrompt(FixedIncomeInfo)     // 自动入账提示（带确认/取消按钮）
+    case selectionFollowUp(NeedMoreInfoParsed) // 选择器追问卡片
 }
 
 // MARK: - 对话消息模型
@@ -99,7 +100,14 @@ struct ChatRecordView: View {
                             SimpleChatBubble(
                                 message: message,
                                 onConfirmAutoIncome: confirmAutoIncome,
-                                onCancelAutoIncome: cancelAutoIncome
+                                onCancelAutoIncome: cancelAutoIncome,
+                                onPickerSelection: { selectedAccount, needMoreInfo in
+                                    handlePickerSelection(selectedAccount, for: needMoreInfo)
+                                },
+                                onPickerCancel: {
+                                    pendingPartialData = nil
+                                    messages.append(ChatMessage(type: .assistantText("好的，已取消。有其他需要记录的吗？")))
+                                }
                             )
                         }
                         
@@ -399,67 +407,84 @@ struct ChatRecordView: View {
         
         // 检查是否是追问回复（有待处理的部分数据）
         if let pending = pendingPartialData {
-            if let partialData = pending.partialData {
-                // 持仓追问回复
-                let combinedText = buildCombinedText(userInput: text, partialData: partialData, missingFields: pending.missingFields)
-                pendingPartialData = nil
-                parseAndRespond(text: combinedText, parsingMessageId: nil)
-            } else if let autoPaymentData = pending.partialAutoPaymentData {
-                // 自动扣款追问回复
-                let combinedText = buildCombinedTextForAutoPayment(userInput: text, partialData: autoPaymentData, missingFields: pending.missingFields)
-                pendingPartialData = nil
-                parseAndRespond(text: combinedText, parsingMessageId: nil)
-            } else {
-                pendingPartialData = nil
-                parseAndRespond(text: text, parsingMessageId: nil)
-            }
+            let combinedText = buildCombinedTextForFollowUp(userInput: text, pending: pending)
+            pendingPartialData = nil
+            parseAndRespond(text: combinedText, parsingMessageId: nil)
         } else {
             // 正常流程
             parseAndRespond(text: text, parsingMessageId: nil)
         }
     }
     
-    // MARK: - 构建合并后的文本（用于持仓追问回复）
-    private func buildCombinedText(userInput: String, partialData: HoldingUpdateParsed, missingFields: [String]) -> String {
-        // 根据缺失字段类型，将用户输入的值合并到完整描述中
-        var combinedText = ""
+    // MARK: - 统一的追问回复处理
+    private func buildCombinedTextForFollowUp(userInput: String, pending: NeedMoreInfoParsed) -> String {
+        let missingFields = pending.missingFields
         
-        // 判断用户输入的内容类型
+        switch pending.originalIntent {
+        case .holdingUpdate:
+            if let data = pending.partialHoldingData {
+                return buildHoldingFollowUpText(userInput: userInput, data: data, missingFields: missingFields)
+            }
+            
+        case .autoPayment:
+            if let data = pending.partialAutoPaymentData {
+                return buildAutoPaymentFollowUpText(userInput: userInput, data: data, missingFields: missingFields)
+            }
+            
+        case .transaction:
+            if let data = pending.partialTransactionData {
+                return buildTransactionFollowUpText(userInput: userInput, data: data, missingFields: missingFields)
+            }
+            
+        case .assetUpdate:
+            if let data = pending.partialAssetData {
+                return buildAssetFollowUpText(userInput: userInput, data: data, missingFields: missingFields)
+            }
+            
+        case .creditCardUpdate:
+            if let data = pending.partialCreditCardData {
+                return buildCreditCardFollowUpText(userInput: userInput, data: data, missingFields: missingFields)
+            }
+            
+        case .budget:
+            if let data = pending.partialBudgetData {
+                return buildBudgetFollowUpText(userInput: userInput, data: data, missingFields: missingFields)
+            }
+            
+        default:
+            break
+        }
+        
+        return userInput
+    }
+    
+    // MARK: - 持仓追问回复
+    private func buildHoldingFollowUpText(userInput: String, data: HoldingUpdateParsed, missingFields: [String]) -> String {
         if missingFields.contains("price") {
-            // 用户补充了价格
             let priceStr = userInput.replacingOccurrences(of: "元", with: "")
                 .replacingOccurrences(of: "块", with: "")
                 .replacingOccurrences(of: "美元", with: "")
                 .replacingOccurrences(of: "港币", with: "")
                 .trimmingCharacters(in: .whitespaces)
             
-            let actionStr = partialData.holdingAction == "SELL" ? "卖出" : "买入"
-            let currencyStr = partialData.currency == "USD" ? "美元" : (partialData.currency == "HKD" ? "港币" : "元")
+            let actionStr = data.holdingAction == "SELL" ? "卖出" : "买入"
+            let currencyStr = data.currency == "USD" ? "美元" : (data.currency == "HKD" ? "港币" : "元")
             
-            combinedText = "\(actionStr)\(Int(partialData.quantity))股\(partialData.name)，每股\(priceStr)\(currencyStr)"
-        } else if missingFields.contains("quantity") && missingFields.contains("price") {
-            // 用户同时补充了数量和价格
-            combinedText = userInput  // 假设用户输入的是完整描述
-        } else {
-            // 其他情况，直接使用用户输入
-            combinedText = userInput
+            return "\(actionStr)\(Int(data.quantity))股\(data.name)，每股\(priceStr)\(currencyStr)"
         }
-        
-        return combinedText
+        return userInput
     }
     
-    // MARK: - 构建合并后的文本（用于自动扣款追问回复）
-    private func buildCombinedTextForAutoPayment(userInput: String, partialData: AutoPaymentParsed, missingFields: [String]) -> String {
-        // 提取用户输入的日期数字
+    // MARK: - 自动扣款追问回复
+    private func buildAutoPaymentFollowUpText(userInput: String, data: AutoPaymentParsed, missingFields: [String]) -> String {
         let dayStr = userInput.replacingOccurrences(of: "每个月", with: "")
             .replacingOccurrences(of: "每月", with: "")
             .replacingOccurrences(of: "号", with: "")
             .replacingOccurrences(of: "日", with: "")
             .trimmingCharacters(in: .whitespaces)
         
-        // 构建完整的订阅描述
         let typeStr: String
-        switch partialData.paymentType {
+        switch data.paymentType {
         case "SUBSCRIPTION": typeStr = "订阅"
         case "MEMBERSHIP": typeStr = "会员"
         case "INSURANCE": typeStr = "保险"
@@ -468,8 +493,249 @@ struct ChatRecordView: View {
         default: typeStr = "自动扣款"
         }
         
-        // 构建完整描述："订阅Netflix每月88块，每月4号扣费"
-        return "\(typeStr)\(partialData.name)每月\(partialData.amount)块，每月\(dayStr)号扣费"
+        return "\(typeStr)\(data.name)每月\(data.amount)块，每月\(dayStr)号扣费"
+    }
+    
+    // MARK: - 交易追问回复
+    private func buildTransactionFollowUpText(userInput: String, data: AIRecordParsed, missingFields: [String]) -> String {
+        var result = ""
+        let typeStr = data.type == .income ? "收入" : (data.type == .transfer ? "转账" : "花了")
+        
+        if missingFields.contains("amount") {
+            // 补充金额
+            let amountStr = userInput.replacingOccurrences(of: "元", with: "")
+                .replacingOccurrences(of: "块", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            result = "\(data.description)\(typeStr)\(amountStr)块"
+        } else if missingFields.contains("category") {
+            // 补充分类
+            result = "\(data.description)\(typeStr)\(data.amount)块，分类是\(userInput)"
+        } else {
+            result = userInput
+        }
+        return result
+    }
+    
+    // MARK: - 资产追问回复
+    private func buildAssetFollowUpText(userInput: String, data: AssetUpdateParsed, missingFields: [String]) -> String {
+        var result = ""
+        
+        if missingFields.contains("amount") || missingFields.contains("total_value") {
+            let amountStr = userInput.replacingOccurrences(of: "元", with: "")
+                .replacingOccurrences(of: "块", with: "")
+                .replacingOccurrences(of: "万", with: "0000")
+                .trimmingCharacters(in: .whitespaces)
+            result = "我有\(amountStr)的\(data.assetName)"
+        } else if missingFields.contains("interest_rate") {
+            result = "\(data.assetName)\(data.totalValue)块，利率\(userInput)"
+        } else if missingFields.contains("repayment_day") || missingFields.contains("monthly_payment") {
+            result = "\(data.assetName)\(data.totalValue)块，\(userInput)"
+        } else {
+            result = userInput
+        }
+        return result
+    }
+    
+    // MARK: - 信用卡追问回复
+    private func buildCreditCardFollowUpText(userInput: String, data: CreditCardParsed, missingFields: [String]) -> String {
+        var result = ""
+        
+        if missingFields.contains("credit_limit") {
+            let limitStr = userInput.replacingOccurrences(of: "元", with: "")
+                .replacingOccurrences(of: "块", with: "")
+                .replacingOccurrences(of: "万", with: "0000")
+                .trimmingCharacters(in: .whitespaces)
+            result = "\(data.name)信用卡额度\(limitStr)"
+        } else if missingFields.contains("repayment_due_date") {
+            let dayStr = userInput.replacingOccurrences(of: "号", with: "")
+                .replacingOccurrences(of: "日", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            result = "\(data.name)信用卡额度\(data.creditLimit ?? 0)，还款日\(dayStr)号"
+        } else {
+            result = userInput
+        }
+        return result
+    }
+    
+    // MARK: - 预算追问回复
+    private func buildBudgetFollowUpText(userInput: String, data: BudgetParsed, missingFields: [String]) -> String {
+        var result = ""
+        
+        if missingFields.contains("amount") || missingFields.contains("target_amount") {
+            let amountStr = userInput.replacingOccurrences(of: "元", with: "")
+                .replacingOccurrences(of: "块", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            result = "\(data.name)预算\(amountStr)块"
+        } else if missingFields.contains("category") {
+            result = "\(userInput)预算\(data.targetAmount)块"
+        } else {
+            result = userInput
+        }
+        return result
+    }
+    
+    // MARK: - 处理选择器选择
+    private func handlePickerSelection(_ selectedAccount: SelectedAccountInfo, for needMoreInfo: NeedMoreInfoParsed) {
+        // 清除待处理数据
+        pendingPartialData = nil
+        
+        // 移除选择器追问气泡
+        messages.removeAll { msg in
+            if case .selectionFollowUp = msg.type { return true }
+            return false
+        }
+        
+        // 根据原始意图类型，补全数据并显示确认卡片
+        switch needMoreInfo.originalIntent {
+        case .transaction:
+            if var txData = needMoreInfo.partialTransactionData {
+                // 补全账户信息
+                if selectedAccount.type == .creditCard {
+                    txData.cardIdentifier = selectedAccount.cardIdentifier
+                } else {
+                    txData.accountName = selectedAccount.displayName
+                }
+                
+                // 添加确认对话消息
+                let confirmText = buildSelectionConfirmText(txData: txData, accountName: selectedAccount.displayName)
+                messages.append(ChatMessage(type: .assistantText(confirmText)))
+                
+                // 创建完整事件
+                let event = ParsedFinancialEvent(
+                    eventType: .transaction,
+                    transactionData: txData,
+                    assetUpdateData: nil,
+                    creditCardData: nil,
+                    holdingUpdateData: nil,
+                    budgetData: nil,
+                    autoPaymentData: nil,
+                    needMoreInfoData: nil,
+                    queryResponseData: nil
+                )
+                
+                // 显示确认卡片
+                self.editableEvents = [event]
+                self.showingEventCards = true
+            }
+            
+        case .holdingUpdate:
+            if var holdingData = needMoreInfo.partialHoldingData {
+                // 补全账户信息
+                holdingData.accountName = selectedAccount.displayName
+                holdingData.accountId = selectedAccount.id
+                
+                // 添加确认对话消息
+                let actionStr = holdingData.holdingAction == "SELL" ? "卖出" : "买入"
+                let confirmText = "好的，\(actionStr)\(Int(holdingData.quantity))股\(holdingData.name)，使用\(selectedAccount.displayName)账户"
+                messages.append(ChatMessage(type: .assistantText(confirmText)))
+                
+                let event = ParsedFinancialEvent(
+                    eventType: .holdingUpdate,
+                    transactionData: nil,
+                    assetUpdateData: nil,
+                    creditCardData: nil,
+                    holdingUpdateData: holdingData,
+                    budgetData: nil,
+                    autoPaymentData: nil,
+                    needMoreInfoData: nil,
+                    queryResponseData: nil
+                )
+                
+                self.editableEvents = [event]
+                self.showingEventCards = true
+            }
+            
+        case .autoPayment:
+            if var autoPaymentData = needMoreInfo.partialAutoPaymentData {
+                // 补全来源账户
+                autoPaymentData.sourceAccount = selectedAccount.displayName
+                
+                // 添加确认对话消息
+                let confirmText = "好的，\(autoPaymentData.name)的自动扣款将从\(selectedAccount.displayName)支付"
+                messages.append(ChatMessage(type: .assistantText(confirmText)))
+                
+                let event = ParsedFinancialEvent(
+                    eventType: .autoPayment,
+                    transactionData: nil,
+                    assetUpdateData: nil,
+                    creditCardData: nil,
+                    holdingUpdateData: nil,
+                    budgetData: nil,
+                    autoPaymentData: autoPaymentData,
+                    needMoreInfoData: nil,
+                    queryResponseData: nil
+                )
+                
+                self.editableEvents = [event]
+                self.showingEventCards = true
+            }
+            
+        default:
+            messages.append(ChatMessage(type: .assistantText("已选择: \(selectedAccount.displayName)")))
+        }
+    }
+    
+    // MARK: - 构建选择确认文本
+    private func buildSelectionConfirmText(txData: AIRecordParsed, accountName: String) -> String {
+        let typeStr = txData.type == .income ? "收入" : "支出"
+        let amountStr = String(format: "%.0f", Double(truncating: txData.amount as NSNumber))
+        
+        if txData.type == .income {
+            return "好的，\(txData.description)\(typeStr)\(amountStr)元，存入\(accountName)"
+        } else {
+            return "好的，\(txData.description)\(typeStr)\(amountStr)元，\(accountName)支付"
+        }
+    }
+    
+    // MARK: - 检查是否需要账户选择追问
+    private func checkNeedAccountSelection(events: [ParsedFinancialEvent]) -> NeedMoreInfoParsed? {
+        // 检查是否有交易事件缺少账户信息
+        for event in events {
+            if event.eventType == .transaction, let txData = event.transactionData {
+                // 如果没有账户名且没有信用卡标识，需要追问
+                let hasAccount = !txData.accountName.isEmpty
+                let hasCreditCard = txData.cardIdentifier != nil && !txData.cardIdentifier!.isEmpty
+                
+                if !hasAccount && !hasCreditCard {
+                    // 根据交易类型确定追问类型
+                    let pickerType: FollowUpPickerType = txData.type == .income ? .incomeAccount : .expenseAccount
+                    let question = txData.type == .income ? "请选择收款账户" : "请选择支付账户"
+                    
+                    return NeedMoreInfoParsed(
+                        originalIntent: .transaction,
+                        missingFields: ["source_account"],
+                        question: question,
+                        pickerType: pickerType,
+                        partialHoldingData: nil,
+                        partialAutoPaymentData: nil,
+                        partialTransactionData: txData,
+                        partialAssetData: nil,
+                        partialCreditCardData: nil,
+                        partialBudgetData: nil
+                    )
+                }
+            }
+            
+            // 检查持仓更新是否缺少账户
+            if event.eventType == .holdingUpdate, let holdingData = event.holdingUpdateData {
+                if holdingData.accountName == nil || holdingData.accountName?.isEmpty == true {
+                    return NeedMoreInfoParsed(
+                        originalIntent: .holdingUpdate,
+                        missingFields: ["account"],
+                        question: "请选择投资账户",
+                        pickerType: .investmentAccount,
+                        partialHoldingData: holdingData,
+                        partialAutoPaymentData: nil,
+                        partialTransactionData: nil,
+                        partialAssetData: nil,
+                        partialCreditCardData: nil,
+                        partialBudgetData: nil
+                    )
+                }
+            }
+        }
+        
+        return nil
     }
     
     // MARK: - 开始录音
@@ -512,20 +778,9 @@ struct ChatRecordView: View {
         
         // 检查是否是追问回复
         if let pending = pendingPartialData {
-            if let partialData = pending.partialData {
-                // 持仓追问回复
-                let combinedText = buildCombinedText(userInput: recognizedText, partialData: partialData, missingFields: pending.missingFields)
-                pendingPartialData = nil
-                parseAndRespond(text: combinedText, parsingMessageId: nil)
-            } else if let autoPaymentData = pending.partialAutoPaymentData {
-                // 自动扣款追问回复
-                let combinedText = buildCombinedTextForAutoPayment(userInput: recognizedText, partialData: autoPaymentData, missingFields: pending.missingFields)
-                pendingPartialData = nil
-                parseAndRespond(text: combinedText, parsingMessageId: nil)
-            } else {
-                pendingPartialData = nil
-                parseAndRespond(text: recognizedText, parsingMessageId: nil)
-            }
+            let combinedText = buildCombinedTextForFollowUp(userInput: recognizedText, pending: pending)
+            pendingPartialData = nil
+            parseAndRespond(text: combinedText, parsingMessageId: nil)
         } else {
             parseAndRespond(text: recognizedText, parsingMessageId: nil)
         }
@@ -560,8 +815,19 @@ struct ChatRecordView: View {
                        let needMoreInfo = needMoreInfoEvent.needMoreInfoData {
                         // 保存部分数据，等待用户补充
                         self.pendingPartialData = needMoreInfo
-                        // 显示追问消息
-                        self.messages.append(ChatMessage(type: .assistantText(needMoreInfo.question)))
+                        
+                        // 根据追问类型显示不同的 UI
+                        if needMoreInfo.requiresPicker {
+                            // 需要选择器的追问 - 显示选择器卡片
+                            self.messages.append(ChatMessage(type: .selectionFollowUp(needMoreInfo)))
+                        } else {
+                            // 文本追问 - 显示追问消息
+                            self.messages.append(ChatMessage(type: .assistantText(needMoreInfo.question)))
+                        }
+                    } else if let accountFollowUp = self.checkNeedAccountSelection(events: events) {
+                        // 检查交易事件是否缺少账户，需要选择器追问
+                        self.pendingPartialData = accountFollowUp
+                        self.messages.append(ChatMessage(type: .selectionFollowUp(accountFollowUp)))
                     } else {
                         // 正常流程：设置可编辑事件并显示确认卡片
                         self.editableEvents = events
@@ -850,6 +1116,8 @@ struct SimpleChatBubble: View {
     let message: ChatMessage
     var onConfirmAutoIncome: ((FixedIncomeInfo, UUID) -> Void)?
     var onCancelAutoIncome: ((UUID) -> Void)?
+    var onPickerSelection: ((SelectedAccountInfo, NeedMoreInfoParsed) -> Void)?
+    var onPickerCancel: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -911,7 +1179,24 @@ struct SimpleChatBubble: View {
 
         case .autoIncomePrompt(let info):
             autoIncomePromptBubble(info: info)
+            
+        case .selectionFollowUp(let needMoreInfo):
+            selectionFollowUpBubble(needMoreInfo: needMoreInfo)
         }
+    }
+    
+    // MARK: - 选择器追问气泡
+    @ViewBuilder
+    private func selectionFollowUpBubble(needMoreInfo: NeedMoreInfoParsed) -> some View {
+        SelectionFollowUpCard(
+            needMoreInfo: needMoreInfo,
+            onSelection: { selectedAccount in
+                onPickerSelection?(selectedAccount, needMoreInfo)
+            },
+            onCancel: {
+                onPickerCancel?()
+            }
+        )
     }
     
     // 用户消息气泡
