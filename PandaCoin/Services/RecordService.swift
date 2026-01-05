@@ -213,6 +213,7 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: nil,
+                        autoPaymentData: nil,
                         needMoreInfoData: nil,
                         queryResponseData: nil
                     )
@@ -256,6 +257,7 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: nil,
+                        autoPaymentData: nil,
                         needMoreInfoData: nil,
                         queryResponseData: nil
                     )
@@ -284,6 +286,7 @@ class RecordService: ObservableObject {
                         creditCardData: creditCardData,
                         holdingUpdateData: nil,
                         budgetData: nil,
+                        autoPaymentData: nil,
                         needMoreInfoData: nil,
                         queryResponseData: nil
                     )
@@ -311,6 +314,7 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: holdingData,
                         budgetData: nil,
+                        autoPaymentData: nil,
                         needMoreInfoData: nil,
                         queryResponseData: nil
                     )
@@ -334,6 +338,32 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: budgetData,
+                        autoPaymentData: nil,
+                        needMoreInfoData: nil,
+                        queryResponseData: nil
+                    )
+
+                case .autoPayment:
+                    // 自动扣款/订阅
+                    logInfo("📅 自动扣款: \(data.name ?? "")")
+                    let autoPaymentData = AutoPaymentParsed(
+                        name: data.name ?? "",
+                        paymentType: data.payment_type ?? "SUBSCRIPTION",
+                        amount: Decimal(data.amount ?? 0),
+                        currency: data.currency ?? "CNY",
+                        dayOfMonth: data.day_of_month,
+                        sourceAccount: data.source_account,
+                        category: data.category ?? "SUBSCRIPTION",
+                        note: data.note
+                    )
+                    return ParsedFinancialEvent(
+                        eventType: .autoPayment,
+                        transactionData: nil,
+                        assetUpdateData: nil,
+                        creditCardData: nil,
+                        holdingUpdateData: nil,
+                        budgetData: nil,
+                        autoPaymentData: autoPaymentData,
                         needMoreInfoData: nil,
                         queryResponseData: nil
                     )
@@ -345,9 +375,9 @@ class RecordService: ObservableObject {
                     // 解析原始意图
                     let originalIntent = FinancialEventType(rawValue: data.original_intent ?? "") ?? .nullStatement
                     
-                    // 构建已解析的部分数据
+                    // 构建已解析的部分数据（持仓）
                     var partialHoldingData: HoldingUpdateParsed? = nil
-                    if let partial = data.partial_data {
+                    if let partial = data.partial_data, originalIntent == .holdingUpdate {
                         partialHoldingData = HoldingUpdateParsed(
                             name: partial.name ?? "",
                             holdingType: partial.holding_type ?? "STOCK",
@@ -364,11 +394,27 @@ class RecordService: ObservableObject {
                         )
                     }
                     
+                    // 构建已解析的部分数据（自动扣款）
+                    var partialAutoPaymentData: AutoPaymentParsed? = nil
+                    if let partial = data.partial_data, originalIntent == .autoPayment {
+                        partialAutoPaymentData = AutoPaymentParsed(
+                            name: partial.name ?? "",
+                            paymentType: partial.payment_type ?? "SUBSCRIPTION",
+                            amount: Decimal(partial.amount ?? 0),
+                            currency: partial.currency ?? "CNY",
+                            dayOfMonth: nil,  // 缺失的字段
+                            sourceAccount: nil,
+                            category: partial.category ?? "SUBSCRIPTION",
+                            note: nil
+                        )
+                    }
+                    
                     let needMoreInfoData = NeedMoreInfoParsed(
                         originalIntent: originalIntent,
                         missingFields: data.missing_fields ?? [],
                         question: data.question ?? "请提供更多信息",
-                        partialData: partialHoldingData
+                        partialData: partialHoldingData,
+                        partialAutoPaymentData: partialAutoPaymentData
                     )
                     
                     return ParsedFinancialEvent(
@@ -378,6 +424,7 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: nil,
+                        autoPaymentData: nil,
                         needMoreInfoData: needMoreInfoData,
                         queryResponseData: nil
                     )
@@ -401,6 +448,7 @@ class RecordService: ObservableObject {
                         creditCardData: nil,
                         holdingUpdateData: nil,
                         budgetData: nil,
+                        autoPaymentData: nil,
                         needMoreInfoData: nil,
                         queryResponseData: queryData
                     )
@@ -442,6 +490,7 @@ class RecordService: ObservableObject {
         let transactionEvents = events.filter { $0.eventType == .transaction }
         let budgetEvents = events.filter { $0.eventType == .budget }
         let holdingEvents = events.filter { $0.eventType == .holdingUpdate }
+        let autoPaymentEvents = events.filter { $0.eventType == .autoPayment }
         
         // 第一阶段：先保存资产和信用卡更新（创建新账户）
         var phase1Publishers: [AnyPublisher<Void, APIError>] = []
@@ -478,6 +527,16 @@ class RecordService: ObservableObject {
         for event in holdingEvents {
             if let data = event.holdingUpdateData {
                 let pub = saveHoldingUpdate(data)
+                    .map { _ in () }
+                    .eraseToAnyPublisher()
+                phase1Publishers.append(pub)
+            }
+        }
+        
+        // 保存自动扣款/订阅
+        for event in autoPaymentEvents {
+            if let data = event.autoPaymentData {
+                let pub = saveAutoPayment(data)
                     .map { _ in () }
                     .eraseToAnyPublisher()
                 phase1Publishers.append(pub)
@@ -654,6 +713,42 @@ class RecordService: ObservableObject {
         )
     }
     
+    // MARK: - 保存自动扣款/订阅
+    private func saveAutoPayment(_ data: AutoPaymentParsed) -> AnyPublisher<AutoPayment, APIError> {
+        logInfo("✅ 保存自动扣款: \(data.name), 金额=\(data.amount), 扣款日=\(data.dayOfMonth ?? 1)")
+        
+        // 映射 paymentType 字符串到 PaymentType 枚举
+        let paymentType: PaymentType
+        switch data.paymentType.uppercased() {
+        case "SUBSCRIPTION": paymentType = .subscription
+        case "MEMBERSHIP": paymentType = .subscription  // 会员也映射到订阅
+        case "LOAN": paymentType = .loan
+        case "MORTGAGE": paymentType = .mortgage
+        case "CREDIT_CARD_FULL": paymentType = .creditCardFull
+        case "CREDIT_CARD_MIN": paymentType = .creditCardMin
+        default: paymentType = .subscription
+        }
+        
+        let request = CreateAutoPaymentRequest(
+            name: data.name,
+            paymentType: paymentType,
+            creditCardId: nil,
+            liabilityAccountId: nil,
+            sourceAccounts: nil,  // 用户可以稍后在自动扣款模块中配置
+            fixedAmount: NSDecimalNumber(decimal: data.amount).doubleValue,
+            dayOfMonth: data.dayOfMonth ?? 1,
+            executeTime: nil,
+            reminderDaysBefore: 1,
+            insufficientFundsPolicy: .notify,
+            totalPeriods: nil,
+            completedPeriods: nil,
+            startDate: nil,
+            isEnabled: true
+        )
+        
+        return AutoPaymentService.shared.createAutoPayment(request)
+    }
+    
     // MARK: - 保存预算
     private func saveBudget(_ data: BudgetParsed) -> AnyPublisher<Budget, APIError> {
         logInfo("✅ 保存预算: \(data.name), 目标金额=\(data.targetAmount)")
@@ -749,8 +844,29 @@ class RecordService: ObservableObject {
     }
 
     /// 查找已有的持仓（优先用代码匹配，其次用名称）
+    /// 卖出时会从所有持仓中搜索，买入时仅从指定账户搜索
     private func findExistingHolding(_ data: HoldingUpdateParsed, accountId: String) -> Holding? {
         let holdingService = HoldingService.shared
+
+        // 卖出时：从所有持仓中搜索（因为用户可能选错了账户）
+        if data.holdingAction == "SELL" {
+            let allHoldings = holdingService.holdings
+
+            // 优先匹配股票代码
+            if let code = data.tickerCode, !code.isEmpty {
+                if let matched = allHoldings.first(where: { $0.tickerCode?.uppercased() == code.uppercased() }) {
+                    return matched
+                }
+            }
+
+            // 名称模糊匹配
+            return allHoldings.first { holding in
+                holding.name.lowercased().contains(data.name.lowercased()) ||
+                data.name.lowercased().contains(holding.name.lowercased())
+            }
+        }
+
+        // 买入时：仅从指定账户搜索
         let accountHoldings = holdingService.getHoldings(forAccountId: accountId)
 
         // 优先匹配股票代码
@@ -1125,14 +1241,18 @@ struct FinancialEventData: Codable {
     
     // is_recurring 用于 BUDGET 和 TRANSACTION（复用同一个字段）
     
+    // AUTO_PAYMENT 字段
+    let payment_type: String?       // SUBSCRIPTION, MEMBERSHIP, INSURANCE, UTILITY, RENT, OTHER
+    let day_of_month: Int?          // 每月扣款日 (1-28)
+    
     // 贷款专用字段 (LOAN / MORTGAGE)
     let loan_term_months: Int?      // 贷款期限(月)
     let interest_rate: Double?      // 年利率 (%)
     let monthly_payment: Double?    // 月供金额
     let repayment_day: Int?         // 还款日 (1-28)
     
-    // 自动还款配置
-    let auto_repayment: Bool?       // 是否启用自动还款
+    // 自动扣款配置
+    let auto_repayment: Bool?       // 是否启用自动扣款
     let repayment_type: String?     // 还款类型: "FULL" 或 "MIN"（信用卡用）
 
     // HOLDING_UPDATE 字段
@@ -1183,6 +1303,11 @@ struct PartialDataResponse: Codable {
     let currency: String?
     let ticker_code: String?
     let date: String?
+    
+    // AUTO_PAYMENT 部分数据
+    let payment_type: String?
+    let amount: Double?
+    let category: String?
 }
 
 // MARK: - 统一解析结果类型
@@ -1192,6 +1317,7 @@ enum FinancialEventType: String, Codable {
     case creditCardUpdate = "CREDIT_CARD_UPDATE"
     case holdingUpdate = "HOLDING_UPDATE"
     case budget = "BUDGET"
+    case autoPayment = "AUTO_PAYMENT"  // 订阅/自动扣款
     case queryResponse = "QUERY_RESPONSE"  // 查询响应（消费分析、预算查询等）
     case nullStatement = "NULL_STATEMENT"
     case needMoreInfo = "NEED_MORE_INFO"  // 缺少关键信息，需要追问
@@ -1217,6 +1343,9 @@ struct ParsedFinancialEvent: Identifiable {
     // 预算数据
     var budgetData: BudgetParsed?
     
+    // 自动扣款数据（订阅等）
+    var autoPaymentData: AutoPaymentParsed?
+    
     // 追问数据（缺少关键信息时）
     var needMoreInfoData: NeedMoreInfoParsed?
     
@@ -1241,6 +1370,31 @@ struct NeedMoreInfoParsed {
     let missingFields: [String]             // 缺失的字段
     let question: String                    // AI 追问的问题
     let partialData: HoldingUpdateParsed?   // 已解析的部分数据（目前主要用于 HOLDING_UPDATE）
+    let partialAutoPaymentData: AutoPaymentParsed?  // 已解析的自动扣款部分数据
+}
+
+// 自动扣款解析结果
+struct AutoPaymentParsed {
+    let name: String                // 订阅名称，如 "Netflix"
+    let paymentType: String         // SUBSCRIPTION, MEMBERSHIP, INSURANCE, UTILITY, RENT, OTHER
+    let amount: Decimal             // 扣款金额
+    let currency: String            // 币种
+    var dayOfMonth: Int?            // 每月扣款日 (1-28)
+    var sourceAccount: String?      // 扣款来源账户
+    let category: String            // 分类，默认 SUBSCRIPTION
+    let note: String?               // 备注
+    
+    // 显示名称
+    var paymentTypeDisplayName: String {
+        switch paymentType {
+        case "SUBSCRIPTION": return "订阅服务"
+        case "MEMBERSHIP": return "会员费"
+        case "INSURANCE": return "保险"
+        case "UTILITY": return "水电燃气"
+        case "RENT": return "房租"
+        default: return "其他"
+        }
+    }
 }
 
 // 资产更新解析结果
@@ -1274,8 +1428,8 @@ struct AssetUpdateParsed {
     var monthlyPayment: Double?     // 月供金额
     var repaymentDay: Int?          // 还款日 (1-28)
     
-    // 自动还款配置
-    var autoRepayment: Bool?        // 是否启用自动还款
+    // 自动扣款配置
+    var autoRepayment: Bool?        // 是否启用自动扣款
     var sourceAccount: String?      // 扣款来源账户名称
 }
 
@@ -1302,8 +1456,8 @@ struct CreditCardParsed {
     let repaymentDueDate: String?   // 还款日（如 "04"）
     var cardIdentifier: String?     // 卡片唯一标识（如尾号"1234"）
     
-    // 自动还款配置
-    var autoRepayment: Bool?        // 是否启用自动还款
+    // 自动扣款配置
+    var autoRepayment: Bool?        // 是否启用自动扣款
     var repaymentType: String?      // 还款类型: "FULL" 或 "MIN"
     var sourceAccount: String?      // 扣款来源账户名称
 }

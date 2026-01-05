@@ -186,14 +186,14 @@ struct SettingsView: View {
 
             // MARK: - 财务管理
             Section("财务管理") {
-                Button(action: { requireAuth("自动还款") { showAutoPayment = true } }) {
+                Button(action: { requireAuth("自动扣款") { showAutoPayment = true } }) {
                     HStack {
                         ZStack {
                             Circle().fill(Color.green.opacity(0.1)).frame(width: 30, height: 30)
                             Image(systemName: "calendar.badge.clock").foregroundColor(.green).font(.system(size: 14))
                         }
 
-                        Text("自动还款")
+                        Text("自动扣款")
                             .foregroundColor(Theme.text)
 
                         Spacer()

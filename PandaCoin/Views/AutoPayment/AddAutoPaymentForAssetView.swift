@@ -8,7 +8,7 @@
 import SwiftUI
 import Combine
 
-/// 从资产详情页快速设置自动还款的简化视图
+/// 从资产详情页快速设置自动扣款的简化视图
 struct AddAutoPaymentForAssetView: View {
     @Environment(\.dismiss) private var dismiss
     let asset: Asset
@@ -196,7 +196,7 @@ struct AddAutoPaymentForAssetView: View {
                 }
             }
         }
-        .navigationTitle("设置自动还款")
+        .navigationTitle("设置自动扣款")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {

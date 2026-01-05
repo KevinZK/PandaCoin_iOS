@@ -80,7 +80,7 @@ struct AutoPaymentDetailView: View {
                 executeNow()
             }
         } message: {
-            Text("确定要立即执行此自动还款吗？将从您的账户扣款。")
+            Text("确定要立即执行此自动扣款吗？将从您的账户扣款。")
         }
         .alert("确认删除", isPresented: $showingDeleteConfirm) {
             Button("取消", role: .cancel) { }
@@ -437,7 +437,7 @@ struct AutoPaymentDetailView: View {
                 } else {
                     Image(systemName: "trash")
                 }
-                Text("删除自动还款")
+                Text("删除自动扣款")
             }
             .font(.headline)
             .foregroundColor(.red)
@@ -683,7 +683,7 @@ struct EditAutoPaymentView: View {
                 }
             }
         }
-        .navigationTitle("编辑自动还款")
+        .navigationTitle("编辑自动扣款")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {

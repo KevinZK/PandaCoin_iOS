@@ -398,18 +398,28 @@ struct ChatRecordView: View {
         messages.append(ChatMessage(type: .assistantParsing))
         
         // 检查是否是追问回复（有待处理的部分数据）
-        if let pending = pendingPartialData, let partialData = pending.partialData {
-            // 将用户输入与部分数据合并，形成完整的请求
-            let combinedText = buildCombinedText(userInput: text, partialData: partialData, missingFields: pending.missingFields)
-            pendingPartialData = nil  // 清除待处理数据
-            parseAndRespond(text: combinedText, parsingMessageId: nil)
+        if let pending = pendingPartialData {
+            if let partialData = pending.partialData {
+                // 持仓追问回复
+                let combinedText = buildCombinedText(userInput: text, partialData: partialData, missingFields: pending.missingFields)
+                pendingPartialData = nil
+                parseAndRespond(text: combinedText, parsingMessageId: nil)
+            } else if let autoPaymentData = pending.partialAutoPaymentData {
+                // 自动扣款追问回复
+                let combinedText = buildCombinedTextForAutoPayment(userInput: text, partialData: autoPaymentData, missingFields: pending.missingFields)
+                pendingPartialData = nil
+                parseAndRespond(text: combinedText, parsingMessageId: nil)
+            } else {
+                pendingPartialData = nil
+                parseAndRespond(text: text, parsingMessageId: nil)
+            }
         } else {
             // 正常流程
             parseAndRespond(text: text, parsingMessageId: nil)
         }
     }
     
-    // MARK: - 构建合并后的文本（用于追问回复）
+    // MARK: - 构建合并后的文本（用于持仓追问回复）
     private func buildCombinedText(userInput: String, partialData: HoldingUpdateParsed, missingFields: [String]) -> String {
         // 根据缺失字段类型，将用户输入的值合并到完整描述中
         var combinedText = ""
@@ -436,6 +446,30 @@ struct ChatRecordView: View {
         }
         
         return combinedText
+    }
+    
+    // MARK: - 构建合并后的文本（用于自动扣款追问回复）
+    private func buildCombinedTextForAutoPayment(userInput: String, partialData: AutoPaymentParsed, missingFields: [String]) -> String {
+        // 提取用户输入的日期数字
+        let dayStr = userInput.replacingOccurrences(of: "每个月", with: "")
+            .replacingOccurrences(of: "每月", with: "")
+            .replacingOccurrences(of: "号", with: "")
+            .replacingOccurrences(of: "日", with: "")
+            .trimmingCharacters(in: .whitespaces)
+        
+        // 构建完整的订阅描述
+        let typeStr: String
+        switch partialData.paymentType {
+        case "SUBSCRIPTION": typeStr = "订阅"
+        case "MEMBERSHIP": typeStr = "会员"
+        case "INSURANCE": typeStr = "保险"
+        case "UTILITY": typeStr = "水电费"
+        case "RENT": typeStr = "房租"
+        default: typeStr = "自动扣款"
+        }
+        
+        // 构建完整描述："订阅Netflix每月88块，每月4号扣费"
+        return "\(typeStr)\(partialData.name)每月\(partialData.amount)块，每月\(dayStr)号扣费"
     }
     
     // MARK: - 开始录音
@@ -477,10 +511,21 @@ struct ChatRecordView: View {
         messages.append(ChatMessage(type: .assistantParsing))
         
         // 检查是否是追问回复
-        if let pending = pendingPartialData, let partialData = pending.partialData {
-            let combinedText = buildCombinedText(userInput: recognizedText, partialData: partialData, missingFields: pending.missingFields)
-            pendingPartialData = nil
-            parseAndRespond(text: combinedText, parsingMessageId: nil)
+        if let pending = pendingPartialData {
+            if let partialData = pending.partialData {
+                // 持仓追问回复
+                let combinedText = buildCombinedText(userInput: recognizedText, partialData: partialData, missingFields: pending.missingFields)
+                pendingPartialData = nil
+                parseAndRespond(text: combinedText, parsingMessageId: nil)
+            } else if let autoPaymentData = pending.partialAutoPaymentData {
+                // 自动扣款追问回复
+                let combinedText = buildCombinedTextForAutoPayment(userInput: recognizedText, partialData: autoPaymentData, missingFields: pending.missingFields)
+                pendingPartialData = nil
+                parseAndRespond(text: combinedText, parsingMessageId: nil)
+            } else {
+                pendingPartialData = nil
+                parseAndRespond(text: recognizedText, parsingMessageId: nil)
+            }
         } else {
             parseAndRespond(text: recognizedText, parsingMessageId: nil)
         }
@@ -748,7 +793,7 @@ struct ChatRecordView: View {
     private var hasSaveableEvents: Bool {
         editableEvents.contains { event in
             switch event.eventType {
-            case .transaction, .assetUpdate, .creditCardUpdate, .holdingUpdate, .budget:
+            case .transaction, .assetUpdate, .creditCardUpdate, .holdingUpdate, .budget, .autoPayment:
                 return true
             case .queryResponse, .nullStatement, .needMoreInfo:
                 return false

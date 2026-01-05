@@ -129,11 +129,18 @@ class SubscriptionService: ObservableObject {
         // 启动交易监听
         updateListenerTask = listenForTransactions()
 
-        // 初始加载
+        // 初始加载产品（不在这里同步订阅，等待登录后再同步）
         Task {
             await loadProducts()
-            await updateSubscriptionStatus()
         }
+    }
+    
+    /// 登录后调用：同步 Apple 订阅到后端并刷新状态
+    func syncAfterLogin() async {
+        print("🔄 [Subscription] 登录后同步 Apple 订阅...")
+        await syncAppleSubscriptionsToBackend()
+        // 同步后不需要再调用 fetchCurrentUser，因为 AuthService 已经在调用
+        print("✅ [Subscription] Apple 订阅同步完成")
     }
 
     deinit {

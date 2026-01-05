@@ -513,7 +513,7 @@ struct AssetDetailView: View {
         }
     }
     
-    // MARK: - 检查关联的自动还款
+    // MARK: - 检查关联的自动扣款
     private func checkLinkedAutoPayment() {
         // 只对贷款类资产检查
         guard asset.type == .loan || asset.type == .mortgage else { return }
@@ -523,7 +523,7 @@ struct AssetDetailView: View {
             .sink(
                 receiveCompletion: { _ in },
                 receiveValue: { [self] payments in
-                    // 查找关联到当前资产的自动还款
+                    // 查找关联到当前资产的自动扣款
                     linkedAutoPayment = payments.first { $0.liabilityAccountId == asset.id }
                 }
             )
@@ -593,13 +593,13 @@ struct AssetDetailView: View {
                 }
             }
             
-            // 贷款类资产显示自动还款按钮
+            // 贷款类资产显示自动扣款按钮
             if asset.type == .loan || asset.type == .mortgage {
                 Divider()
                     .padding(.vertical, 4)
                 
                 if let autoPayment = linkedAutoPayment {
-                    // 已设置自动还款 - 显示查看按钮
+                    // 已设置自动扣款 - 显示查看按钮
                     Button(action: { showingAutoPaymentDetail = true }) {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
@@ -607,7 +607,7 @@ struct AssetDetailView: View {
                                 .foregroundColor(.green)
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("自动还款已启用")
+                                Text("自动扣款已启用")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .foregroundColor(Theme.text)
@@ -625,12 +625,12 @@ struct AssetDetailView: View {
                         }
                     }
                 } else {
-                    // 未设置自动还款 - 显示设置按钮
+                    // 未设置自动扣款 - 显示设置按钮
                     Button(action: { showingAutoPaymentSetup = true }) {
                         HStack {
                             Image(systemName: "calendar.badge.clock")
                                 .font(.system(size: 16))
-                            Text("设置自动还款")
+                            Text("设置自动扣款")
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                             Spacer()

@@ -206,7 +206,7 @@ struct AssetRequest: Codable {
     let loanStartDate: String?
     let institutionName: String?
     
-    // 自动还款配置
+    // 自动扣款配置
     let autoRepayment: Bool?
     let sourceAccountId: String?
     let sourceAccountName: String?

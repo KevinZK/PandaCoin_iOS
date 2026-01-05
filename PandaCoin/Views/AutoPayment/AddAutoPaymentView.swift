@@ -281,7 +281,7 @@ struct AddAutoPaymentView: View {
                 }
             }
         }
-        .navigationTitle("添加自动还款")
+        .navigationTitle("添加自动扣款")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {

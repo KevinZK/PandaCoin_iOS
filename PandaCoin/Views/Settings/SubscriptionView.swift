@@ -155,7 +155,7 @@ struct SubscriptionView: View {
             benefitRow(icon: "camera.fill", title: "拍照记账", description: "拍摄票据自动识别")
             benefitRow(icon: "creditcard.fill", title: "资产管理", description: "全面管理您的资产")
             benefitRow(icon: "chart.pie.fill", title: "预算管理", description: "智能预算规划")
-            benefitRow(icon: "arrow.triangle.2.circlepath", title: "自动记账", description: "自动还款与入账")
+            benefitRow(icon: "arrow.triangle.2.circlepath", title: "自动记账", description: "自动扣款与入账")
             benefitRow(icon: "chart.bar.fill", title: "完整统计", description: "深度财务分析报告")
         }
         .padding(20)

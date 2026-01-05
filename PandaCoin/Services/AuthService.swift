@@ -39,8 +39,12 @@ class AuthService: ObservableObject {
         // 检查是否已登录
         isAuthenticated = networkManager.accessToken != nil
         if isAuthenticated {
-            fetchCurrentUser()
-            fetchDefaultExpenseAccount()
+            // 先同步 Apple 订阅到后端，再获取用户数据
+            Task { @MainActor in
+                await SubscriptionService.shared.syncAfterLogin()
+                self.fetchCurrentUser()
+                self.fetchDefaultExpenseAccount()
+            }
         }
     }
     
@@ -209,8 +213,11 @@ class AuthService: ObservableObject {
         currentUser = response.user
         isAuthenticated = true
         fetchDefaultExpenseAccount()
-        // 登录后立即获取完整用户数据（包含订阅状态）
-        fetchCurrentUser()
+        // 登录后先同步 Apple 订阅，再获取完整用户数据
+        Task { @MainActor in
+            await SubscriptionService.shared.syncAfterLogin()
+            self.fetchCurrentUser()
+        }
     }
 
     private func handleAppleAuthSuccess(_ response: AppleAuthResponse) {
@@ -218,7 +225,10 @@ class AuthService: ObservableObject {
         currentUser = response.user
         isAuthenticated = true
         fetchDefaultExpenseAccount()
-        // 登录后立即获取完整用户数据（包含订阅状态）
-        fetchCurrentUser()
+        // 登录后先同步 Apple 订阅，再获取完整用户数据
+        Task { @MainActor in
+            await SubscriptionService.shared.syncAfterLogin()
+            self.fetchCurrentUser()
+        }
     }
 }

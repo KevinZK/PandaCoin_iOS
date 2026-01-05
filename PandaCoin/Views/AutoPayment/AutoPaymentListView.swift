@@ -27,7 +27,7 @@ struct AutoPaymentListView: View {
                 paymentListView
             }
         }
-        .navigationTitle("自动还款")
+        .navigationTitle("自动扣款")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -66,11 +66,11 @@ struct AutoPaymentListView: View {
                 .font(.system(size: 60))
                 .foregroundColor(Theme.textSecondary)
             
-            Text("暂无自动还款")
+            Text("暂无自动扣款")
                 .font(.title2)
                 .foregroundColor(Theme.text)
             
-            Text("设置自动还款，系统将在每月指定日期\n自动从您的账户扣款还贷")
+            Text("设置自动扣款，系统将在每月指定日期\n自动从您的账户扣款还贷")
                 .font(.subheadline)
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -78,7 +78,7 @@ struct AutoPaymentListView: View {
             Button(action: { showingAddSheet = true }) {
                 HStack {
                     Image(systemName: "plus.circle.fill")
-                    Text("添加自动还款")
+                    Text("添加自动扣款")
                 }
                 .font(.headline)
                 .foregroundColor(.white)
@@ -156,7 +156,7 @@ struct AutoPaymentListView: View {
     }
 }
 
-// MARK: - 自动还款卡片
+// MARK: - 自动扣款卡片
 
 struct AutoPaymentCard: View {
     let payment: AutoPayment

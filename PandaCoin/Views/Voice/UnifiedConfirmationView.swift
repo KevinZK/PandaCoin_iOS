@@ -171,7 +171,7 @@ struct UnifiedConfirmationView: View {
     private var hasSaveableEvents: Bool {
         editableEvents.contains { event in
             switch event.eventType {
-            case .transaction, .assetUpdate, .creditCardUpdate, .holdingUpdate, .budget:
+            case .transaction, .assetUpdate, .creditCardUpdate, .holdingUpdate, .budget, .autoPayment:
                 return true
             case .queryResponse, .nullStatement, .needMoreInfo:
                 return false
@@ -289,6 +289,13 @@ struct EventConfirmCard: View {
                         set: { event.budgetData = $0 }
                     ))
                 }
+            case .autoPayment:
+                if let autoPaymentData = event.autoPaymentData {
+                    AutoPaymentCardContent(data: Binding(
+                        get: { event.autoPaymentData ?? autoPaymentData },
+                        set: { event.autoPaymentData = $0 }
+                    ))
+                }
             case .queryResponse:
                 if let queryData = event.queryResponseData {
                     QueryResponseCardContent(data: queryData)
@@ -327,6 +334,7 @@ struct EventConfirmCard: View {
         case .creditCardUpdate: return "信用卡"
         case .holdingUpdate: return "持仓交易"
         case .budget: return "预算"
+        case .autoPayment: return "自动扣款"
         case .queryResponse: return "查询结果"
         case .nullStatement: return "无效"
         case .needMoreInfo: return "追问"
@@ -340,6 +348,7 @@ struct EventConfirmCard: View {
         case .creditCardUpdate: return "creditcard"
         case .holdingUpdate: return "chart.line.uptrend.xyaxis"
         case .budget: return "target"
+        case .autoPayment: return "arrow.triangle.2.circlepath"
         case .queryResponse: return "chart.bar.doc.horizontal"
         case .nullStatement: return "xmark"
         case .needMoreInfo: return "questionmark.circle"
@@ -361,9 +370,75 @@ struct EventConfirmCard: View {
             }
             return .green
         case .budget: return .purple
+        case .autoPayment: return .cyan
         case .queryResponse: return .teal
         case .nullStatement: return Theme.textSecondary
         case .needMoreInfo: return .gray
+        }
+    }
+}
+
+// MARK: - 自动扣款卡片内容
+struct AutoPaymentCardContent: View {
+    @Binding var data: AutoPaymentParsed
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            // 订阅名称
+            HStack {
+                Text("订阅名称")
+                    .font(AppFont.body(size: 14))
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Text(data.name)
+                    .font(AppFont.body(size: 14, weight: .medium))
+                    .foregroundColor(Theme.text)
+            }
+            
+            Divider()
+            
+            // 类型
+            HStack {
+                Text("类型")
+                    .font(AppFont.body(size: 14))
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Text(data.paymentTypeDisplayName)
+                    .font(AppFont.body(size: 14))
+                    .foregroundColor(Theme.text)
+            }
+            
+            Divider()
+            
+            // 金额
+            HStack {
+                Text("每月金额")
+                    .font(AppFont.body(size: 14))
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Text("¥\(data.amount.formatted())")
+                    .font(AppFont.body(size: 16, weight: .bold))
+                    .foregroundColor(Theme.expense)
+            }
+            
+            Divider()
+            
+            // 扣款日
+            HStack {
+                Text("扣款日")
+                    .font(AppFont.body(size: 14))
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                if let day = data.dayOfMonth {
+                    Text("每月\(day)号")
+                        .font(AppFont.body(size: 14))
+                        .foregroundColor(Theme.text)
+                } else {
+                    Text("未设置")
+                        .font(AppFont.body(size: 14))
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
         }
     }
 }
@@ -1071,7 +1146,7 @@ struct AssetUpdateCardContent: View {
                         }
                     }
                     
-                    // 自动还款设置
+                    // 自动扣款设置
                     if data.repaymentDay != nil {
                         Divider()
                         
@@ -1082,7 +1157,7 @@ struct AssetUpdateCardContent: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.triangle.2.circlepath")
                                     .foregroundColor(Theme.bambooGreen)
-                                Text("启用自动还款")
+                                Text("启用自动扣款")
                                     .font(AppFont.body(size: 14, weight: .medium))
                             }
                         }
@@ -1663,7 +1738,7 @@ struct CreditCardUpdateCardContent: View {
                 )
             }
             
-            // 自动还款设置（信用卡）
+            // 自动扣款设置（信用卡）
             if data.repaymentDueDate != nil && !data.repaymentDueDate!.isEmpty {
                 Divider()
                     .padding(.vertical, 4)
@@ -1676,7 +1751,7 @@ struct CreditCardUpdateCardContent: View {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.triangle.2.circlepath")
                                 .foregroundColor(Theme.bambooGreen)
-                            Text("启用自动还款")
+                            Text("启用自动扣款")
                                 .font(AppFont.body(size: 14, weight: .medium))
                         }
                     }
@@ -1971,22 +2046,58 @@ struct HoldingUpdateCardContent: View {
     private func refreshAccountsAndMatch() {
         isLoadingAccounts = true
 
-        // 刷新账户列表
-        accountService.fetchAssets()
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { _ in
-                    isLoadingAccounts = false
-                    // 刷新完成后尝试匹配
-                    matchAccountAfterRefresh()
-                },
-                receiveValue: { _ in }
-            )
-            .store(in: &accountService.cancellables)
+        let holdingService = HoldingService.shared
+
+        // 并行刷新账户列表和持仓数据
+        Publishers.Zip(
+            accountService.fetchAssets(),
+            holdingService.fetchHoldings()
+        )
+        .receive(on: DispatchQueue.main)
+        .sink(
+            receiveCompletion: { _ in
+                isLoadingAccounts = false
+                // 刷新完成后尝试匹配
+                matchAccountAfterRefresh()
+            },
+            receiveValue: { _, _ in }
+        )
+        .store(in: &accountService.cancellables)
     }
 
     private func matchAccountAfterRefresh() {
-        // 尝试匹配 AI 识别出的账户名
+        // 卖出时：从所有持仓中查找匹配的持仓，自动选择正确的账户
+        if data.holdingAction == "SELL" {
+            let holdingService = HoldingService.shared
+            let allHoldings = holdingService.holdings
+
+            // 优先用股票代码匹配
+            if let code = data.tickerCode, !code.isEmpty {
+                if let matched = allHoldings.first(where: { $0.tickerCode?.uppercased() == code.uppercased() }) {
+                    selectedAccountId = matched.accountId
+                    data.accountId = matched.accountId
+                    if let account = investmentAccounts.first(where: { $0.id == matched.accountId }) {
+                        data.accountName = account.name
+                    }
+                    return
+                }
+            }
+
+            // 名称模糊匹配
+            if let matched = allHoldings.first(where: { holding in
+                holding.name.lowercased().contains(data.name.lowercased()) ||
+                data.name.lowercased().contains(holding.name.lowercased())
+            }) {
+                selectedAccountId = matched.accountId
+                data.accountId = matched.accountId
+                if let account = investmentAccounts.first(where: { $0.id == matched.accountId }) {
+                    data.accountName = account.name
+                }
+                return
+            }
+        }
+
+        // 买入时：尝试匹配 AI 识别出的账户名
         if let accountName = data.accountName {
             if let matched = investmentAccounts.first(where: { $0.name.contains(accountName) || accountName.contains($0.name) }) {
                 selectedAccountId = matched.id
