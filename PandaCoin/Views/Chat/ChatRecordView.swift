@@ -72,6 +72,8 @@ struct ChatRecordView: View {
     
     // 追问状态：保存部分数据，等待用户补充信息
     @State private var pendingPartialData: NeedMoreInfoParsed? = nil
+    // 待处理的所有事件（用于多笔交易时保存完整列表）
+    @State private var pendingEvents: [ParsedFinancialEvent] = []
 
     // 图片处理状态
     @State private var isProcessingImage = false  // 正在处理图片
@@ -585,7 +587,41 @@ struct ChatRecordView: View {
             return false
         }
         
-        // 根据原始意图类型，补全数据并显示确认卡片
+        // 如果有保存的多笔事件，将账户应用到所有缺少账户的事件
+        if !pendingEvents.isEmpty {
+            var updatedEvents: [ParsedFinancialEvent] = []
+            
+            for var event in pendingEvents {
+                if event.eventType == .transaction, var txData = event.transactionData {
+                    // 检查是否需要补全账户
+                    let hasAccount = !txData.accountName.isEmpty
+                    let hasCreditCard = txData.cardIdentifier != nil && !txData.cardIdentifier!.isEmpty
+                    
+                    if !hasAccount && !hasCreditCard {
+                        // 补全账户信息
+                        if selectedAccount.type == .creditCard {
+                            txData.cardIdentifier = selectedAccount.cardIdentifier
+                        } else {
+                            txData.accountName = selectedAccount.displayName
+                        }
+                        event.transactionData = txData
+                    }
+                }
+                updatedEvents.append(event)
+            }
+            
+            // 添加确认对话消息
+            let confirmText = "好的，\(updatedEvents.count)笔记录将使用\(selectedAccount.displayName)"
+            messages.append(ChatMessage(type: .assistantText(confirmText)))
+            
+            // 显示所有事件的确认卡片
+            self.editableEvents = updatedEvents
+            self.showingEventCards = true
+            self.pendingEvents = []  // 清空待处理事件
+            return
+        }
+        
+        // 单笔事件的处理逻辑（从 partialData 构建）
         switch needMoreInfo.originalIntent {
         case .transaction:
             if var txData = needMoreInfo.partialTransactionData {
@@ -826,6 +862,8 @@ struct ChatRecordView: View {
                         }
                     } else if let accountFollowUp = self.checkNeedAccountSelection(events: events) {
                         // 检查交易事件是否缺少账户，需要选择器追问
+                        // 保存所有事件，选择账户后统一应用
+                        self.pendingEvents = events
                         self.pendingPartialData = accountFollowUp
                         self.messages.append(ChatMessage(type: .selectionFollowUp(accountFollowUp)))
                     } else {
