@@ -88,9 +88,11 @@ class AssetService: ObservableObject {
             body: request
         )
         .handleEvents(receiveOutput: { [weak self] (updatedAsset: Asset) in
-            // 更新本地缓存
-            if let index = self?.accounts.firstIndex(where: { $0.id == updatedAsset.id }) {
-                self?.accounts[index] = updatedAsset
+            // 更新本地缓存（必须在主线程）
+            DispatchQueue.main.async {
+                if let index = self?.accounts.firstIndex(where: { $0.id == updatedAsset.id }) {
+                    self?.accounts[index] = updatedAsset
+                }
             }
         })
         .eraseToAnyPublisher()
