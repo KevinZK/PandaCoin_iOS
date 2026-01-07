@@ -70,8 +70,8 @@ struct SimpleChatBubble: View {
         case .assistantError(let error):
             errorBubble(error: error)
 
-        case .savedConfirmation(let count):
-            confirmationBubble(count: count)
+        case .savedConfirmation(let summary):
+            confirmationBubble(summary: summary)
 
         case .autoIncomePrompt(let info):
             autoIncomePromptBubble(info: info)
@@ -182,12 +182,12 @@ struct SimpleChatBubble: View {
     }
     
     // MARK: - 保存成功确认气泡
-    private func confirmationBubble(count: Int) -> some View {
+    private func confirmationBubble(summary: SavedEventsSummary) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(Theme.income)
                 .font(.system(size: 16))
-            Text("已记录\(count)笔！继续保持好习惯 💪")
+            Text(summary.confirmationMessage)
                 .font(AppFont.body(size: 15))
                 .foregroundColor(Theme.text)
         }

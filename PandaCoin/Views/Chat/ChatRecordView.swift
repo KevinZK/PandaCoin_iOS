@@ -395,7 +395,8 @@ struct ChatRecordView: View {
                     self.messages.append(ChatMessage(type: .assistantError("保存失败：\(error.localizedDescription)")))
                 }
             } receiveValue: { count in
-                self.messages.append(ChatMessage(type: .savedConfirmation(count)))
+                let summary = SavedEventsSummary(events: events)
+                self.messages.append(ChatMessage(type: .savedConfirmation(summary)))
                 self.editableEvents = []
                 
                 // 刷新账户列表
