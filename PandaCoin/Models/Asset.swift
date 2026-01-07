@@ -94,13 +94,16 @@ enum AssetType: String, Codable, CaseIterable {
 // MARK: - 资产模型
 struct Asset: Codable, Identifiable, Hashable {
     let id: String
-    let name: String
+    var name: String
     let type: AssetType
     var balance: Decimal
     let currency: String
     let userId: String
     let createdAt: Date
     let updatedAt: Date
+    
+    // 银行卡/账户标识（尾号）
+    var cardIdentifier: String?
     
     // 贷款专用字段
     let loanTermMonths: Int?       // 贷款期限(月)
@@ -119,6 +122,7 @@ struct Asset: Codable, Identifiable, Hashable {
         case userId
         case createdAt
         case updatedAt
+        case cardIdentifier
         case loanTermMonths
         case interestRate
         case monthlyPayment
@@ -135,6 +139,9 @@ struct Asset: Codable, Identifiable, Hashable {
         balance = try container.decode(Decimal.self, forKey: .balance)
         currency = try container.decode(String.self, forKey: .currency)
         userId = try container.decode(String.self, forKey: .userId)
+        
+        // 银行卡/账户标识（尾号）
+        cardIdentifier = try container.decodeIfPresent(String.self, forKey: .cardIdentifier)
         
         // 贷款字段（可选）
         loanTermMonths = try container.decodeIfPresent(Int.self, forKey: .loanTermMonths)
@@ -245,6 +252,7 @@ struct AssetRequest: Codable {
 struct UpdateAccountRequest: Codable {
     let name: String?
     let balance: Decimal?
+    let cardIdentifier: String?
     let loanTermMonths: Int?
     let interestRate: Double?
     let monthlyPayment: Double?
@@ -254,6 +262,7 @@ struct UpdateAccountRequest: Codable {
     init(
         name: String? = nil,
         balance: Decimal? = nil,
+        cardIdentifier: String? = nil,
         loanTermMonths: Int? = nil,
         interestRate: Double? = nil,
         monthlyPayment: Double? = nil,
@@ -262,6 +271,7 @@ struct UpdateAccountRequest: Codable {
     ) {
         self.name = name
         self.balance = balance
+        self.cardIdentifier = cardIdentifier
         self.loanTermMonths = loanTermMonths
         self.interestRate = interestRate
         self.monthlyPayment = monthlyPayment

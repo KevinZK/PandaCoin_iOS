@@ -16,6 +16,10 @@ struct AssetUpdateCardContent: View {
         data.assetType.uppercased() == "CREDIT_CARD"
     }
     
+    private var isBankType: Bool {
+        ["BANK", "SAVINGS", "DIGITAL_WALLET"].contains(data.assetType.uppercased())
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
             // 资产名称和金额
@@ -46,6 +50,13 @@ struct AssetUpdateCardContent: View {
                     .padding(.vertical, 3)
                     .background(assetCategoryColor)
                     .cornerRadius(10)
+                
+                // 卡号尾号（银行卡/储蓄卡）
+                if isBankType, let identifier = data.cardIdentifier, !identifier.isEmpty {
+                    Label("尾号 \(identifier)", systemImage: "creditcard")
+                        .font(AppFont.body(size: 13, weight: .medium))
+                        .foregroundColor(Theme.bambooGreen)
+                }
                 
                 // 机构名称
                 if let institution = data.institutionName, !institution.isEmpty {

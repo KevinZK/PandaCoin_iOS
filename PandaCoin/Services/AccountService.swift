@@ -75,6 +75,27 @@ class AssetService: ObservableObject {
         .eraseToAnyPublisher()
     }
     
+    // MARK: - 更新资产（完整对象）
+    func updateAsset(_ asset: Asset) -> AnyPublisher<Asset, APIError> {
+        let request = UpdateAccountRequest(
+            name: asset.name,
+            balance: asset.balance,
+            cardIdentifier: asset.cardIdentifier
+        )
+        return networkManager.request(
+            endpoint: "/assets/\(asset.id)",
+            method: "PATCH",
+            body: request
+        )
+        .handleEvents(receiveOutput: { [weak self] (updatedAsset: Asset) in
+            // 更新本地缓存
+            if let index = self?.accounts.firstIndex(where: { $0.id == updatedAsset.id }) {
+                self?.accounts[index] = updatedAsset
+            }
+        })
+        .eraseToAnyPublisher()
+    }
+    
     // MARK: - 删除资产
     func deleteAccount(id: String) -> AnyPublisher<Void, APIError> {
         return networkManager.request(

@@ -711,10 +711,10 @@ struct EmptyAccountView: View {
             Image(systemName: "wallet.pass")
                 .font(.system(size: 32))
                 .foregroundColor(Theme.textSecondary)
-            Text("暂无可用账户")
+            Text("暂无可用资产类型")
                 .font(AppFont.body(size: 14))
                 .foregroundColor(Theme.textSecondary)
-            Text("请先在资产模块添加账户")
+            Text("你可以资产模块添加资产账户或者让Finboo帮你添加：我的花旗银行储蓄卡有4000$")
                 .font(AppFont.body(size: 12))
                 .foregroundColor(Theme.textSecondary.opacity(0.7))
         }

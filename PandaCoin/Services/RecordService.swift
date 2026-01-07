@@ -243,6 +243,7 @@ class RecordService: ObservableObject {
                         repaymentAmount: data.repayment_amount,
                         repaymentSchedule: data.repayment_schedule,
                         cardIdentifier: data.card_identifier,
+                        isIdentifierUpdate: data.is_identifier_update ?? false,
                         loanTermMonths: data.loan_term_months,
                         interestRate: data.interest_rate,
                         monthlyPayment: data.monthly_payment,
@@ -451,7 +452,8 @@ class RecordService: ObservableObject {
                                 location: nil,
                                 repaymentAmount: partial.monthly_payment,
                                 repaymentSchedule: nil,
-                                cardIdentifier: nil,
+                                cardIdentifier: partial.card_identifier,
+                                isIdentifierUpdate: false,
                                 loanTermMonths: partial.loan_term_months,
                                 interestRate: partial.interest_rate,
                                 monthlyPayment: partial.monthly_payment,
@@ -1362,6 +1364,9 @@ struct FinancialEventData: Codable {
     // 通用信用卡标识字段（TRANSACTION/ASSET_UPDATE/CREDIT_CARD_UPDATE 共用）
     let card_identifier: String?
     
+    // 尾号更新标记（仅用于 ASSET_UPDATE，表示更新已有账户的尾号）
+    let is_identifier_update: Bool?
+    
     // BUDGET 字段
     let budget_action: String?
     let priority: String?
@@ -1602,8 +1607,11 @@ struct AssetUpdateParsed {
     let repaymentAmount: Double?
     let repaymentSchedule: String?
     
-    // 信用卡标识（仅当 asset_type = CREDIT_CARD 时使用）
+    // 信用卡/银行卡标识（尾号）
     var cardIdentifier: String?
+    
+    // 是否为尾号更新（更新已有账户的尾号，而非创建新账户）
+    var isIdentifierUpdate: Bool
     
     // 贷款专用字段 (LOAN / MORTGAGE)
     var loanTermMonths: Int?        // 贷款期限(月)
