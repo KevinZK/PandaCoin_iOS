@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct CreditCardListView: View {
     @Environment(\.dismiss) var dismiss
@@ -87,26 +88,53 @@ struct CreditCardListView: View {
     
     // MARK: - 卡片列表
     private var cardListView: some View {
-        ScrollView {
-            LazyVStack(spacing: Spacing.medium) {
-                ForEach(creditCardService.creditCards) { card in
+        List {
+            ForEach(creditCardService.creditCards) { card in
+                ZStack {
+                    // 隐藏的 NavigationLink（无箭头）
                     NavigationLink {
                         CreditCardTransactionsView(creditCard: card)
                     } label: {
-                        CreditCardRow(card: card)
+                        EmptyView()
                     }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button {
-                            selectedCard = card
-                        } label: {
-                            Label("编辑卡片", systemImage: "pencil")
-                        }
+                    .opacity(0)
+
+                    // 可见的卡片内容
+                    CreditCardRow(card: card)
+                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        selectedCard = card
+                    } label: {
+                        Label("编辑", systemImage: "pencil")
+                    }
+                    .tint(Theme.bambooGreen)
+
+                    Button(role: .destructive) {
+                        deleteCard(card)
+                    } label: {
+                        Label("删除", systemImage: "trash")
                     }
                 }
             }
-            .padding()
         }
+        .listStyle(.plain)
+        .background(Theme.background)
+    }
+
+    private func deleteCard(_ card: CreditCard) {
+        creditCardService.deleteCreditCard(id: card.id)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { _ in
+                    creditCardService.fetchCreditCards()
+                }
+            )
+            .store(in: &creditCardService.cancellables)
     }
 }
 

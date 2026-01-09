@@ -92,33 +92,34 @@ struct AutoPaymentListView: View {
     }
     
     // MARK: - 列表视图
-    
+
     private var paymentListView: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(service.autoPayments) { payment in
-                    AutoPaymentCard(payment: payment) {
-                        selectedPayment = payment
+        List {
+            ForEach(service.autoPayments) { payment in
+                AutoPaymentCard(payment: payment) {
+                    selectedPayment = payment
+                }
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        selectedPayment = payment  // 打开详情/编辑视图
+                    } label: {
+                        Label("编辑", systemImage: "pencil")
                     }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            deletePayment(payment)
-                        } label: {
-                            Label("删除", systemImage: "trash")
-                        }
-                        
-                        Button {
-                            togglePayment(payment)
-                        } label: {
-                            Label(payment.isEnabled ? "禁用" : "启用",
-                                  systemImage: payment.isEnabled ? "pause.circle" : "play.circle")
-                        }
-                        .tint(payment.isEnabled ? .orange : .green)
+                    .tint(Theme.bambooGreen)
+
+                    Button(role: .destructive) {
+                        deletePayment(payment)
+                    } label: {
+                        Label("删除", systemImage: "trash")
                     }
                 }
             }
-            .padding()
         }
+        .listStyle(.plain)
+        .background(Theme.background)
         .refreshable {
             await refreshDataAsync()
         }

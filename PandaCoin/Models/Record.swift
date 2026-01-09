@@ -29,6 +29,37 @@ struct RecordAccount: Codable {
     let id: String
     let name: String
     let type: String
+    let deletedAt: Date?  // 账户软删除时间，nil表示账户正常
+
+    // 账户是否已删除
+    var isDeleted: Bool {
+        deletedAt != nil
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, type, deletedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        type = try container.decode(String.self, forKey: .type)
+
+        // 解析 deletedAt（可能是字符串或 Date）
+        if let dateString = try container.decodeIfPresent(String.self, forKey: .deletedAt) {
+            deletedAt = ISO8601DateFormatter().date(from: dateString)
+        } else {
+            deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
+        }
+    }
+
+    init(id: String, name: String, type: String, deletedAt: Date? = nil) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.deletedAt = deletedAt
+    }
 }
 
 // MARK: - 记账记录
@@ -46,18 +77,19 @@ struct Record: Codable, Identifiable {
     let confidence: Double?     // AI解析置信度
     let createdAt: Date
     let updatedAt: Date
-    
+    let deletedAt: Date?        // 软删除时间，nil表示未删除
+
     // 转账/还款场景
     let targetAccountId: String?
-    
+
     // 信用卡场景
     let creditCardId: String?
     let cardIdentifier: String?
-    
+
     // 关联数据（后端只返回部分字段）
     var account: RecordAccount?
     var targetAccount: RecordAccount?
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case amount
@@ -72,6 +104,7 @@ struct Record: Codable, Identifiable {
         case confidence
         case createdAt
         case updatedAt
+        case deletedAt
         case targetAccountId
         case creditCardId
         case cardIdentifier
@@ -108,21 +141,39 @@ struct Record: Codable, Identifiable {
         self.confidence = nil
         self.createdAt = Date()
         self.updatedAt = Date()
+        self.deletedAt = nil
         self.targetAccountId = targetAccountId
         self.creditCardId = creditCardId
         self.cardIdentifier = cardIdentifier
-        
+
         if let accountId = accountId, let accountName = accountName {
             self.account = RecordAccount(id: accountId, name: accountName, type: "")
         } else {
             self.account = nil
         }
-        
+
         if let targetAccountId = targetAccountId, let targetAccountName = targetAccountName {
             self.targetAccount = RecordAccount(id: targetAccountId, name: targetAccountName, type: "")
         } else {
             self.targetAccount = nil
         }
+    }
+
+    // MARK: - 软删除相关属性
+
+    /// 记录本身是否已删除
+    var isDeleted: Bool {
+        deletedAt != nil
+    }
+
+    /// 关联的源账户是否已删除
+    var isAccountDeleted: Bool {
+        account?.isDeleted ?? false
+    }
+
+    /// 关联的目标账户是否已删除
+    var isTargetAccountDeleted: Bool {
+        targetAccount?.isDeleted ?? false
     }
     
     // MARK: - 资金流动描述

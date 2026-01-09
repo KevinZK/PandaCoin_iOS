@@ -11,6 +11,7 @@ import Combine
 struct AutoIncomeListView: View {
     @StateObject private var service = AutoIncomeService.shared
     @State private var showAddSheet = false
+    @State private var selectedIncomeForEdit: AutoIncome?
     @State private var cancellables = Set<AnyCancellable>()
 
     var body: some View {
@@ -78,34 +79,46 @@ struct AutoIncomeListView: View {
     // MARK: - 入账列表
 
     private var incomeListView: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(service.autoIncomes) { income in
+        List {
+            ForEach(service.autoIncomes) { income in
+                ZStack {
+                    // 隐藏的 NavigationLink（无箭头）
                     NavigationLink(destination: AutoIncomeDetailView(income: income)) {
-                        AutoIncomeCard(income: income)
+                        EmptyView()
                     }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            deleteIncome(income)
-                        } label: {
-                            Label("删除", systemImage: "trash")
-                        }
+                    .opacity(0)
 
-                        Button {
-                            toggleIncome(income)
-                        } label: {
-                            Label(income.isEnabled ? "禁用" : "启用",
-                                  systemImage: income.isEnabled ? "pause.circle" : "play.circle")
-                        }
-                        .tint(income.isEnabled ? .orange : .green)
+                    // 可见的卡片内容
+                    AutoIncomeCard(income: income)
+                }
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button {
+                        selectedIncomeForEdit = income
+                    } label: {
+                        Label("编辑", systemImage: "pencil")
+                    }
+                    .tint(Theme.bambooGreen)
+
+                    Button(role: .destructive) {
+                        deleteIncome(income)
+                    } label: {
+                        Label("删除", systemImage: "trash")
                     }
                 }
             }
-            .padding()
         }
+        .listStyle(.plain)
+        .background(Theme.background)
         .refreshable {
             await refreshData()
+        }
+        .sheet(item: $selectedIncomeForEdit) { income in
+            NavigationView {
+                AutoIncomeDetailView(income: income)
+            }
         }
     }
 

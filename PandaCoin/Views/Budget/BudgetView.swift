@@ -210,6 +210,14 @@ struct BudgetView: View {
                             }
                             // 左滑操作
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button {
+                                    selectedBudget = budget
+                                    showingEditBudget = true
+                                } label: {
+                                    Label("编辑", systemImage: "pencil")
+                                }
+                                .tint(Theme.bambooGreen)
+
                                 Button(role: .destructive) {
                                     if budget.isRecurring {
                                         budgetToDelete = budget
@@ -220,14 +228,6 @@ struct BudgetView: View {
                                 } label: {
                                     Label("删除", systemImage: "trash")
                                 }
-
-                                Button {
-                                    selectedBudget = budget
-                                    showingEditBudget = true
-                                } label: {
-                                    Label("编辑", systemImage: "pencil")
-                                }
-                                .tint(.blue)
                             }
                     }
                 }

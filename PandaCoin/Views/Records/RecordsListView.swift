@@ -14,7 +14,8 @@ struct RecordsListView: View {
     @State private var showAddRecord = false
     @State private var selectedType: RecordType? = nil
     @State private var searchText = ""
-    
+    @State private var selectedRecordForEdit: Record?
+
     init(recordService: RecordService = RecordService()) {
         _recordService = StateObject(wrappedValue: recordService)
     }
@@ -66,6 +67,12 @@ struct RecordsListView: View {
             AddRecordView(accountService: accountService, recordService: recordService)
                 .onAppear {
                     // 只有打开添加记账页面时才加载账户列表
+                    accountService.fetchAccounts()
+                }
+        }
+        .sheet(item: $selectedRecordForEdit) { record in
+            EditRecordView(record: record, accountService: accountService, recordService: recordService)
+                .onAppear {
                     accountService.fetchAccounts()
                 }
         }
@@ -147,7 +154,14 @@ struct RecordsListView: View {
                                         )
                                     )
                             )
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button {
+                                    selectedRecordForEdit = record
+                                } label: {
+                                    Label("编辑", systemImage: "pencil")
+                                }
+                                .tint(Theme.bambooGreen)
+
                                 Button(role: .destructive) {
                                     deleteRecord(record)
                                 } label: {
@@ -291,18 +305,35 @@ struct RecordRowView: View {
                     }
                     
                     // 资金流动提示
-                    if let flowDesc = record.flowDescription {
-                        HStack(spacing: 4) {
-                            Text(record.flowIcon)
-                                .font(.system(size: 11))
-                            Text(flowDesc)
-                                .font(.system(size: 11))
+                    HStack(spacing: 6) {
+                        if let flowDesc = record.flowDescription {
+                            HStack(spacing: 4) {
+                                Text(record.flowIcon)
+                                    .font(.system(size: 11))
+                                Text(flowDesc)
+                                    .font(.system(size: 11))
+                            }
+                            .foregroundColor(flowColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(flowColor.opacity(0.1))
+                            .cornerRadius(4)
                         }
-                        .foregroundColor(flowColor)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(flowColor.opacity(0.1))
-                        .cornerRadius(4)
+
+                        // 账户已删除标签
+                        if record.isAccountDeleted {
+                            HStack(spacing: 2) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 9))
+                                Text("账户已删除")
+                                    .font(.system(size: 10))
+                            }
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(4)
+                        }
                     }
                 }
                 
@@ -507,5 +538,110 @@ struct AddRecordView: View {
     
     return NavigationView {
         RecordsListView(recordService: service)
+    }
+}
+
+// MARK: - 编辑记账视图
+struct EditRecordView: View {
+    @Environment(\.dismiss) var dismiss
+    let record: Record
+    @ObservedObject var accountService: AssetService
+    @ObservedObject var recordService: RecordService
+
+    @State private var amount: String
+    @State private var type: RecordType
+    @State private var category: String
+    @State private var description: String
+    @State private var isLoading = false
+
+    init(record: Record, accountService: AssetService, recordService: RecordService) {
+        self.record = record
+        self.accountService = accountService
+        self.recordService = recordService
+        _amount = State(initialValue: "\(record.amount)")
+        _type = State(initialValue: record.type)
+        _category = State(initialValue: record.category)
+        _description = State(initialValue: record.description ?? "")
+    }
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+
+                Form {
+                    Section("类型") {
+                        Picker("记账类型", selection: $type) {
+                            Text("支出").tag(RecordType.expense)
+                            Text("收入").tag(RecordType.income)
+                            Text("转账").tag(RecordType.transfer)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Section("金额") {
+                        TextField("0.00", text: $amount)
+                            .keyboardType(.decimalPad)
+                            .font(.title)
+                    }
+
+                    Section("分类") {
+                        let categories = type == .expense ?
+                            DefaultCategories.expenseCategories :
+                            DefaultCategories.incomeCategories
+
+                        Picker("选择分类", selection: $category) {
+                            ForEach(categories, id: \.0) { cat in
+                                Text("\(cat.1) \(cat.0)").tag(cat.0)
+                            }
+                        }
+                    }
+
+                    Section("备注") {
+                        TextField("添加备注(可选)", text: $description)
+                    }
+                }
+            }
+            .navigationTitle("编辑记录")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") { dismiss() }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("保存") {
+                        updateRecord()
+                    }
+                    .disabled(amount.isEmpty || isLoading)
+                }
+            }
+        }
+    }
+
+    private func updateRecord() {
+        guard let amountValue = Decimal(string: amount) else { return }
+
+        isLoading = true
+
+        recordService.updateRecord(
+            id: record.id,
+            amount: amountValue,
+            type: type,
+            category: category,
+            description: description.isEmpty ? nil : description
+        )
+        .receive(on: DispatchQueue.main)
+        .sink(
+            receiveCompletion: { completion in
+                isLoading = false
+                if case .finished = completion {
+                    recordService.fetchRecords()
+                    dismiss()
+                }
+            },
+            receiveValue: { _ in }
+        )
+        .store(in: &recordService.cancellables)
     }
 }

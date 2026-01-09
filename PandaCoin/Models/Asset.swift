@@ -101,7 +101,8 @@ struct Asset: Codable, Identifiable, Hashable {
     let userId: String
     let createdAt: Date
     let updatedAt: Date
-    
+    let deletedAt: Date?  // 软删除时间，nil表示未删除
+
     // 银行卡/账户标识（尾号）
     var cardIdentifier: String?
     
@@ -122,6 +123,7 @@ struct Asset: Codable, Identifiable, Hashable {
         case userId
         case createdAt
         case updatedAt
+        case deletedAt
         case cardIdentifier
         case loanTermMonths
         case interestRate
@@ -162,7 +164,14 @@ struct Asset: Codable, Identifiable, Hashable {
         } else {
             updatedAt = try container.decode(Date.self, forKey: .updatedAt)
         }
-        
+
+        // 软删除时间（可选）
+        if let dateString = try container.decodeIfPresent(String.self, forKey: .deletedAt) {
+            deletedAt = ISO8601DateFormatter().date(from: dateString)
+        } else {
+            deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
+        }
+
         if let dateString = try? container.decodeIfPresent(String.self, forKey: .loanStartDate) {
             loanStartDate = ISO8601DateFormatter().date(from: dateString)
         } else {
@@ -170,6 +179,11 @@ struct Asset: Codable, Identifiable, Hashable {
         }
     }
     
+    // 是否已删除
+    var isDeleted: Bool {
+        deletedAt != nil
+    }
+
     // 格式化余额显示
     var formattedBalance: String {
         let formatter = NumberFormatter()
