@@ -65,6 +65,7 @@ struct CreateCreditCardRequest: Codable {
     let institutionName: String
     let cardIdentifier: String
     let creditLimit: Double
+    let currentBalance: Double?  // 待还金额
     let repaymentDueDate: String?
     let currency: String
     // 后端期望 camelCase，不需要 CodingKeys 映射

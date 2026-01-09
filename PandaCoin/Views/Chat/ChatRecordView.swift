@@ -49,6 +49,9 @@ struct ChatRecordView: View {
     // 用于自动滚动到底部
     @Namespace private var bottomID
     
+    // 上下文边界索引：保存成功后设置，下次记账只获取此索引之后的消息作为上下文
+    @State private var contextBoundaryIndex: Int = 0
+    
     // MARK: - Body
     var body: some View {
         VStack(spacing: 0) {
@@ -275,9 +278,39 @@ struct ChatRecordView: View {
             .store(in: &cancellables)
     }
     
+    // MARK: - 构建对话历史（用于多轮追问上下文）
+    private func buildConversationHistory() -> [ChatHistoryMessage] {
+        var history: [ChatHistoryMessage] = []
+        
+        // 只获取上下文边界之后的消息（保存成功后会设置边界）
+        let messagesAfterBoundary = Array(messages.dropFirst(contextBoundaryIndex))
+        
+        // 最多取10条，避免token过长
+        let recentMessages = messagesAfterBoundary.suffix(10)
+        
+        for msg in recentMessages {
+            switch msg.type {
+            case .userText(let text), .userVoice(let text):
+                history.append(ChatHistoryMessage(role: "user", content: text))
+            case .assistantText(let text):
+                history.append(ChatHistoryMessage(role: "assistant", content: text))
+            case .selectionFollowUp(let needMoreInfo):
+                // 追问也作为 assistant 消息
+                history.append(ChatHistoryMessage(role: "assistant", content: needMoreInfo.question))
+            default:
+                break
+            }
+        }
+        
+        return history
+    }
+    
     // MARK: - AI解析并响应
     private func parseAndRespond(text: String) {
-        recordService.parseVoiceInputUnified(text: text)
+        // 构建对话历史用于多轮追问上下文
+        let conversationHistory = buildConversationHistory()
+        
+        recordService.parseVoiceInputUnified(text: text, conversationHistory: conversationHistory.isEmpty ? nil : conversationHistory)
             .receive(on: DispatchQueue.main)
             .sink { completion in
                 self.removeParsingMessage()
@@ -398,6 +431,9 @@ struct ChatRecordView: View {
                 let summary = SavedEventsSummary(events: events)
                 self.messages.append(ChatMessage(type: .savedConfirmation(summary)))
                 self.editableEvents = []
+                
+                // 设置上下文边界：下次记账不会获取此位置之前的消息作为上下文
+                self.contextBoundaryIndex = self.messages.count
                 
                 // 刷新账户列表
                 self.accountService.fetchAccounts()

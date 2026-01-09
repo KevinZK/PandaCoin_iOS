@@ -55,6 +55,7 @@ class CreditCardService: ObservableObject {
         institutionName: String,
         cardIdentifier: String,
         creditLimit: Double,
+        currentBalance: Double? = nil,  // 待还金额
         repaymentDueDate: String?,
         currency: String = "CNY"
     ) -> AnyPublisher<CreditCard, APIError> {
@@ -63,6 +64,7 @@ class CreditCardService: ObservableObject {
             institutionName: institutionName,
             cardIdentifier: cardIdentifier,
             creditLimit: creditLimit,
+            currentBalance: currentBalance,
             repaymentDueDate: repaymentDueDate,
             currency: currency
         )
@@ -197,6 +199,7 @@ class CreditCardService: ObservableObject {
                     name: parsed.name.isEmpty ? nil : parsed.name,
                     institutionName: parsed.institutionName,
                     creditLimit: parsed.creditLimit,
+                    currentBalance: Double(truncating: parsed.outstandingBalance as NSNumber),  // 传递待还金额
                     repaymentDueDate: parsed.repaymentDueDate
                 )
             }
@@ -208,6 +211,7 @@ class CreditCardService: ObservableObject {
             institutionName: parsed.institutionName ?? "",
             cardIdentifier: parsed.cardIdentifier ?? "",
             creditLimit: parsed.creditLimit ?? 0,
+            currentBalance: Double(truncating: parsed.outstandingBalance as NSNumber),  // 传递待还金额
             repaymentDueDate: parsed.repaymentDueDate,
             currency: parsed.currency
         )

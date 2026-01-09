@@ -175,9 +175,9 @@ class RecordService: ObservableObject {
     }
     
     // MARK: - 统一解析方法（支持所有事件类型）
-    func parseVoiceInputUnified(text: String) -> AnyPublisher<[ParsedFinancialEvent], APIError> {
+    func parseVoiceInputUnified(text: String, conversationHistory: [ChatHistoryMessage]? = nil) -> AnyPublisher<[ParsedFinancialEvent], APIError> {
         Logger.shared.logAIRequest(text: text)
-        let request = ParseFinancialRequest(text: text)
+        let request = ParseFinancialRequest(text: text, conversationHistory: conversationHistory)
         return networkManager.request(
             endpoint: "/financial/parse",
             method: "POST",
@@ -1312,8 +1312,21 @@ struct UpdateRecordRequest: Codable {
 struct EmptyResponse: Codable {}
 
 // MARK: - Financial API Models
+
+// 对话历史消息（用于多轮追问上下文）
+struct ChatHistoryMessage: Codable {
+    let role: String  // "user" 或 "assistant"
+    let content: String
+}
+
 struct ParseFinancialRequest: Codable {
     let text: String
+    let conversationHistory: [ChatHistoryMessage]?
+    
+    init(text: String, conversationHistory: [ChatHistoryMessage]? = nil) {
+        self.text = text
+        self.conversationHistory = conversationHistory
+    }
 }
 
 struct FinancialEventsResponse: Codable {
