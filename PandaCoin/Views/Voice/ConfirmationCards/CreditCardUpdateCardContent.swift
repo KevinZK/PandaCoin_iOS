@@ -15,13 +15,21 @@ struct CreditCardUpdateCardContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
             
-            // 发卡银行
+            // 信用卡名称和发卡银行
             HStack(spacing: Spacing.medium) {
-                
-                if let institution = data.institutionName, !institution.isEmpty {
-                    Label(institution, systemImage: "building.2")
-                        .font(AppFont.body(size: 18, weight: .semibold))
-                        .foregroundColor(Theme.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    // 显示信用卡名称
+                    if !data.name.isEmpty {
+                        Text(data.name)
+                            .font(AppFont.body(size: 16, weight: .semibold))
+                            .foregroundColor(Theme.text)
+                    }
+                    // 显示发卡银行（如果与名称不同）
+                    if let institution = data.institutionName, !institution.isEmpty, institution != data.name {
+                        Label(institution, systemImage: "building.2")
+                            .font(AppFont.body(size: 13))
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
                 Spacer()
                 // 显示信用额度（正数，不是待还金额）
@@ -29,7 +37,6 @@ struct CreditCardUpdateCardContent: View {
                     Text(formatCreditLimit(limit))
                         .font(AppFont.monoNumber(size: 20, weight: .bold))
                         .foregroundColor(.blue)
-                    
                 }
             }
 

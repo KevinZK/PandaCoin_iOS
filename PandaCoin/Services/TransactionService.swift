@@ -250,6 +250,9 @@ class TransactionService: ObservableObject {
             body: nil as EmptyBody?
         )
         .map { (_: EmptyResponse) in () }
+        .handleEvents(receiveOutput: { _ in
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
+        })
         .eraseToAnyPublisher()
     }
     

@@ -116,9 +116,7 @@ struct AutoIncomeListView: View {
             await refreshData()
         }
         .sheet(item: $selectedIncomeForEdit) { income in
-            NavigationView {
-                AutoIncomeDetailView(income: income)
-            }
+            AddAutoIncomeView(editingIncome: income)
         }
     }
 

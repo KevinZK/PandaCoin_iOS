@@ -18,6 +18,7 @@ struct AutoIncomeDetailView: View {
     @State private var logs: [AutoIncomeLog] = []
     @State private var showEditSheet = false
     @State private var showDeleteAlert = false
+    @State private var isDeleting = false
     @State private var isExecuting = false
     @State private var executionMessage: String?
     @State private var cancellables = Set<AnyCancellable>()
@@ -44,6 +45,9 @@ struct AutoIncomeDetailView: View {
 
                     // 操作按钮
                     actionButtons
+                    
+                    // 删除
+                    deleteButton
                 }
                 .padding()
             }
@@ -52,21 +56,8 @@ struct AutoIncomeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button(action: { showEditSheet = true }) {
-                        Label("编辑", systemImage: "pencil")
-                    }
-                    Button(action: { toggleEnabled() }) {
-                        Label(currentIncome.isEnabled ? "禁用" : "启用",
-                              systemImage: currentIncome.isEnabled ? "pause.circle" : "play.circle")
-                    }
-                    Divider()
-                    Button(role: .destructive, action: { showDeleteAlert = true }) {
-                        Label("删除", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundColor(Theme.bambooGreen)
+                Button("编辑") {
+                    showEditSheet = true
                 }
             }
         }
@@ -155,7 +146,28 @@ struct AutoIncomeDetailView: View {
         .background(Theme.cardBackground)
         .cornerRadius(CornerRadius.medium)
     }
+    // MARK: - 删除按钮
 
+    private var deleteButton: some View {
+        Button(action: { showDeleteAlert = true }) {
+            HStack {
+                if isDeleting {
+                    ProgressView()
+                        .tint(.red)
+                } else {
+                    Image(systemName: "trash")
+                }
+                Text("删除自动入帐")
+            }
+            .font(.headline)
+            .foregroundColor(.red)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.red.opacity(0.1))
+            .cornerRadius(12)
+        }
+        .disabled(isDeleting)
+    }
     // MARK: - 详情卡片
 
     private var detailsCard: some View {
@@ -171,7 +183,7 @@ struct AutoIncomeDetailView: View {
                 Divider()
                 detailRow(icon: "building.columns", title: "入账账户", value: currentIncome.targetAccountDescription)
                 Divider()
-                detailRow(icon: "tag", title: "分类", value: currentIncome.category)
+                detailRow(icon: "tag", title: "分类", value: CategoryMapper.displayName(for: currentIncome.category))
                 Divider()
                 detailRow(icon: "bell", title: "提前提醒", value: currentIncome.reminderDaysBefore > 0 ? "\(currentIncome.reminderDaysBefore)天前" : "不提醒")
             }
@@ -330,13 +342,17 @@ struct AutoIncomeDetailView: View {
     }
 
     private func deleteIncome() {
+        isDeleting = true
         service.deleteAutoIncome(id: income.id)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { _ in },
-                receiveValue: { _ in
-                    dismiss()
-                }
+                receiveCompletion: { completion in
+                    isDeleting = false
+                    if case .finished = completion {
+                        dismiss()
+                    }
+                },
+                receiveValue: { _ in }
             )
             .store(in: &cancellables)
     }

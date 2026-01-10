@@ -68,6 +68,11 @@ struct CreateCreditCardRequest: Codable {
     let currentBalance: Double?  // 待还金额
     let repaymentDueDate: String?
     let currency: String
+    
+    // 自动扣款配置
+    let autoRepayment: Bool?
+    let repaymentType: String?      // "FULL" 或 "MIN"
+    let sourceAccountName: String?  // 扣款来源账户名称
     // 后端期望 camelCase，不需要 CodingKeys 映射
 }
 

@@ -43,7 +43,15 @@ class FollowUpManager: ObservableObject {
             pendingPartialData = needMoreInfo
             
             if needMoreInfo.requiresPicker {
-                return .showPickerFollowUp(needMoreInfo)
+                // 检查是否有可用账户，如果没有则不显示选择器
+                let hasAvailableAccounts = checkHasAvailableAccounts(for: needMoreInfo.pickerType, accounts: availableAccounts)
+                
+                if hasAvailableAccounts {
+                    return .showPickerFollowUp(needMoreInfo)
+                } else {
+                    // 无可用账户，使用后端返回的 question（已包含引导信息）
+                    return .showTextFollowUp(needMoreInfo.question)
+                }
             } else {
                 return .showTextFollowUp(needMoreInfo.question)
             }

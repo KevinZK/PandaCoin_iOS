@@ -108,4 +108,6 @@ class LanguageManager: ObservableObject {
 
 extension Notification.Name {
     static let languageDidChange = Notification.Name("languageDidChange")
+    /// 净资产需要刷新（记账、资产变动等）
+    static let netWorthNeedsRefresh = Notification.Name("netWorthNeedsRefresh")
 }

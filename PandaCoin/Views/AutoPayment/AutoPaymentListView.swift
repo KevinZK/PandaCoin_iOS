@@ -12,6 +12,7 @@ struct AutoPaymentListView: View {
     @StateObject private var service = AutoPaymentService.shared
     @State private var showingAddSheet = false
     @State private var selectedPayment: AutoPayment?
+    @State private var editingPayment: AutoPayment?
     @State private var showingDetail = false
     @State private var cancellables = Set<AnyCancellable>()
     
@@ -32,7 +33,7 @@ struct AutoPaymentListView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showingAddSheet = true }) {
-                    Image(systemName: "plus.circle.fill")
+                    Image(systemName: "plus")
                         .foregroundColor(Theme.bambooGreen)
                 }
             }
@@ -48,6 +49,14 @@ struct AutoPaymentListView: View {
         .sheet(item: $selectedPayment) { payment in
             NavigationView {
                 AutoPaymentDetailView(payment: payment)
+            }
+            .onDisappear {
+                refreshData()
+            }
+        }
+        .sheet(item: $editingPayment) { payment in
+            NavigationView {
+                EditAutoPaymentView(payment: payment)
             }
             .onDisappear {
                 refreshData()
@@ -104,7 +113,7 @@ struct AutoPaymentListView: View {
                 .listRowSeparator(.hidden)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button {
-                        selectedPayment = payment  // 打开详情/编辑视图
+                        editingPayment = payment  // 直接打开编辑视图
                     } label: {
                         Label("编辑", systemImage: "pencil")
                     }

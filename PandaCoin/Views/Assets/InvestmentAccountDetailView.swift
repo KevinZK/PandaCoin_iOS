@@ -296,7 +296,7 @@ struct InvestmentAccountDetailView: View {
     private func fetchHoldings() {
         isLoading = true
 
-        holdingService.fetchAccountHoldings(accountId: asset.id)
+        holdingService.fetchInvestmentHoldings(investmentId: asset.id)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { completion in

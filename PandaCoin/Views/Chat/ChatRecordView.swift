@@ -431,12 +431,15 @@ struct ChatRecordView: View {
                 let summary = SavedEventsSummary(events: events)
                 self.messages.append(ChatMessage(type: .savedConfirmation(summary)))
                 self.editableEvents = []
-                
+
                 // 设置上下文边界：下次记账不会获取此位置之前的消息作为上下文
                 self.contextBoundaryIndex = self.messages.count
-                
+
                 // 刷新账户列表
                 self.accountService.fetchAccounts()
+
+                // 通知首页刷新净资产
+                NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
                 
                 // 如果有银行账户没有尾号，显示建议提示
                 if let assetName = bankAssetWithoutIdentifier {
@@ -467,8 +470,8 @@ struct ChatRecordView: View {
         for event in events {
             if event.eventType == .assetUpdate,
                let assetData = event.assetUpdateData {
-                // 只检查银行类账户
-                let bankTypes = ["BANK", "SAVINGS", "DIGITAL_WALLET"]
+                // 只检查银行卡类账户（需要尾号区分不同卡片）
+                let bankTypes = ["BANK", "SAVINGS"]
                 if bankTypes.contains(assetData.assetType.uppercased()) {
                     // 检查是否缺少卡号尾号
                     if assetData.cardIdentifier == nil || assetData.cardIdentifier?.isEmpty == true {

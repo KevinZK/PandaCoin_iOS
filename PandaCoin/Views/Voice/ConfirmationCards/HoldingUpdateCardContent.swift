@@ -205,9 +205,9 @@ struct HoldingUpdateCardContent: View {
 
             if let code = data.tickerCode, !code.isEmpty {
                 if let matched = allHoldings.first(where: { $0.tickerCode?.uppercased() == code.uppercased() }) {
-                    selectedAccountId = matched.accountId
-                    data.accountId = matched.accountId
-                    if let account = investmentAccounts.first(where: { $0.id == matched.accountId }) {
+                    selectedAccountId = matched.investmentId
+                    data.accountId = matched.investmentId
+                    if let account = investmentAccounts.first(where: { $0.id == matched.investmentId }) {
                         data.accountName = account.name
                     }
                     return
@@ -218,9 +218,9 @@ struct HoldingUpdateCardContent: View {
                 holding.name.lowercased().contains(data.name.lowercased()) ||
                 data.name.lowercased().contains(holding.name.lowercased())
             }) {
-                selectedAccountId = matched.accountId
-                data.accountId = matched.accountId
-                if let account = investmentAccounts.first(where: { $0.id == matched.accountId }) {
+                selectedAccountId = matched.investmentId
+                data.accountId = matched.investmentId
+                if let account = investmentAccounts.first(where: { $0.id == matched.investmentId }) {
                     data.accountName = account.name
                 }
                 return

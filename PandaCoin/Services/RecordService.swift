@@ -955,7 +955,7 @@ class RecordService: ObservableObject {
             }
 
             return holdingService.buyNewHolding(
-                accountId: accountId,
+                investmentId: accountId,
                 name: data.name,
                 type: mapHoldingType(data.holdingType),
                 market: mapMarketType(data.market),
@@ -995,8 +995,8 @@ class RecordService: ObservableObject {
             }
         }
 
-        // 买入时：仅从指定账户搜索
-        let accountHoldings = holdingService.getHoldings(forAccountId: accountId)
+        // 买入时：仅从指定投资账户搜索
+        let accountHoldings = holdingService.getHoldings(forInvestmentId: accountId)
 
         // 优先匹配股票代码
         if let code = data.tickerCode, !code.isEmpty {
@@ -1205,6 +1205,9 @@ class RecordService: ObservableObject {
             method: "DELETE"
         )
         .map { (_: EmptyResponse) in () }
+        .handleEvents(receiveOutput: { _ in
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
+        })
         .eraseToAnyPublisher()
     }
     

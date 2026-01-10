@@ -147,6 +147,10 @@ struct DashboardView: View {
                 netWorthValue = Decimal(nw.net_worth)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .netWorthNeedsRefresh)) { _ in
+            // 资金变动后刷新净资产（记账、资产增删改等）
+            transactionService.fetchNetWorth()
+        }
     }
     
     // MARK: - 简化的顶部导航栏（只有菜单按钮）

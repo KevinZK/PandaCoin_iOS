@@ -57,7 +57,10 @@ class CreditCardService: ObservableObject {
         creditLimit: Double,
         currentBalance: Double? = nil,  // 待还金额
         repaymentDueDate: String?,
-        currency: String = "CNY"
+        currency: String = "CNY",
+        autoRepayment: Bool? = nil,
+        repaymentType: String? = nil,
+        sourceAccountName: String? = nil
     ) -> AnyPublisher<CreditCard, APIError> {
         let request = CreateCreditCardRequest(
             name: name,
@@ -66,7 +69,10 @@ class CreditCardService: ObservableObject {
             creditLimit: creditLimit,
             currentBalance: currentBalance,
             repaymentDueDate: repaymentDueDate,
-            currency: currency
+            currency: currency,
+            autoRepayment: autoRepayment,
+            repaymentType: repaymentType,
+            sourceAccountName: sourceAccountName
         )
         
         return networkManager.request(
@@ -80,12 +86,13 @@ class CreditCardService: ObservableObject {
                     self?.creditCards.append(card)
                     self?.saveToLocalStorage()
                 }
+                NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
                 logInfo("✅ 创建信用卡成功: \(card.displayName)")
             }
         )
         .eraseToAnyPublisher()
     }
-    
+
     // MARK: - 更新信用卡
     func updateCreditCard(
         id: String,
@@ -120,12 +127,13 @@ class CreditCardService: ObservableObject {
                         self?.saveToLocalStorage()
                     }
                 }
+                NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
                 logInfo("✅ 更新信用卡成功: \(updatedCard.displayName)")
             }
         )
         .eraseToAnyPublisher()
     }
-    
+
     // MARK: - 删除信用卡
     func deleteCreditCard(id: String) -> AnyPublisher<Void, APIError> {
         return networkManager.request(
@@ -139,12 +147,13 @@ class CreditCardService: ObservableObject {
                     self?.creditCards.removeAll { $0.id == id }
                     self?.saveToLocalStorage()
                 }
+                NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
                 logInfo("✅ 删除信用卡成功")
             }
         )
         .eraseToAnyPublisher()
     }
-    
+
     // MARK: - 根据 cardIdentifier 查找信用卡
     func findCard(byIdentifier identifier: String) -> CreditCard? {
         return creditCards.first { $0.cardIdentifier == identifier }
@@ -213,7 +222,10 @@ class CreditCardService: ObservableObject {
             creditLimit: parsed.creditLimit ?? 0,
             currentBalance: Double(truncating: parsed.outstandingBalance as NSNumber),  // 传递待还金额
             repaymentDueDate: parsed.repaymentDueDate,
-            currency: parsed.currency
+            currency: parsed.currency,
+            autoRepayment: parsed.autoRepayment,
+            repaymentType: parsed.repaymentType,
+            sourceAccountName: parsed.sourceAccount
         )
     }
     
@@ -235,12 +247,13 @@ class CreditCardService: ObservableObject {
                         self?.saveToLocalStorage()
                     }
                 }
+                NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
                 logInfo("✅ 信用卡消费记录创建成功")
             }
         )
         .eraseToAnyPublisher()
     }
-    
+
     // MARK: - 获取信用卡消费记录
     func getTransactions(creditCardId: String, month: String? = nil) -> AnyPublisher<CreditCardTransactionsResponse, APIError> {
         var endpoint = "/credit-cards/\(creditCardId)/transactions"

@@ -66,8 +66,13 @@ struct SelectionFollowUpCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
-            // 显示已解析的部分信息（交易摘要）
-            if let summary = partialDataSummary {
+            // 显示 AI 追问消息（优先显示）
+            if !needMoreInfo.question.isEmpty {
+                Text(needMoreInfo.question)
+                    .font(AppFont.body(size: 15))
+                    .foregroundColor(Theme.text)
+            } else if let summary = partialDataSummary {
+                // 兜底：显示已解析的部分信息（交易摘要）
                 Text(summary)
                     .font(AppFont.body(size: 15))
                     .foregroundColor(Theme.text)

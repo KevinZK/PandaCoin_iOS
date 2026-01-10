@@ -60,6 +60,7 @@ class AssetService: ObservableObject {
         )
         .handleEvents(receiveOutput: { [weak self] (account: Asset) in
             self?.accounts.append(account)
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
         })
         .eraseToAnyPublisher()
     }
@@ -72,6 +73,9 @@ class AssetService: ObservableObject {
             method: "PATCH",
             body: request
         )
+        .handleEvents(receiveOutput: { _ in
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
+        })
         .eraseToAnyPublisher()
     }
     
@@ -94,6 +98,7 @@ class AssetService: ObservableObject {
                     self?.accounts[index] = updatedAsset
                 }
             }
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
         })
         .eraseToAnyPublisher()
     }
@@ -105,6 +110,9 @@ class AssetService: ObservableObject {
             method: "DELETE"
         )
         .map { (_: EmptyResponse) in () }
+        .handleEvents(receiveOutput: { _ in
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
+        })
         .eraseToAnyPublisher()
     }
     

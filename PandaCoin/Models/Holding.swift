@@ -99,7 +99,7 @@ enum HoldingTransactionType: String, Codable, CaseIterable {
 // MARK: - 持仓模型
 struct Holding: Codable, Identifiable, Hashable {
     let id: String
-    let accountId: String
+    let investmentId: String
     let userId: String
     let name: String
     let displayName: String?
@@ -128,8 +128,8 @@ struct Holding: Codable, Identifiable, Hashable {
     let createdAt: Date
     let updatedAt: Date
 
-    // 可选的账户信息
-    let account: AccountInfo?
+    // 可选的投资账户信息
+    let investment: InvestmentInfo?
 
     // 计算属性 - 使用后端计算的值，如果没有则本地计算
     var marketValue: Double {
@@ -210,17 +210,17 @@ struct Holding: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, accountId, userId, name, displayName, type, market
+        case id, investmentId, userId, name, displayName, type, market
         case tickerCode, codeVerified, codeSource, quantity, avgCostPrice
         case currentPrice, previousClose, priceChange, priceChangePercent
         case lastPriceAt, priceSource, currentValue, profitLoss, profitLossPercent
-        case currency, createdAt, updatedAt, account
+        case currency, createdAt, updatedAt, investment
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
-        accountId = try container.decode(String.self, forKey: .accountId)
+        investmentId = try container.decode(String.self, forKey: .investmentId)
         userId = try container.decode(String.self, forKey: .userId)
         name = try container.decode(String.self, forKey: .name)
         displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
@@ -245,7 +245,7 @@ struct Holding: Codable, Identifiable, Hashable {
         profitLossPercent = try container.decodeIfPresent(Double.self, forKey: .profitLossPercent)
         
         currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
-        account = try container.decodeIfPresent(AccountInfo.self, forKey: .account)
+        investment = try container.decodeIfPresent(InvestmentInfo.self, forKey: .investment)
 
         // 日期解析
         if let dateString = try? container.decode(String.self, forKey: .createdAt) {
@@ -268,8 +268,8 @@ struct Holding: Codable, Identifiable, Hashable {
     }
 }
 
-// MARK: - 账户简要信息
-struct AccountInfo: Codable, Hashable {
+// MARK: - 投资账户简要信息
+struct InvestmentInfo: Codable, Hashable {
     let id: String
     let name: String
     let type: String
@@ -280,7 +280,7 @@ struct AccountInfo: Codable, Hashable {
 struct HoldingTransaction: Codable, Identifiable, Hashable {
     let id: String
     let holdingId: String
-    let accountId: String
+    let investmentId: String
     let userId: String
     let type: HoldingTransactionType
     let quantity: Double
@@ -306,7 +306,7 @@ struct HoldingTransaction: Codable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, holdingId, accountId, userId, type, quantity, price, amount
+        case id, holdingId, investmentId, userId, type, quantity, price, amount
         case fee, quantityAfter, avgCostAfter, date, note, rawText, createdAt, holding
     }
 
@@ -314,7 +314,7 @@ struct HoldingTransaction: Codable, Identifiable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         holdingId = try container.decode(String.self, forKey: .holdingId)
-        accountId = try container.decode(String.self, forKey: .accountId)
+        investmentId = try container.decode(String.self, forKey: .investmentId)
         userId = try container.decode(String.self, forKey: .userId)
         type = try container.decode(HoldingTransactionType.self, forKey: .type)
         quantity = try container.decode(Double.self, forKey: .quantity)
@@ -349,9 +349,9 @@ struct HoldingInfo: Codable, Hashable {
     let type: HoldingType
 }
 
-// MARK: - 账户持仓汇总
-struct AccountHoldingsSummary: Codable {
-    let account: Asset
+// MARK: - 投资账户持仓汇总
+struct InvestmentHoldingsSummary: Codable {
+    let investment: Investment
     let holdings: [Holding]
     let summary: HoldingsSummaryData
 }
@@ -376,7 +376,7 @@ struct TotalHoldingsSummary: Codable {
 
 // MARK: - 请求 DTO
 struct BuyNewHoldingRequest: Codable {
-    let accountId: String
+    let investmentId: String
     let name: String
     let displayName: String?
     let type: HoldingType

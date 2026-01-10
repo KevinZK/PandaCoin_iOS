@@ -39,10 +39,10 @@ class HoldingService: ObservableObject {
             .eraseToAnyPublisher()
     }
 
-    // MARK: - 获取指定账户的持仓
-    func fetchAccountHoldings(accountId: String) -> AnyPublisher<AccountHoldingsSummary, APIError> {
+    // MARK: - 获取指定投资账户的持仓
+    func fetchInvestmentHoldings(investmentId: String) -> AnyPublisher<InvestmentHoldingsSummary, APIError> {
         return networkManager.request(
-            endpoint: "/holdings/account/\(accountId)",
+            endpoint: "/holdings/investment/\(investmentId)",
             method: "GET"
         )
     }
@@ -65,7 +65,7 @@ class HoldingService: ObservableObject {
 
     // MARK: - 买入新资产（创建持仓 + 首次买入）
     func buyNewHolding(
-        accountId: String,
+        investmentId: String,
         name: String,
         type: HoldingType,
         market: MarketType,
@@ -81,7 +81,7 @@ class HoldingService: ObservableObject {
     ) -> AnyPublisher<BuyHoldingResponse, APIError> {
         let dateString = date.map { ISO8601DateFormatter().string(from: $0) }
         let request = BuyNewHoldingRequest(
-            accountId: accountId,
+            investmentId: investmentId,
             name: name,
             displayName: displayName,
             type: type,
@@ -105,6 +105,7 @@ class HoldingService: ObservableObject {
             DispatchQueue.main.async {
                 self?.holdings.insert(response.holding, at: 0)
             }
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
         })
         .eraseToAnyPublisher()
     }
@@ -142,6 +143,7 @@ class HoldingService: ObservableObject {
                     self?.holdings[index] = response.holding
                 }
             }
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
         })
         .eraseToAnyPublisher()
     }
@@ -179,6 +181,7 @@ class HoldingService: ObservableObject {
                     self?.holdings[index] = response.holding
                 }
             }
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
         })
         .eraseToAnyPublisher()
     }
@@ -186,7 +189,7 @@ class HoldingService: ObservableObject {
     // MARK: - 获取交易记录
     func fetchTransactions(
         holdingId: String? = nil,
-        accountId: String? = nil
+        investmentId: String? = nil
     ) -> AnyPublisher<[HoldingTransaction], APIError> {
         var endpoint = "/holdings/transactions"
         var queryItems: [String] = []
@@ -194,8 +197,8 @@ class HoldingService: ObservableObject {
         if let holdingId = holdingId {
             queryItems.append("holdingId=\(holdingId)")
         }
-        if let accountId = accountId {
-            queryItems.append("accountId=\(accountId)")
+        if let investmentId = investmentId {
+            queryItems.append("investmentId=\(investmentId)")
         }
 
         if !queryItems.isEmpty {
@@ -221,6 +224,7 @@ class HoldingService: ObservableObject {
                     self?.holdings[index] = holding
                 }
             }
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
         })
         .eraseToAnyPublisher()
     }
@@ -236,6 +240,7 @@ class HoldingService: ObservableObject {
             DispatchQueue.main.async {
                 self?.holdings.removeAll { $0.id == id }
             }
+            NotificationCenter.default.post(name: .netWorthNeedsRefresh, object: nil)
         })
         .eraseToAnyPublisher()
     }
@@ -250,14 +255,14 @@ class HoldingService: ObservableObject {
         return holdings.first { $0.tickerCode?.lowercased() == code.lowercased() }
     }
 
-    // MARK: - 获取指定账户的持仓列表
-    func getHoldings(forAccountId accountId: String) -> [Holding] {
-        return holdings.filter { $0.accountId == accountId }
+    // MARK: - 获取指定投资账户的持仓列表
+    func getHoldings(forInvestmentId investmentId: String) -> [Holding] {
+        return holdings.filter { $0.investmentId == investmentId }
     }
 
-    // MARK: - 计算账户持仓总市值
-    func calculateAccountHoldingsValue(accountId: String) -> Double {
-        return getHoldings(forAccountId: accountId)
+    // MARK: - 计算投资账户持仓总市值
+    func calculateInvestmentHoldingsValue(investmentId: String) -> Double {
+        return getHoldings(forInvestmentId: investmentId)
             .reduce(0) { $0 + $1.marketValue }
     }
 
