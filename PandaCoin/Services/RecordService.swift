@@ -1704,7 +1704,12 @@ struct HoldingUpdateParsed {
     }
 
     var actionDisplayName: String {
-        holdingAction == "BUY" ? "买入" : "卖出"
+        switch holdingAction.uppercased() {
+        case "BUY": return "买入"
+        case "SELL": return "卖出"
+        case "HOLD": return "持有"
+        default: return holdingAction
+        }
     }
 
     var typeDisplayName: String {

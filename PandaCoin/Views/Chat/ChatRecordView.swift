@@ -117,6 +117,12 @@ struct ChatRecordView: View {
             }
         }
         .background(Color.clear)
+        .onAppear {
+            // 确保账户数据已加载，用于判断是否需要追问账户选择
+            if accountService.accounts.isEmpty {
+                accountService.fetchAccounts()
+            }
+        }
         .onChange(of: externalImage) { newImage in
             if let image = newImage {
                 processImageDirectly(image)

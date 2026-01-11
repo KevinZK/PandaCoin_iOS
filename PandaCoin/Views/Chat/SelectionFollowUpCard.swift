@@ -303,7 +303,7 @@ struct SelectionFollowUpCard: View {
     }
     
     private var investmentAccounts: [Asset] {
-        accountService.accounts.filter { $0.type == .investment }
+        accountService.accounts.filter { $0.type == .investment || $0.type == .crypto }
     }
 }
 

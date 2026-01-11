@@ -48,13 +48,13 @@ struct HoldingUpdateCardContent: View {
 
                 Spacer()
 
-                // 买入/卖出标签
+                // 买入/卖出/持有标签
                 Text(data.actionDisplayName)
                     .font(AppFont.body(size: 14, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(data.holdingAction == "BUY" ? Theme.expense : Theme.income)
+                    .background(actionColor)
                     .cornerRadius(8)
             }
 
@@ -62,7 +62,7 @@ struct HoldingUpdateCardContent: View {
             if hasValidPrice {
                 Text(formattedAmount)
                     .font(AppFont.monoNumber(size: 24, weight: .bold))
-                    .foregroundColor(data.holdingAction == "BUY" ? Theme.expense : Theme.income)
+                    .foregroundColor(actionColor)
             }
 
             // 数量（和单价，如果有）
@@ -193,7 +193,10 @@ struct HoldingUpdateCardContent: View {
                 isLoadingAccounts = false
                 matchAccountAfterRefresh()
             },
-            receiveValue: { _, _ in }
+            receiveValue: { [weak accountService] assets, _ in
+                // 确保账户数据在 receiveCompletion 之前更新
+                accountService?.accounts = assets
+            }
         )
         .store(in: &accountService.cancellables)
     }
@@ -296,8 +299,22 @@ struct HoldingUpdateCardContent: View {
     }
 
     private var formattedAmount: String {
-        let prefix = data.holdingAction == "BUY" ? "-" : "+"
+        let prefix: String
+        switch data.holdingAction.uppercased() {
+        case "BUY": prefix = "-"
+        case "SELL": prefix = "+"
+        default: prefix = ""  // HOLD 等不显示前缀
+        }
         return "\(prefix)\(currencySymbol)\(data.formattedAmount)"
+    }
+
+    private var actionColor: Color {
+        switch data.holdingAction.uppercased() {
+        case "BUY": return Theme.expense
+        case "SELL": return Theme.income
+        case "HOLD": return Theme.bambooGreen
+        default: return Theme.textSecondary
+        }
     }
 
     private var formattedQuantity: String {
