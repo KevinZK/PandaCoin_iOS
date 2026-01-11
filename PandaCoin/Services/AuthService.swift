@@ -149,7 +149,7 @@ class AuthService: ObservableObject {
     
     /// 获取默认支出账户
     func fetchDefaultExpenseAccount() {
-        networkManager.request(endpoint: "/auth/default-expense-account", method: "GET")
+        networkManager.optionalRequest(endpoint: "/auth/default-expense-account", method: "GET")
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in },

@@ -389,6 +389,7 @@ struct BuyNewHoldingRequest: Codable {
     let note: String?
     let rawText: String?
     let currency: String?
+    let holdingAction: String? // BUY | HOLD - HOLD 时仅创建持仓记录，不扣减余额
 }
 
 struct HoldingTransactionRequest: Codable {
@@ -416,5 +417,5 @@ struct UpdateHoldingRequest: Codable {
 // MARK: - 响应包装
 struct BuyHoldingResponse: Codable {
     let holding: Holding
-    let transaction: HoldingTransaction
+    let transaction: HoldingTransaction? // HOLD 操作时为 null
 }

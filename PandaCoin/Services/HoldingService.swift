@@ -77,7 +77,8 @@ class HoldingService: ObservableObject {
         date: Date? = nil,
         note: String? = nil,
         rawText: String? = nil,
-        currency: String? = nil
+        currency: String? = nil,
+        holdingAction: String? = nil // BUY | HOLD - HOLD 时仅创建持仓记录，不扣减余额
     ) -> AnyPublisher<BuyHoldingResponse, APIError> {
         let dateString = date.map { ISO8601DateFormatter().string(from: $0) }
         let request = BuyNewHoldingRequest(
@@ -93,7 +94,8 @@ class HoldingService: ObservableObject {
             date: dateString,
             note: note,
             rawText: rawText,
-            currency: currency
+            currency: currency,
+            holdingAction: holdingAction
         )
 
         return networkManager.request(

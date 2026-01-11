@@ -197,7 +197,113 @@ class NetworkManager: ObservableObject {
             }
             .eraseToAnyPublisher()
     }
-    
+
+    // MARK: - 可选数据请求方法（允许 data 为 null）
+    func optionalRequest<T: Decodable>(
+        endpoint: String,
+        method: String = "GET",
+        body: Encodable? = nil,
+        requiresAuth: Bool = true
+    ) -> AnyPublisher<T?, APIError> {
+
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            logError("无效的URL: \(baseURL)\(endpoint)")
+            return Fail(error: APIError.invalidURL).eraseToAnyPublisher()
+        }
+
+        let startTime = Date()
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var headers: [String: String] = ["Content-Type": "application/json"]
+
+        if requiresAuth, let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            headers["Authorization"] = "Bearer \(token.prefix(10))..."
+        }
+
+        var bodyData: Data?
+        if let body = body {
+            do {
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                bodyData = try encoder.encode(body)
+                request.httpBody = bodyData
+            } catch {
+                logError("请求体编码失败", error: error)
+                return Fail(error: APIError.networkError(error)).eraseToAnyPublisher()
+            }
+        }
+
+        Logger.shared.logNetworkRequest(
+            method: method,
+            url: url.absoluteString,
+            headers: headers,
+            body: bodyData
+        )
+
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { data, response -> Data in
+                let duration = Date().timeIntervalSince(startTime)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    logError("无效的响应类型")
+                    throw APIError.invalidResponse
+                }
+
+                Logger.shared.logNetworkResponse(
+                    url: url.absoluteString,
+                    statusCode: httpResponse.statusCode,
+                    data: data,
+                    duration: duration
+                )
+
+                switch httpResponse.statusCode {
+                case 200...299:
+                    return data
+                case 401:
+                    logWarning("未授权访问: \(url.absoluteString)")
+                    throw APIError.unauthorized
+                case 400...499, 500...599:
+                    if let apiError = try? JSONDecoder().decode(APIResponse<String?>.self, from: data) {
+                        logError("服务器错误 [\(httpResponse.statusCode)]: \(apiError.message)")
+                        throw APIError.serverError(apiError.message)
+                    }
+                    logError("服务器错误 [\(httpResponse.statusCode)]")
+                    throw APIError.invalidResponse
+                default:
+                    throw APIError.invalidResponse
+                }
+            }
+            .tryMap { data -> T? in
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+
+                let wrapper = try decoder.decode(APIResponseWrapper<T>.self, from: data)
+
+                guard wrapper.code == 0 else {
+                    logError("服务器返回错误: \(wrapper.message)")
+                    throw APIError.serverError(wrapper.message)
+                }
+
+                // 允许 data 为 null，返回 nil
+                return wrapper.data
+            }
+            .mapError { error in
+                if let apiError = error as? APIError {
+                    return apiError
+                } else if let decodingError = error as? DecodingError {
+                    logError("JSON解析失败: \(url.absoluteString)", error: error)
+                    return APIError.decodingError(error)
+                } else {
+                    return APIError.networkError(error)
+                }
+            }
+            .eraseToAnyPublisher()
+    }
+
     // MARK: - 登出
     func logout() {
         accessToken = nil

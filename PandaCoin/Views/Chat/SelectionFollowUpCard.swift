@@ -292,18 +292,22 @@ struct SelectionFollowUpCard: View {
     
     // MARK: - 账户过滤
     private var availableExpenseAccounts: [Asset] {
+        // 流动资产账户：银行卡、现金、电子钱包、储蓄账户、其他资产
         accountService.accounts.filter { account in
             switch account.type {
-            case .bank, .cash, .digitalWallet, .savings:
+            case .bank, .cash, .digitalWallet, .savings, .otherAsset:
                 return true
             default:
                 return false
             }
         }
     }
-    
+
     private var investmentAccounts: [Asset] {
-        accountService.accounts.filter { $0.type == .investment || $0.type == .crypto }
+        // 投资类账户：证券投资、加密货币、养老金
+        accountService.accounts.filter {
+            $0.type == .investment || $0.type == .crypto || $0.type == .retirement
+        }
     }
 }
 

@@ -17,7 +17,10 @@ struct HoldingUpdateCardContent: View {
     @State private var isLoadingAccounts = true
 
     private var investmentAccounts: [Asset] {
-        accountService.accounts.filter { $0.type == .investment || $0.type == .crypto }
+        // 投资类账户：证券投资、加密货币、养老金
+        accountService.accounts.filter {
+            $0.type == .investment || $0.type == .crypto || $0.type == .retirement
+        }
     }
 
     private var hasValidPrice: Bool {

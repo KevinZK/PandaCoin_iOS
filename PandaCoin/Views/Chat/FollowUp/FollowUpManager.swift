@@ -81,15 +81,15 @@ class FollowUpManager: ObservableObject {
     // MARK: - 检查是否有可用账户
     private func checkHasAvailableAccounts(for pickerType: FollowUpPickerType?, accounts: [Asset]) -> Bool {
         guard let pickerType = pickerType else { return true }
-        
+
         switch pickerType {
-        case .expenseAccount, .incomeAccount:
-            // 支出/收入需要储蓄类账户
-            let savingsTypes: [AssetType] = [.bank, .cash, .digitalWallet, .savings]
-            return accounts.contains { savingsTypes.contains($0.type) }
+        case .expenseAccount, .incomeAccount, .autoPaymentSource:
+            // 支出/收入/自动扣款需要流动资产账户
+            let liquidTypes: [AssetType] = [.bank, .cash, .digitalWallet, .savings, .otherAsset]
+            return accounts.contains { liquidTypes.contains($0.type) }
         case .investmentAccount:
-            // 投资需要证券/加密货币账户
-            let investmentTypes: [AssetType] = [.investment, .crypto]
+            // 投资需要证券/加密货币/养老金账户
+            let investmentTypes: [AssetType] = [.investment, .crypto, .retirement]
             return accounts.contains { investmentTypes.contains($0.type) }
         default:
             return !accounts.isEmpty

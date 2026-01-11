@@ -967,7 +967,8 @@ class RecordService: ObservableObject {
                 date: data.date,
                 note: data.note,
                 rawText: nil,
-                currency: data.currency
+                currency: data.currency,
+                holdingAction: data.holdingAction // BUY | HOLD - 区分买入和记录持有
             )
         }
     }

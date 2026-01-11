@@ -74,6 +74,11 @@ struct ChatRecordView: View {
                                     handlePickerSelection(selectedAccount, for: needMoreInfo)
                                 },
                                 onPickerCancel: {
+                                    // 移除选择器追问气泡
+                                    messages.removeAll { msg in
+                                        if case .selectionFollowUp = msg.type { return true }
+                                        return false
+                                    }
                                     followUpManager.cancelFollowUp()
                                     messages.append(ChatMessage(type: .assistantText("好的，已取消。有其他需要记录的吗？")))
                                 }

@@ -65,12 +65,14 @@ class AccountSelectionHandler {
         selectedAccount: SelectedAccountInfo
     ) -> (events: [ParsedFinancialEvent], confirmText: String) {
         var updatedEvents: [ParsedFinancialEvent] = []
-        
+        var holdingNames: [String] = []
+
         for var event in events {
+            // 处理交易事件
             if event.eventType == .transaction, var txData = event.transactionData {
                 let hasAccount = !txData.accountName.isEmpty
                 let hasCreditCard = txData.cardIdentifier != nil && !txData.cardIdentifier!.isEmpty
-                
+
                 if !hasAccount && !hasCreditCard {
                     if selectedAccount.type == .creditCard {
                         txData.cardIdentifier = selectedAccount.cardIdentifier
@@ -80,10 +82,35 @@ class AccountSelectionHandler {
                     event.transactionData = txData
                 }
             }
+
+            // 处理持仓更新事件
+            if event.eventType == .holdingUpdate, var holdingData = event.holdingUpdateData {
+                if holdingData.accountName == nil || holdingData.accountName?.isEmpty == true {
+                    holdingData.accountName = selectedAccount.displayName
+                    holdingData.accountId = selectedAccount.id
+                    event.holdingUpdateData = holdingData
+
+                    // 收集持仓名称用于确认文本
+                    let quantityStr = holdingData.holdingType == "CRYPTO"
+                        ? String(format: "%.4f", holdingData.quantity)
+                        : "\(Int(holdingData.quantity))"
+                    let unitStr = holdingData.holdingType == "CRYPTO" ? "个" : "股"
+                    holdingNames.append("\(quantityStr)\(unitStr)\(holdingData.name)")
+                }
+            }
+
             updatedEvents.append(event)
         }
-        
-        let confirmText = "好的，\(updatedEvents.count)笔记录将使用\(selectedAccount.displayName)"
+
+        // 生成确认文本
+        let confirmText: String
+        if !holdingNames.isEmpty {
+            let holdingSummary = holdingNames.joined(separator: "、")
+            confirmText = "好的，您的\(selectedAccount.displayName)持有\(holdingSummary)"
+        } else {
+            confirmText = "好的，\(updatedEvents.count)笔记录将使用\(selectedAccount.displayName)"
+        }
+
         return (updatedEvents, confirmText)
     }
     
@@ -144,12 +171,28 @@ class AccountSelectionHandler {
         selectedAccount: SelectedAccountInfo
     ) -> (events: [ParsedFinancialEvent], confirmText: String)? {
         guard var holdingData = needMoreInfo.partialHoldingData else { return nil }
-        
+
         holdingData.accountName = selectedAccount.displayName
         holdingData.accountId = selectedAccount.id
-        
-        let actionStr = holdingData.holdingAction == "SELL" ? "卖出" : "买入"
-        let confirmText = "好的，\(actionStr)\(Int(holdingData.quantity))股\(holdingData.name)，使用\(selectedAccount.displayName)账户"
+
+        // 根据持仓操作类型生成确认文本
+        let actionStr: String
+        let quantityStr: String
+        let unitStr = holdingData.holdingType == "CRYPTO" ? "个" : "股"
+
+        switch holdingData.holdingAction.uppercased() {
+        case "SELL":
+            actionStr = "卖出"
+            quantityStr = holdingData.holdingType == "CRYPTO" ? String(format: "%.4f", holdingData.quantity) : "\(Int(holdingData.quantity))"
+        case "HOLD":
+            actionStr = "持有"
+            quantityStr = holdingData.holdingType == "CRYPTO" ? String(format: "%.4f", holdingData.quantity) : "\(Int(holdingData.quantity))"
+        default:
+            actionStr = "买入"
+            quantityStr = holdingData.holdingType == "CRYPTO" ? String(format: "%.4f", holdingData.quantity) : "\(Int(holdingData.quantity))"
+        }
+
+        let confirmText = "好的，\(actionStr)\(quantityStr)\(unitStr)\(holdingData.name)，使用\(selectedAccount.displayName)账户"
         
         let event = ParsedFinancialEvent(
             eventType: .holdingUpdate,
