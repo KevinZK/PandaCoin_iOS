@@ -29,6 +29,7 @@ struct RecordAccount: Codable {
     let id: String
     let name: String
     let type: String
+    let currency: String?
     let deletedAt: Date?  // 账户软删除时间，nil表示账户正常
 
     // 账户是否已删除
@@ -37,7 +38,7 @@ struct RecordAccount: Codable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, type, deletedAt
+        case id, name, type, currency, deletedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -45,6 +46,7 @@ struct RecordAccount: Codable {
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         type = try container.decode(String.self, forKey: .type)
+        currency = try container.decodeIfPresent(String.self, forKey: .currency)
 
         // 解析 deletedAt（可能是字符串或 Date）
         if let dateString = try container.decodeIfPresent(String.self, forKey: .deletedAt) {
@@ -54,10 +56,11 @@ struct RecordAccount: Codable {
         }
     }
 
-    init(id: String, name: String, type: String, deletedAt: Date? = nil) {
+    init(id: String, name: String, type: String, currency: String? = nil, deletedAt: Date? = nil) {
         self.id = id
         self.name = name
         self.type = type
+        self.currency = currency
         self.deletedAt = deletedAt
     }
 }
@@ -90,6 +93,9 @@ struct Record: Codable, Identifiable {
     var account: RecordAccount?
     var targetAccount: RecordAccount?
 
+    // 货币格式化字段（后端返回）
+    let amountFormatted: MoneyResponse?
+
     enum CodingKeys: String, CodingKey {
         case id
         case amount
@@ -110,6 +116,7 @@ struct Record: Codable, Identifiable {
         case cardIdentifier
         case account
         case targetAccount
+        case amountFormatted
     }
     
     // MARK: - 便捷初始化器（用于本地构造）
@@ -145,6 +152,7 @@ struct Record: Codable, Identifiable {
         self.targetAccountId = targetAccountId
         self.creditCardId = creditCardId
         self.cardIdentifier = cardIdentifier
+        self.amountFormatted = nil
 
         if let accountId = accountId, let accountName = accountName {
             self.account = RecordAccount(id: accountId, name: accountName, type: "")
@@ -222,14 +230,29 @@ struct Record: Codable, Identifiable {
     
     // 格式化金额显示
     var formattedAmount: String {
+        // 优先使用后端返回的格式化金额
+        if let formatted = amountFormatted?.formatted {
+            let prefix: String
+            switch type {
+            case .expense, .payment:
+                prefix = "-"
+            case .income:
+                prefix = "+"
+            case .transfer:
+                prefix = ""
+            }
+            return prefix + formatted
+        }
+
+        // 降级到本地格式化
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
-        
+
         let number = NSDecimalNumber(decimal: amount)
         let amountStr = formatter.string(from: number) ?? "0.00"
-        
+
         switch type {
         case .expense:
             return "-¥\(amountStr)"
@@ -240,6 +263,11 @@ struct Record: Codable, Identifiable {
         case .payment:
             return "-¥\(amountStr)"  // 还款显示为负（资金流出）
         }
+    }
+
+    /// 获取转换后的格式化金额（如有）
+    var convertedFormattedAmount: String? {
+        amountFormatted?.convertedFormatted
     }
 }
 

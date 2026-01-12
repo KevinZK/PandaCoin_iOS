@@ -7,6 +7,12 @@
 
 import Foundation
 
+// MARK: - 格式化金额响应（统计用）
+struct FormattedAmount: Codable {
+    let amount: Double
+    let formatted: String
+}
+
 // MARK: - 基础统计数据
 struct RecordStatistics: Codable {
     let period: String
@@ -19,6 +25,12 @@ struct RecordStatistics: Codable {
     let categoryStats: [String: Decimal]
     let incomeCategoryStats: [String: Decimal]?
     let recordCount: Int
+
+    // 货币格式化字段（后端返回）
+    let baseCurrency: String?
+    let totalIncomeFormatted: String?
+    let totalExpenseFormatted: String?
+    let balanceFormatted: String?
 }
 
 // MARK: - 趋势数据点
@@ -28,6 +40,11 @@ struct TrendDataPoint: Codable, Identifiable {
     let income: Double
     let expense: Double
     let balance: Double
+
+    // 货币格式化字段（后端返回）
+    let incomeFormatted: String?
+    let expenseFormatted: String?
+    let balanceFormatted: String?
 }
 
 // MARK: - 趋势统计
@@ -38,12 +55,21 @@ struct TrendStatistics: Codable {
     let data: [TrendDataPoint]
     let summary: TrendSummary
 
+    // 货币格式化
+    let baseCurrency: String?
+
     struct TrendSummary: Codable {
         let totalIncome: Double
         let totalExpense: Double
         let avgDailyExpense: Double
         let maxExpenseDay: String
         let maxExpenseAmount: Double
+
+        // 货币格式化字段
+        let totalIncomeFormatted: String?
+        let totalExpenseFormatted: String?
+        let avgDailyExpenseFormatted: String?
+        let maxExpenseAmountFormatted: String?
     }
 }
 
@@ -55,6 +81,11 @@ struct ComparisonItem: Codable, Identifiable {
     let previousAmount: Double
     let change: Double
     let changePercent: Double
+
+    // 货币格式化字段
+    let currentAmountFormatted: String?
+    let previousAmountFormatted: String?
+    let changeFormatted: String?
 }
 
 // MARK: - 环比对比统计
@@ -66,11 +97,19 @@ struct ComparisonStatistics: Codable {
     let changes: PeriodChanges
     let categoryComparison: [ComparisonItem]
 
+    // 货币格式化
+    let baseCurrency: String?
+
     struct PeriodStats: Codable {
         let totalIncome: Double
         let totalExpense: Double
         let balance: Double
         let savingsRate: Double
+
+        // 货币格式化字段
+        let totalIncomeFormatted: String?
+        let totalExpenseFormatted: String?
+        let balanceFormatted: String?
     }
 
     struct PeriodChanges: Codable {

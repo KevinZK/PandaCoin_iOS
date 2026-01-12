@@ -131,6 +131,12 @@ struct Holding: Codable, Identifiable, Hashable {
     // 可选的投资账户信息
     let investment: InvestmentInfo?
 
+    // 货币格式化字段（后端返回）
+    let currentPriceFormatted: MoneyResponse?
+    let avgCostPriceFormatted: MoneyResponse?
+    let currentValueFormatted: MoneyResponse?
+    let profitLossFormatted: MoneyResponse?
+
     // 计算属性 - 使用后端计算的值，如果没有则本地计算
     var marketValue: Double {
         if let value = currentValue { return value }
@@ -179,8 +185,11 @@ struct Holding: Codable, Identifiable, Hashable {
         return formatter.string(from: date)
     }
 
-    // 格式化市值显示
+    // 格式化市值显示（优先使用后端格式化）
     var formattedMarketValue: String {
+        if let formatted = currentValueFormatted?.formatted {
+            return formatted
+        }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 2
@@ -188,14 +197,28 @@ struct Holding: Codable, Identifiable, Hashable {
         return formatter.string(from: NSNumber(value: marketValue)) ?? "0.00"
     }
 
-    // 格式化盈亏显示
+    // 格式化盈亏显示（优先使用后端格式化）
     var formattedPnL: String {
+        if let formatted = profitLossFormatted?.formatted {
+            let prefix = unrealizedPnL >= 0 ? "+" : ""
+            return prefix + formatted
+        }
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         formatter.positivePrefix = "+"
         return formatter.string(from: NSNumber(value: unrealizedPnL)) ?? "0.00"
+    }
+
+    // 获取转换后的市值（如有）
+    var convertedMarketValue: String? {
+        currentValueFormatted?.convertedFormatted
+    }
+
+    // 获取转换后的盈亏（如有）
+    var convertedPnL: String? {
+        profitLossFormatted?.convertedFormatted
     }
 
     // 格式化盈亏百分比
@@ -215,6 +238,7 @@ struct Holding: Codable, Identifiable, Hashable {
         case currentPrice, previousClose, priceChange, priceChangePercent
         case lastPriceAt, priceSource, currentValue, profitLoss, profitLossPercent
         case currency, createdAt, updatedAt, investment
+        case currentPriceFormatted, avgCostPriceFormatted, currentValueFormatted, profitLossFormatted
     }
 
     init(from decoder: Decoder) throws {
@@ -265,6 +289,12 @@ struct Holding: Codable, Identifiable, Hashable {
         } else {
             lastPriceAt = try container.decodeIfPresent(Date.self, forKey: .lastPriceAt)
         }
+
+        // 货币格式化字段
+        currentPriceFormatted = try container.decodeIfPresent(MoneyResponse.self, forKey: .currentPriceFormatted)
+        avgCostPriceFormatted = try container.decodeIfPresent(MoneyResponse.self, forKey: .avgCostPriceFormatted)
+        currentValueFormatted = try container.decodeIfPresent(MoneyResponse.self, forKey: .currentValueFormatted)
+        profitLossFormatted = try container.decodeIfPresent(MoneyResponse.self, forKey: .profitLossFormatted)
     }
 }
 
@@ -363,6 +393,13 @@ struct HoldingsSummaryData: Codable {
     let totalValue: Double
     let unrealizedPnL: Double
     let unrealizedPnLPercent: Double
+
+    // 货币格式化字段
+    let cashBalanceFormatted: String?
+    let holdingsMarketValueFormatted: String?
+    let holdingsCostFormatted: String?
+    let totalValueFormatted: String?
+    let unrealizedPnLFormatted: String?
 }
 
 // MARK: - 总持仓汇总
@@ -372,6 +409,12 @@ struct TotalHoldingsSummary: Codable {
     let unrealizedPnL: Double
     let unrealizedPnLPercent: Double
     let holdingsCount: Int
+
+    // 货币格式化字段
+    let baseCurrency: String?
+    let totalMarketValueFormatted: String?
+    let totalCostFormatted: String?
+    let unrealizedPnLFormatted: String?
 }
 
 // MARK: - 请求 DTO

@@ -105,7 +105,7 @@ struct Asset: Codable, Identifiable, Hashable {
 
     // 银行卡/账户标识（尾号）
     var cardIdentifier: String?
-    
+
     // 贷款专用字段
     let loanTermMonths: Int?       // 贷款期限(月)
     let interestRate: Double?      // 年利率 (%)
@@ -113,7 +113,10 @@ struct Asset: Codable, Identifiable, Hashable {
     let repaymentDay: Int?         // 还款日 (每月几号)
     let loanStartDate: Date?       // 贷款开始日期
     let institutionName: String?   // 贷款机构
-    
+
+    // 货币格式化字段（后端返回）
+    let balanceFormatted: MoneyResponse?
+
     enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -131,6 +134,7 @@ struct Asset: Codable, Identifiable, Hashable {
         case repaymentDay
         case loanStartDate
         case institutionName
+        case balanceFormatted
     }
     
     init(from decoder: Decoder) throws {
@@ -177,6 +181,9 @@ struct Asset: Codable, Identifiable, Hashable {
         } else {
             loanStartDate = try container.decodeIfPresent(Date.self, forKey: .loanStartDate)
         }
+
+        // 货币格式化字段
+        balanceFormatted = try container.decodeIfPresent(MoneyResponse.self, forKey: .balanceFormatted)
     }
     
     // 是否已删除
@@ -184,15 +191,25 @@ struct Asset: Codable, Identifiable, Hashable {
         deletedAt != nil
     }
 
-    // 格式化余额显示
+    // 格式化余额显示（优先使用后端格式化）
     var formattedBalance: String {
+        // 优先使用后端返回的格式化金额
+        if let formatted = balanceFormatted?.formatted {
+            return formatted
+        }
+        // 降级到本地格式化
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
-        
+
         let number = NSDecimalNumber(decimal: balance)
         return formatter.string(from: number) ?? "0.00"
+    }
+
+    // 获取转换后的余额格式化（如有）
+    var convertedBalance: String? {
+        balanceFormatted?.convertedFormatted
     }
     
     // 格式化月供显示

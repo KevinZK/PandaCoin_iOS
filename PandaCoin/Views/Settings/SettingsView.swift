@@ -14,7 +14,9 @@ struct SettingsView: View {
     @StateObject private var languageManager = LanguageManager.shared
     @StateObject private var authService = AuthService.shared
     @StateObject private var subscriptionService = SubscriptionService.shared
+    @StateObject private var currencyService = CurrencyService.shared
     @State private var showLanguagePicker = false
+    @State private var showCurrencyPicker = false
     @State private var showDeleteAccountAlert = false
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -225,6 +227,29 @@ struct SettingsView: View {
 
             // MARK: - 偏好设置
             Section("偏好设置") {
+                // 货币设置
+                Button(action: { requireAuth("货币设置") { showCurrencyPicker = true } }) {
+                    HStack {
+                        ZStack {
+                            Circle().fill(Color.green.opacity(0.1)).frame(width: 30, height: 30)
+                            Image(systemName: "dollarsign.circle").foregroundColor(.green).font(.system(size: 14))
+                        }
+
+                        Text("基础货币")
+                            .foregroundColor(Theme.text)
+
+                        Spacer()
+
+                        Text(currencyService.currentCurrencyInfo?.displayName ?? "CNY")
+                            .font(.subheadline)
+                            .foregroundColor(Theme.textSecondary)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(Theme.textSecondary.opacity(0.5))
+                    }
+                }
+
                 // 语言设置
                 Button(action: { showLanguagePicker = true }) {
                     HStack {
@@ -323,6 +348,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showLanguagePicker) {
             LanguagePickerView(selectedLanguage: $languageManager.currentLanguage)
+        }
+        .sheet(isPresented: $showCurrencyPicker) {
+            CurrencyPickerView(currencyService: currencyService)
         }
         .sheet(isPresented: $showAutoPayment) {
             NavigationView {
@@ -500,6 +528,68 @@ struct LanguagePickerView: View {
                     Button(L10n.Common.cancel) {
                         dismiss()
                     }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 货币选择器视图
+struct CurrencyPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var currencyService: CurrencyService
+    @State private var selectedCurrency: String = "CNY"
+
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(CurrencyInfo.supportedCurrencies) { currency in
+                    Button(action: {
+                        selectedCurrency = currency.code
+                        currencyService.setBaseCurrency(currency.code)
+                        dismiss()
+                    }) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 8) {
+                                    Text(currency.symbol)
+                                        .font(.title2)
+                                        .frame(width: 30)
+
+                                    VStack(alignment: .leading) {
+                                        Text(currency.nameCn)
+                                            .foregroundColor(Theme.text)
+                                        Text(currency.code)
+                                            .font(.caption)
+                                            .foregroundColor(Theme.textSecondary)
+                                    }
+                                }
+                            }
+
+                            Spacer()
+
+                            if currencyService.baseCurrency == currency.code {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("选择基础货币")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(L10n.Common.cancel) {
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                selectedCurrency = currencyService.baseCurrency
+                // 加载用户货币设置
+                if currencyService.userSettings == nil {
+                    currencyService.loadUserSettings()
                 }
             }
         }
